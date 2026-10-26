@@ -15,6 +15,10 @@ export class InputManager {
     this.onToggleCamera = null;
     this.onResetVehicle = null;
 
+    // Gamepad state
+    this.gamepadIndex = null;
+    this.prevGamepadButtons = {};
+
     // Virtual Touch Joystick
     this.joystickActive = false;
     this.joystickOrigin = { x: 0, y: 0 };
@@ -22,6 +26,7 @@ export class InputManager {
 
     this.bindKeyboard();
     this.bindTouchControls();
+    this.bindGamepad();
   }
 
   bindKeyboard() {
@@ -58,6 +63,35 @@ export class InputManager {
       }
       this.keys[e.code] = false;
     });
+  }
+
+  bindGamepad() {
+    window.addEventListener('gamepadconnected', (e) => {
+      this.gamepadIndex = e.gamepad.index;
+      console.log(`🎮 Gamepad connected at index ${e.gamepad.index}: ${e.gamepad.id}`);
+      const toast = document.getElementById('toast-msg');
+      if (toast) {
+        toast.innerText = `🎮 Gamepad Connected: ${e.gamepad.id.substring(0, 24)}...`;
+        toast.classList.add('visible');
+        setTimeout(() => toast.classList.remove('visible'), 3000);
+      }
+    });
+
+    window.addEventListener('gamepaddisconnected', (e) => {
+      if (this.gamepadIndex === e.gamepad.index) {
+        this.gamepadIndex = null;
+      }
+    });
+  }
+
+  pollGamepad() {
+    if (!navigator.getGamepads) return null;
+    const gamepads = navigator.getGamepads();
+    for (let i = 0; i < gamepads.length; i++) {
+      const gp = gamepads[i];
+      if (gp && gp.connected) return gp;
+    }
+    return null;
   }
 
   bindTouchControls() {
@@ -157,26 +191,92 @@ export class InputManager {
     let t = 0;
     let b = 0;
     let s = 0;
+    let handbrakeActive = false;
 
-    // Acceleration & Braking
+    // 1. Keyboard Inputs
     if (this.keys['KeyW'] || this.keys['ArrowUp'] || this.btnGas) t += 1;
     if (this.keys['KeyS'] || this.keys['ArrowDown'] || this.btnBrake) b += 1;
 
-    // Steering (Left turns Left, Right turns Right)
+    // Steering (A/Left = Left, D/Right = Right)
     if (this.keys['KeyA'] || this.keys['ArrowLeft']) s += 1;
     if (this.keys['KeyD'] || this.keys['ArrowRight']) s -= 1;
 
-    // Virtual Joystick
+    if (this.keys['Space'] || this.btnDrift) handbrakeActive = true;
+
+    // 2. Touch Joystick Input
     if (this.joystickActive) {
       s -= this.joystickPos.x;
       if (this.joystickPos.y < -0.15) t += -this.joystickPos.y;
       if (this.joystickPos.y > 0.15) b += this.joystickPos.y;
     }
 
+    // 3. HTML5 Gamepad Input (Xbox, PlayStation, etc.)
+    const gp = this.pollGamepad();
+    if (gp) {
+      // Analog Steering (Left Stick X, with 0.12 deadzone)
+      const stickX = gp.axes[0] || 0;
+      if (Math.abs(stickX) > 0.12) {
+        // Swap sign to match: left stick tilts left
+        s -= stickX;
+      }
+
+      // D-Pad Steering
+      if (gp.buttons[14] && gp.buttons[14].pressed) s += 1; // D-pad Left
+      if (gp.buttons[15] && gp.buttons[15].pressed) s -= 1; // D-pad Right
+
+      // Triggers for Gas & Brake
+      // Right Trigger (buttons[7]): Analog Throttle
+      if (gp.buttons[7]) {
+        t = Math.max(t, gp.buttons[7].value);
+      }
+      // Left Trigger (buttons[6]): Analog Brake
+      if (gp.buttons[6]) {
+        b = Math.max(b, gp.buttons[6].value);
+      }
+
+      // Face Buttons & D-Pad
+      if (gp.buttons[12] && gp.buttons[12].pressed) t = 1.0; // D-pad Up
+      if (gp.buttons[13] && gp.buttons[13].pressed) b = 1.0; // D-pad Down
+
+      // Handbrake Drift: B (buttons[1]), X (buttons[2]), or Right Bumper (buttons[5])
+      if ((gp.buttons[1] && gp.buttons[1].pressed) ||
+          (gp.buttons[2] && gp.buttons[2].pressed) ||
+          (gp.buttons[5] && gp.buttons[5].pressed)) {
+        handbrakeActive = true;
+      }
+
+      // Deliver action: Button A (buttons[0])
+      const btnAPressed = gp.buttons[0] && gp.buttons[0].pressed;
+      if (btnAPressed && !this.prevGamepadButtons[0]) {
+        if (this.onActionDeliver) this.onActionDeliver();
+      }
+      this.prevGamepadButtons[0] = btnAPressed;
+
+      // Toggle Camera: Button Y (buttons[3])
+      const btnYPressed = gp.buttons[3] && gp.buttons[3].pressed;
+      if (btnYPressed && !this.prevGamepadButtons[3]) {
+        if (this.onToggleCamera) this.onToggleCamera();
+      }
+      this.prevGamepadButtons[3] = btnYPressed;
+
+      // Reset Van: Start Button (buttons[9])
+      const btnStartPressed = gp.buttons[9] && gp.buttons[9].pressed;
+      if (btnStartPressed && !this.prevGamepadButtons[9]) {
+        if (this.onResetVehicle) this.onResetVehicle();
+      }
+      this.prevGamepadButtons[9] = btnStartPressed;
+
+      // Doors: Left Bumper (buttons[4])
+      const btnLBPressed = gp.buttons[4] && gp.buttons[4].pressed;
+      if (btnLBPressed && !this.prevGamepadButtons[4]) {
+        if (this.onToggleSideDoor) this.onToggleSideDoor();
+      }
+      this.prevGamepadButtons[4] = btnLBPressed;
+    }
+
     this.throttle = Math.min(1.0, Math.max(0.0, t));
     this.brake = Math.min(1.0, Math.max(0.0, b));
     this.steer = Math.min(1.0, Math.max(-1.0, s));
-    // Space bar is strictly Handbrake
-    this.handbrake = Boolean(this.keys['Space'] || this.btnDrift);
+    this.handbrake = handbrakeActive;
   }
 }

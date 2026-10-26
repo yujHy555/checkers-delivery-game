@@ -31,7 +31,7 @@ export class VanModel {
     const tireTex = TextureGenerator.createTireTexture();
     const rimTex = TextureGenerator.createWheelRimTexture();
 
-    // Chassis Group (responds to dynamic suspension pitch, roll, and bump)
+    // Chassis Group (Base at axle height y = 0.35, responds to pitch/roll)
     this.chassisGroup = new THREE.Group();
     this.chassisGroup.position.y = 0.35;
     this.root.add(this.chassisGroup);
@@ -189,7 +189,7 @@ export class VanModel {
     this.chassisGroup.add(this.cargoBed);
     this.createCargoBags();
 
-    // 3. FOUR ALL-TERRAIN WHEELS
+    // 3. FOUR ALL-TERRAIN WHEELS (Radius = 0.35, Center at y = 0.35, Bottom touches y = 0.00 exactly!)
     this.wheels = [];
     const wheelPositions = [
       { id: 'FL', x: -0.68, z: 1.05, isFront: true },
@@ -208,12 +208,13 @@ export class VanModel {
 
     for (const wp of wheelPositions) {
       const steerPivot = new THREE.Group();
-      steerPivot.position.set(wp.x, 0.35, wp.z);
+      steerPivot.position.set(wp.x, 0.35, wp.z); // Wheel center at y = 0.35 above ground
 
       const spinGroup = new THREE.Group();
       const tireMesh = new THREE.Mesh(tireGeo, tireMat);
       const rimMesh = new THREE.Mesh(rimGeo, rimMat);
       tireMesh.castShadow = true;
+      rimMesh.castShadow = true;
 
       spinGroup.add(tireMesh, rimMesh);
       steerPivot.add(spinGroup);
@@ -257,17 +258,17 @@ export class VanModel {
   }
 
   update(dt, vehiclePhysics) {
-    // 1. Sync Root position & Heading with Physics
+    // 1. Root position sits directly at the ground contact elevation
     this.root.position.copy(vehiclePhysics.position);
     this.root.rotation.y = vehiclePhysics.heading;
 
-    // 2. Chassis Pitch, Roll, and Landing compression
+    // 2. Chassis Pitch, Roll, and subtle Suspension bump
     this.chassisGroup.position.y = 0.35 - vehiclePhysics.suspensionCompress;
     this.chassisGroup.rotation.x = vehiclePhysics.visualPitch;
     this.chassisGroup.rotation.z = vehiclePhysics.visualRoll;
 
     // 3. Wheel Spin & Steering
-    const rollDelta = (vehiclePhysics.speed / vehiclePhysics.wheelRadius) * dt;
+    const rollDelta = (vehiclePhysics.speed / 0.35) * dt;
 
     for (const w of this.wheels) {
       w.spinGroup.rotation.x += rollDelta;
@@ -278,7 +279,7 @@ export class VanModel {
 
     // 4. Cockpit Steering Wheel
     if (this.steeringWheelPivot) {
-      this.steeringWheelPivot.rotation.z = -vehiclePhysics.steerAngle * 2.8;
+      this.steeringWheelPivot.rotation.z = -vehiclePhysics.steerAngle * 2.5;
     }
 
     // 5. Brake Lights

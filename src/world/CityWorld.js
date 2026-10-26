@@ -26,7 +26,7 @@ export class CityWorld {
     // 2. Road Network
     this.buildRoads();
 
-    // 3. SOLID DOUBLE-SIDED 3D JUMP RAMPS (Drive smoothly up and down from both sides)
+    // 3. SOLID DOUBLE-SIDED 3D JUMP RAMPS (NO RAILINGS, clean open geometry)
     this.buildDoubleSidedRamps();
 
     // 4. Slalom Cones Area
@@ -100,7 +100,7 @@ export class CityWorld {
   }
 
   buildDoubleSidedRamps() {
-    // Solid simple untextured matte material (clean vibrant amber)
+    // Solid simple untextured matte material (clean vibrant amber, NO railings)
     const rampMat = new THREE.MeshStandardMaterial({
       color: 0xff8f00,
       roughness: 0.5,
@@ -108,17 +108,8 @@ export class CityWorld {
       side: THREE.DoubleSide
     });
 
-    const sideMat = new THREE.MeshStandardMaterial({
-      color: 0x37474f,
-      roughness: 0.6,
-      side: THREE.DoubleSide
-    });
-
-    // Creates a DOUBLE-SIDED A-FRAME RAMP:
-    // Slopes up from -depth/2 to center apex (0, height, 0), then slopes down to +depth/2!
-    // Van can drive smoothly up and down from BOTH directions or launch at speed.
+    // Creates an airtight, solid double-sided A-Frame wedge WITHOUT any railings
     const createDoubleSidedRampMesh = (w, d, h) => {
-      const group = new THREE.Group();
       const hw = w / 2;
       const hd = d / 2;
 
@@ -138,11 +129,11 @@ export class CityWorld {
         -hw, 0, -hd,   hw, 0, hd,    hw, 0, -hd,
         -hw, 0, -hd,  -hw, 0, hd,    hw, 0, hd,
 
-        // Face 4: Left Side Triangular Gable (2 triangles forming peak)
+        // Face 4: Left Side Triangular Gable (Solid side wall)
         -hw, 0, -hd,  -hw, h, 0,    -hw, 0, 0,
         -hw, 0, 0,    -hw, h, 0,    -hw, 0, hd,
 
-        // Face 5: Right Side Triangular Gable
+        // Face 5: Right Side Triangular Gable (Solid side wall)
         hw, 0, -hd,   hw, 0, 0,     hw, h, 0,
         hw, 0, 0,     hw, 0, hd,    hw, h, 0
       ]);
@@ -154,35 +145,7 @@ export class CityWorld {
       const mesh = new THREE.Mesh(geo, rampMat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      group.add(mesh);
-
-      // Side Guard Rails
-      const railGeoL = new THREE.BoxGeometry(0.16, 0.4, Math.hypot(hd, h));
-      const railSouthL = new THREE.Mesh(railGeoL, sideMat);
-      railSouthL.position.set(-hw, h / 2 + 0.2, -hd / 2);
-      railSouthL.rotation.x = -Math.atan2(h, hd);
-      railSouthL.castShadow = true;
-      group.add(railSouthL);
-
-      const railNorthL = new THREE.Mesh(railGeoL, sideMat);
-      railNorthL.position.set(-hw, h / 2 + 0.2, hd / 2);
-      railNorthL.rotation.x = Math.atan2(h, hd);
-      railNorthL.castShadow = true;
-      group.add(railNorthL);
-
-      const railSouthR = new THREE.Mesh(railGeoL, sideMat);
-      railSouthR.position.set(hw, h / 2 + 0.2, -hd / 2);
-      railSouthR.rotation.x = -Math.atan2(h, hd);
-      railSouthR.castShadow = true;
-      group.add(railSouthR);
-
-      const railNorthR = new THREE.Mesh(railGeoL, sideMat);
-      railNorthR.position.set(hw, h / 2 + 0.2, hd / 2);
-      railNorthR.rotation.x = Math.atan2(h, hd);
-      railNorthR.castShadow = true;
-      group.add(railNorthR);
-
-      return group;
+      return mesh;
     };
 
     const addDoubleSidedRamp = (x, z, w, d, h, angleY = 0) => {
@@ -191,7 +154,7 @@ export class CityWorld {
       rampMesh.rotation.y = angleY;
       this.scene.add(rampMesh);
 
-      // Register double-sided collision ramp
+      // Register double-sided collision ramp with solid sides
       this.colliders.push({
         type: 'ramp',
         isDoubleSided: true,

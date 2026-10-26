@@ -9,11 +9,10 @@ export class ArcadeVehicle {
     this.width = 1.5;
     this.height = 1.9;
     this.wheelRadius = 0.35;
-    this.rideHeight = 0.35; // EXACT: tires touch the asphalt at y = 0.00!
     this.wheelBaseHalf = 1.05; // front & rear axle distance
 
-    // Position & Orientation
-    this.position = new THREE.Vector3(options.x || 0, this.rideHeight, options.z || -40);
+    // Position represents the road contact ground elevation (0.00 on flat road)
+    this.position = new THREE.Vector3(options.x || 0, 0, options.z || -40);
     this.velocity = new THREE.Vector3();
     this.heading = options.heading || 0;
     this.pitch = 0;
@@ -25,18 +24,17 @@ export class ArcadeVehicle {
     this.visualPitch = 0;
     this.suspensionCompress = 0;
 
-    // Arcade Driving Parameters (High Agility & Punchy Feel)
+    // AAA Progressive Driving Parameters
     this.maxSpeed = 38.0; // ~137 km/h
-    this.reverseMaxSpeed = 14.0;
-    this.accelRate = 38.0; // Responsive instant pickup
-    this.brakeRate = 60.0; // Sharp brakes
-    this.dragCoeff = 0.982;
+    this.reverseMaxSpeed = 12.0;
+    this.baseAccelRate = 22.0; // Progressive smooth acceleration (no sudden jerk)
+    this.brakeRate = 50.0; // Responsive clean brakes
+    this.dragCoeff = 0.984;
 
-    // Steering (High Maneuverability)
+    // Speed-Sensitive Steering (Stable at high speeds, agile at low speeds)
     this.steerInput = 0;
     this.steerAngle = 0;
-    this.maxSteerAngle = THREE.MathUtils.degToRad(38); // 38 deg sharp turning
-    this.steerResponse = 20.0; // Fast steering response
+    this.steerResponse = 15.0;
 
     // Grip & Drift
     this.isDrifting = false;
@@ -76,7 +74,7 @@ export class ArcadeVehicle {
     this.skidMaterial = new THREE.MeshBasicMaterial({
       color: 0x111111,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.82,
       depthWrite: false,
       side: THREE.DoubleSide
     });
@@ -149,16 +147,22 @@ export class ArcadeVehicle {
     const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     const right = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-    // 2. STEERING INPUT (High maneuverability)
-    this.steerInput = THREE.MathUtils.lerp(this.steerInput, input.steer, this.steerResponse * dt);
-    this.steerAngle = this.steerInput * this.maxSteerAngle;
-
     // Forward and Lateral speeds
     this.speed = this.velocity.dot(forward);
     this.lateralVelocity = this.velocity.dot(right);
     this.slipSpeed = Math.abs(this.lateralVelocity);
+    const absSpeed = Math.abs(this.speed);
 
-    this.isBrakingHard = input.brake > 0.35 && Math.abs(this.speed) > 2.5;
+    // 2. SPEED-SENSITIVE STEERING ANGLE
+    // Sharp at low speed (32 deg), smoothly tightens at high speed (13 deg) for rock-solid stability!
+    const speedRatio = Math.min(1.0, absSpeed / 28.0);
+    const maxSteerDeg = THREE.MathUtils.lerp(32.0, 13.0, speedRatio);
+    const dynamicMaxSteer = THREE.MathUtils.degToRad(maxSteerDeg);
+
+    this.steerInput = THREE.MathUtils.lerp(this.steerInput, input.steer, this.steerResponse * dt);
+    this.steerAngle = this.steerInput * dynamicMaxSteer;
+
+    this.isBrakingHard = input.brake > 0.35 && absSpeed > 2.5;
 
     // 3. TWO-POINT AXLE GROUND SAMPLING (Front Axle & Rear Axle)
     const frontPos = this.position.clone().addScaledVector(forward, this.wheelBaseHalf);
@@ -168,56 +172,48 @@ export class ArcadeVehicle {
     const rearGround = this.samplePointGround(rearPos.x, rearPos.z);
     const centerGround = this.samplePointGround(this.position.x, this.position.z);
 
-    // Height calculation: car follows ground profile underneath wheels
-    const groundElevation = Math.max(
+    // Ground elevation: where the wheels make contact with the road/ramp surface
+    const targetGroundY = Math.max(
       centerGround.height,
       (frontGround.height + rearGround.height) / 2
     );
-    const targetGroundY = groundElevation + this.rideHeight;
 
-    // CRITICAL FIX: In Three.js, NEGATIVE rotation around X tilts nose UP!
-    // When front is higher than rear (climbing), pitch must be NEGATIVE!
-    // When front is lower than rear (descending), pitch must be POSITIVE!
+    // Negative rotation around X tilts nose UP, positive tilts nose DOWN
     const slopeAngle = Math.atan2(frontGround.height - rearGround.height, this.wheelBaseHalf * 2);
     const targetPitch = -slopeAngle;
 
     const isOnRamp = frontGround.isOnRamp || rearGround.isOnRamp || centerGround.isOnRamp;
 
-    // 4. VERTICAL DYNAMICS & JUMP LANDING (ZERO UNWANTED BOUNCE)
-    if (this.position.y <= targetGroundY + 0.12) {
-      // ON GROUND OR ON RAMP
+    // 4. VERTICAL DYNAMICS & JUMP LANDING (FIRM, ZERO BOUNCE)
+    if (this.position.y <= targetGroundY + 0.08) {
       if (this.isAirborne) {
-        // Just landed! SOLID FIRM LANDING (ZERO BOUNCING)
+        // Firm landing, instantly zero vertical bounce
         this.isAirborne = false;
         this.airTime = 0;
-        this.velocity.y = 0; // Kills vertical velocity immediately
-        this.suspensionCompress = 0.04; // Very subtle 4cm visual squish
+        this.velocity.y = 0;
+        this.suspensionCompress = 0.03;
         if (window.gameApp && window.gameApp.audio) {
           window.gameApp.audio.playJumpLand();
         }
       }
 
-      // Hard floor clamp: car can NEVER penetrate below ground/ramp!
+      // Hard clamp: car sits directly on ground surface
       this.position.y = Math.max(targetGroundY, this.position.y);
       this.pitch = THREE.MathUtils.lerp(this.pitch, targetPitch, 20.0 * dt);
 
       if (isOnRamp) {
-        // Driving on double-sided ramp
         const isClimbing = frontGround.height >= rearGround.height;
         if (isClimbing && this.speed > 2.0) {
           this.wasClimbingRamp = true;
-          // Upward velocity while climbing
           this.velocity.y = Math.sin(slopeAngle) * this.speed;
         } else {
-          // Descending down other side smoothly
           this.velocity.y = 0;
         }
 
         // Launch over crest at speed
         if (this.wasClimbingRamp && this.speed > 7.0 && rearGround.height > frontGround.height) {
-          // Crossing over the peak at speed -> launches into the air!
           this.isAirborne = true;
-          this.velocity.y = this.speed * 0.42;
+          this.velocity.y = this.speed * 0.40;
           this.wasClimbingRamp = false;
         }
       } else {
@@ -225,33 +221,34 @@ export class ArcadeVehicle {
         this.velocity.y = 0;
       }
 
-      // Strong downforce keeps car glued to asphalt
-      const downforce = (Math.abs(this.speed) / this.maxSpeed) * 12.0;
+      // Aerodynamic downforce
+      const downforce = (absSpeed / this.maxSpeed) * 12.0;
       this.velocity.y -= downforce * dt;
 
     } else {
-      // AIRBORNE / JUMPING
+      // AIRBORNE
       this.isAirborne = true;
       this.airTime += dt;
       this.velocity.y -= this.gravity * dt;
 
-      // Hard floor constraint while airborne: can never drop below ramp surface
+      // Cannot drop below ramp/ground floor
       if (this.position.y < targetGroundY) {
         this.position.y = targetGroundY;
         this.velocity.y = 0;
         this.isAirborne = false;
-        this.suspensionCompress = 0.04;
+        this.suspensionCompress = 0.03;
       }
 
-      // Smoothly level pitch while in the air
       this.pitch = THREE.MathUtils.lerp(this.pitch, 0, 3.5 * dt);
     }
 
-    // 5. ACCELERATION & BRAKING (High Maneuverability)
+    // 5. PROGRESSIVE ACCELERATION & BRAKING (AAA Tuning)
     if (!this.isAirborne) {
       if (input.throttle > 0) {
         if (this.speed < this.maxSpeed) {
-          const accel = input.throttle * this.accelRate;
+          // Smooth progressive torque: builds up naturally
+          const speedFactorTorque = Math.max(0.35, 1.0 - (this.speed / this.maxSpeed) * 0.65);
+          const accel = input.throttle * this.baseAccelRate * speedFactorTorque;
           this.velocity.addScaledVector(forward, accel * dt);
         }
       } else if (input.brake > 0) {
@@ -259,9 +256,9 @@ export class ArcadeVehicle {
           const brake = input.brake * this.brakeRate;
           this.velocity.addScaledVector(forward, -brake * dt);
         } else {
-          // Instant reverse from stop
+          // Smooth reverse
           if (this.speed > -this.reverseMaxSpeed) {
-            this.velocity.addScaledVector(forward, -input.brake * (this.accelRate * 0.7) * dt);
+            this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.6) * dt);
           }
         }
       } else {
@@ -272,54 +269,53 @@ export class ArcadeVehicle {
       if (input.handbrake) {
         this.isDrifting = true;
         this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 16.0 * dt);
-        this.velocity.multiplyScalar(Math.pow(0.96, dt * 30.0));
+        this.velocity.multiplyScalar(Math.pow(0.965, dt * 30.0));
       } else {
         this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 8.0 * dt);
         if (this.driftFactor < 0.08) this.isDrifting = false;
       }
 
-      // High lateral grip for agile maneuvering
-      const gripRate = THREE.MathUtils.lerp(42.0, 5.5, this.driftFactor);
+      // High lateral grip prevents sliding on straightaways
+      const gripRate = THREE.MathUtils.lerp(45.0, 5.5, this.driftFactor);
       const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
       this.velocity.addScaledVector(right, lateralDecel);
 
-      // 7. STEERING & YAW (NO ROTATION WHEN STOPPED)
-      const absSpeed = Math.abs(this.speed);
-      let speedFactor = 0;
+      // 7. YAW STEERING (NO ROTATION WHEN STOPPED)
+      let turnFactor = 0;
       if (absSpeed > 0.35) {
-        // High agility: full steering authority reached quickly
-        speedFactor = Math.min(1.0, (absSpeed - 0.35) / 4.5);
+        turnFactor = Math.min(1.0, (absSpeed - 0.35) / 5.0);
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
-      const driftBonus = this.isDrifting ? 1.85 : 1.0;
+      const driftBonus = this.isDrifting ? 1.75 : 1.0;
 
-      // Agile yaw rate (3.6)
-      const targetYawRate = this.steerInput * speedFactor * dirSign * 3.6 * driftBonus;
-      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 18.0 * dt);
+      // Speed-attenuated yaw rate: stable at high speeds!
+      const highSpeedDamp = THREE.MathUtils.lerp(3.2, 1.8, speedRatio);
+      const targetYawRate = this.steerInput * turnFactor * dirSign * highSpeedDamp * driftBonus;
+
+      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 16.0 * dt);
       this.heading += this.angularVelocity * dt;
 
     } else {
-      this.heading += this.steerInput * 0.4 * dt;
+      this.heading += this.steerInput * 0.35 * dt;
     }
 
     // 8. INTEGRATE POSITION
     this.position.addScaledVector(this.velocity, dt);
 
-    // 9. OBSTACLE COLLISIONS
+    // 9. OBSTACLE & RAMP SIDE COLLISIONS
     this.resolveCollisions();
 
-    // 10. VISUAL CHASSIS LEAN (Subtle, critically damped, ZERO bounce)
-    const targetRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.014), -0.04, 0.04);
+    // 10. VISUAL CHASSIS LEAN (Subtle & critically damped)
+    const targetRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.012), -0.035, 0.035);
     const targetPitchVisual = THREE.MathUtils.clamp(
-      this.pitch - (input.throttle - input.brake) * 0.025,
+      this.pitch - (input.throttle - input.brake) * 0.02,
       -0.45,
       0.45
     );
 
     this.visualRoll = THREE.MathUtils.lerp(this.visualRoll, targetRoll, 14.0 * dt);
     this.visualPitch = THREE.MathUtils.lerp(this.visualPitch, targetPitchVisual, 16.0 * dt);
-    // Instant settling of landing suspension squish (ZERO BOUNCING)
     this.suspensionCompress = THREE.MathUtils.lerp(this.suspensionCompress, 0, 24.0 * dt);
 
     // 11. ACCURATE SKID MARKS & SMOKE
@@ -341,7 +337,6 @@ export class ArcadeVehicle {
         const hd = c.depth / 2;
 
         if (Math.abs(localX) <= hw && localZ >= -hd && localZ <= hd) {
-          // Double-Sided Ramp: peak height at center localZ = 0, slopes down to 0 at ±hd
           const distFromPeak = Math.abs(localZ);
           const progress = Math.max(0, 1.0 - (distFromPeak / hd));
           const h = progress * c.height;
@@ -388,6 +383,43 @@ export class ArcadeVehicle {
             this.velocity.multiplyScalar(0.75);
           }
         }
+      } else if (c.type === 'ramp') {
+        // SOLID RAMP SIDE COLLISION: Prevent van from passing through triangular sides of ramp!
+        const cosA = Math.cos(-c.angleY);
+        const sinA = Math.sin(-c.angleY);
+        const localX = (this.position.x - c.x) * cosA - (this.position.z - c.z) * sinA;
+        const localZ = (this.position.x - c.x) * sinA + (this.position.z - c.z) * cosA;
+
+        const hw = c.width / 2;
+        const hd = c.depth / 2;
+
+        if (localZ >= -hd && localZ <= hd) {
+          // Height of ramp at this local Z
+          const distFromPeak = Math.abs(localZ);
+          const rampH = Math.max(0, 1.0 - (distFromPeak / hd)) * c.height;
+
+          // If car is lower than the ramp slope edge, treat the side as a solid concrete wall!
+          if (this.position.y < rampH + 0.3) {
+            // Check left side collision
+            if (localX < 0 && localX > -hw - carRadius) {
+              const overlap = (hw + carRadius) - Math.abs(localX);
+              const worldNormX = -Math.cos(c.angleY);
+              const worldNormZ = Math.sin(c.angleY);
+              this.position.x += worldNormX * overlap;
+              this.position.z += worldNormZ * overlap;
+              this.velocity.multiplyScalar(0.7);
+            }
+            // Check right side collision
+            else if (localX > 0 && localX < hw + carRadius) {
+              const overlap = (hw + carRadius) - localX;
+              const worldNormX = Math.cos(c.angleY);
+              const worldNormZ = -Math.sin(c.angleY);
+              this.position.x += worldNormX * overlap;
+              this.position.z += worldNormZ * overlap;
+              this.velocity.multiplyScalar(0.7);
+            }
+          }
+        }
       }
     }
   }
@@ -397,7 +429,8 @@ export class ArcadeVehicle {
     const isDriftSkid = !this.isAirborne && (this.isDrifting || this.slipSpeed > 3.0);
     const isSkidding = isBrakingSkid || isDriftSkid;
 
-    const groundY = this.position.y - this.rideHeight + 0.02;
+    // Contact elevation right on the road/ramp surface
+    const groundY = this.position.y + 0.015;
 
     const rlPos = this.position.clone()
       .addScaledVector(forward, -1.05)
@@ -464,7 +497,7 @@ export class ArcadeVehicle {
 
     const positions = this.skidGeometry.attributes.position.array;
     let pIdx = 0;
-    const w = 0.14; // tire track width
+    const w = 0.14;
 
     for (let i = 0; i < count - 1; i++) {
       const i3 = i * 3;
@@ -476,7 +509,6 @@ export class ArcadeVehicle {
       const rx1 = this.skidHistoryR[i3], ry1 = this.skidHistoryR[i3 + 1], rz1 = this.skidHistoryR[i3 + 2];
       const rx2 = this.skidHistoryR[ni3], ry2 = this.skidHistoryR[ni3 + 1], rz2 = this.skidHistoryR[ni3 + 2];
 
-      // Left tire quad
       positions[pIdx++] = lx1 - w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
       positions[pIdx++] = lx1 + w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
       positions[pIdx++] = lx2 - w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
@@ -485,7 +517,6 @@ export class ArcadeVehicle {
       positions[pIdx++] = lx2 + w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
       positions[pIdx++] = lx2 - w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
 
-      // Right tire quad
       positions[pIdx++] = rx1 - w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
       positions[pIdx++] = rx1 + w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
       positions[pIdx++] = rx2 - w; positions[pIdx++] = ry2; positions[pIdx++] = rz2;
@@ -500,7 +531,7 @@ export class ArcadeVehicle {
   }
 
   reset(x = 0, z = -40, heading = 0) {
-    this.position.set(x, this.rideHeight, z);
+    this.position.set(x, 0, z);
     this.velocity.set(0, 0, 0);
     this.heading = heading;
     this.pitch = 0;
