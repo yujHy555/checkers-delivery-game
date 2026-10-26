@@ -26,22 +26,36 @@ export class InputManager {
 
   bindKeyboard() {
     window.addEventListener('keydown', (e) => {
+      // Spacebar MUST ONLY handbrake turn, NEVER click focused UI buttons or scroll
+      if (e.code === 'Space') {
+        e.preventDefault();
+      }
+
       this.keys[e.code] = true;
 
-      if (e.code === 'KeyG') {
-        if (this.onToggleRearDoors) this.onToggleRearDoors();
-      } else if (e.code === 'KeyH') {
-        if (this.onToggleSideDoor) this.onToggleSideDoor();
-      } else if (e.code === 'KeyC') {
+      // Blur any accidentally focused DOM element
+      if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+      }
+
+      // Explicit camera toggle only via C key
+      if (e.code === 'KeyC') {
         if (this.onToggleCamera) this.onToggleCamera();
       } else if (e.code === 'KeyR') {
         if (this.onResetVehicle) this.onResetVehicle();
+      } else if (e.code === 'KeyG') {
+        if (this.onToggleRearDoors) this.onToggleRearDoors();
+      } else if (e.code === 'KeyH') {
+        if (this.onToggleSideDoor) this.onToggleSideDoor();
       } else if (e.code === 'Enter' || e.code === 'KeyQ' || e.code === 'KeyE') {
         if (this.onActionDeliver) this.onActionDeliver();
       }
     });
 
     window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+      }
       this.keys[e.code] = false;
     });
   }
@@ -130,10 +144,12 @@ export class InputManager {
     el.addEventListener('click', (e) => {
       e.preventDefault();
       callback();
+      el.blur();
     });
     el.addEventListener('touchstart', (e) => {
       e.preventDefault();
       callback();
+      el.blur();
     }, { passive: false });
   }
 
@@ -146,13 +162,11 @@ export class InputManager {
     if (this.keys['KeyW'] || this.keys['ArrowUp'] || this.btnGas) t += 1;
     if (this.keys['KeyS'] || this.keys['ArrowDown'] || this.btnBrake) b += 1;
 
-    // STEERING DIRECTION (SWAPPED as requested by user)
-    // Pressing KeyA / ArrowLeft turns vehicle to user's intended Left
-    // Pressing KeyD / ArrowRight turns vehicle to user's intended Right
+    // Steering (Left turns Left, Right turns Right)
     if (this.keys['KeyA'] || this.keys['ArrowLeft']) s += 1;
     if (this.keys['KeyD'] || this.keys['ArrowRight']) s -= 1;
 
-    // Virtual Joystick (Swapped horizontally to match)
+    // Virtual Joystick
     if (this.joystickActive) {
       s -= this.joystickPos.x;
       if (this.joystickPos.y < -0.15) t += -this.joystickPos.y;
@@ -162,6 +176,7 @@ export class InputManager {
     this.throttle = Math.min(1.0, Math.max(0.0, t));
     this.brake = Math.min(1.0, Math.max(0.0, b));
     this.steer = Math.min(1.0, Math.max(-1.0, s));
+    // Space bar is strictly Handbrake
     this.handbrake = Boolean(this.keys['Space'] || this.btnDrift);
   }
 }

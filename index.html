@@ -294,6 +294,7 @@
       gap: 6px;
       pointer-events: auto;
       transition: background 0.15s ease;
+      outline: none;
     }
     .btn-top-action:hover {
       background: rgba(0, 188, 212, 0.45);
@@ -358,6 +359,7 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
       touch-action: none;
       transition: transform 0.1s, background 0.1s;
+      outline: none;
     }
     .touch-btn:active, .touch-btn.active {
       transform: scale(0.92);
@@ -432,7 +434,7 @@
         <span class="order-dist" id="order-dist">45m</span>
       </div>
       <div style="margin-top: 10px; display: flex; gap: 8px;">
-        <button class="btn-top-action" id="btn-cam">📷 3RD CAM</button>
+        <button class="btn-top-action" id="btn-cam" tabindex="-1" onfocus="this.blur()">📷 3RD CAM</button>
       </div>
     </div>
 
@@ -466,11 +468,10 @@
 
   <!-- DESKTOP KEYBOARD CONTROLS BAR -->
   <div id="desktop-keys-bar">
-    <span><b>W / S / Up / Down</b> Drive &bull; Brake</span>
-    <span><b>A / D / Left / Right</b> Steer (Left / Right)</span>
-    <span><b>SPACE</b> Handbrake Drift</span>
+    <span><b>W / S</b> Drive &bull; Brake</span>
+    <span><b>A / D</b> Steer (Left / Right)</span>
+    <span><b>SPACE</b> Handbrake Turn (Drift)</span>
     <span><b>ENTER / E</b> Deliver Groceries</span>
-    <span><b>H / G</b> Doors</span>
     <span><b>C</b> Camera View</span>
     <span><b>R</b> Reset Van</span>
   </div>
@@ -484,12 +485,12 @@
 
     <!-- ACTION BUTTONS -->
     <div class="touch-btn-cluster">
-      <button class="touch-btn btn-gas" id="btn-gas" title="Accelerate">⚡<br>GAS</button>
-      <button class="touch-btn btn-brake" id="btn-brake" title="Brake / Reverse">🛑<br>BRAKE</button>
-      <button class="touch-btn btn-drift" id="btn-drift" style="grid-column: span 2; width: 100%; height: 46px;" title="Drift / Handbrake">
-        💨 HANDBRAKE DRIFT
+      <button class="touch-btn btn-gas" id="btn-gas" tabindex="-1" onfocus="this.blur()" title="Accelerate">⚡<br>GAS</button>
+      <button class="touch-btn btn-brake" id="btn-brake" tabindex="-1" onfocus="this.blur()" title="Brake / Reverse">🛑<br>BRAKE</button>
+      <button class="touch-btn btn-drift" id="btn-drift" tabindex="-1" onfocus="this.blur()" style="grid-column: span 2; width: 100%; height: 46px;" title="Drift / Handbrake">
+        💨 HANDBRAKE TURN
       </button>
-      <button class="touch-btn" id="btn-deliver" style="grid-column: span 2; width: 100%; height: 44px; background: rgba(0, 188, 212, 0.25);" title="Deliver Groceries">
+      <button class="touch-btn" id="btn-deliver" tabindex="-1" onfocus="this.blur()" style="grid-column: span 2; width: 100%; height: 44px; background: rgba(0, 188, 212, 0.25);" title="Deliver Groceries">
         📦 DELIVER BAGS
       </button>
     </div>

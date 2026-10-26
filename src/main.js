@@ -20,7 +20,7 @@ class GameApp {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // AAA soft shadow filtering
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     this.container.appendChild(this.renderer.domElement);
@@ -29,26 +29,26 @@ class GameApp {
     this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
     this.cameraManager = new CameraManager(this.camera, this.renderer.domElement);
 
-    // 3. Directional Lighting with Grounded Shadows
-    this.setupLighting();
-
-    // 4. World Environment with Solid Ramps & Slalom Area
+    // 3. World Environment with Solid Ramps & Slalom Area
     this.world = new CityWorld(this.scene);
 
-    // 5. Arcade Vehicle Physics (Grounded, punchy, responsive)
+    // 4. Arcade Vehicle Physics (Grounded, punchy, high maneuverability)
     this.vehiclePhysics = new ArcadeVehicle(this.scene, { x: 0, y: 0.38, z: -40, heading: 0 });
     this.vehiclePhysics.setColliders(this.world.colliders);
 
-    // 6. Van Model
+    // 5. Van Model
     this.vanModel = new VanModel(this.scene);
+
+    // 6. SINGLE QUALITY AAA SHADOW SETUP
+    this.setupAAAShadow();
 
     // 7. Delivery Mission System
     this.deliverySystem = new DeliverySystem(this.scene, this.world.deliverySpots);
 
-    // 8. Audio Synth (Engine, Skids, and Subtle Brake Squeal)
+    // 8. Audio Synth
     this.audio = new AudioSynth();
 
-    // 9. Input Manager (Swapped steer controls)
+    // 9. Input Manager
     this.input = new InputManager();
 
     // Setup Callbacks
@@ -71,31 +71,39 @@ class GameApp {
     this.animate();
   }
 
-  setupLighting() {
+  setupAAAShadow() {
+    // Ambient fill
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x445566, 0.85);
     hemiLight.position.set(0, 50, 0);
     this.scene.add(hemiLight);
 
-    // Optimized Directional Sun Shadow
-    this.dirLight = new THREE.DirectionalLight(0xfff8e7, 1.5);
-    this.dirLight.position.set(40, 80, 40);
-    this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.width = 2048;
-    this.dirLight.shadow.mapSize.height = 2048;
-    this.dirLight.shadow.camera.near = 0.5;
-    this.dirLight.shadow.camera.far = 250;
-    
-    // Tight shadow frustum around car for maximum ground shadow sharpness
-    this.dirLight.shadow.camera.left = -40;
-    this.dirLight.shadow.camera.right = 40;
-    this.dirLight.shadow.camera.top = 40;
-    this.dirLight.shadow.camera.bottom = -40;
-    this.dirLight.shadow.bias = -0.0006;
-    this.dirLight.shadow.radius = 1.5;
-    this.scene.add(this.dirLight);
-
-    const ambient = new THREE.AmbientLight(0xdcf8ff, 0.4);
+    const ambient = new THREE.AmbientLight(0xdcf8ff, 0.35);
     this.scene.add(ambient);
+
+    // SINGLE QUALITY AAA DIRECTIONAL SHADOW LIGHT
+    this.sunLight = new THREE.DirectionalLight(0xfff8e7, 1.6);
+    this.sunLight.castShadow = true;
+
+    // Ultra-sharp 2048 shadow texture
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
+
+    // Tight 14x14m frustum locked to vehicle for razor-sharp shadow resolution (>140 px/m)
+    const d = 7.0;
+    this.sunLight.shadow.camera.left = -d;
+    this.sunLight.shadow.camera.right = d;
+    this.sunLight.shadow.camera.top = d;
+    this.sunLight.shadow.camera.bottom = -d;
+    this.sunLight.shadow.camera.near = 5.0;
+    this.sunLight.shadow.camera.far = 65.0;
+
+    // Critical bias settings to eliminate both peter-panning and shadow acne
+    this.sunLight.shadow.bias = -0.0001;
+    this.sunLight.shadow.normalBias = 0.02;
+    this.sunLight.shadow.radius = 1.6;
+
+    this.scene.add(this.sunLight);
+    this.scene.add(this.sunLight.target);
   }
 
   setupInputCallbacks() {
@@ -227,19 +235,18 @@ class GameApp {
     // 4. Update Dynamic Camera
     this.cameraManager.update(dt, this.vanModel.root, this.vehiclePhysics);
 
-    // 5. Update Sun Shadow follow position (tight sharp shadow on vehicle)
-    if (this.dirLight) {
-      this.dirLight.position.x = this.vehiclePhysics.position.x + 40;
-      this.dirLight.position.z = this.vehiclePhysics.position.z + 40;
-      this.dirLight.target.position.copy(this.vehiclePhysics.position);
-      this.dirLight.target.updateMatrixWorld();
+    // 5. UPDATE SINGLE QUALITY AAA SHADOW (Locks to vehicle position)
+    const vanPos = this.vanModel.root.position;
+    if (this.sunLight) {
+      this.sunLight.position.set(vanPos.x + 16, vanPos.y + 32, vanPos.z + 14);
+      this.sunLight.target.position.set(vanPos.x, vanPos.y, vanPos.z);
+      this.sunLight.target.updateMatrixWorld();
     }
 
     // 6. Update Delivery System
-    const carPos = this.vanModel.root.position;
-    this.deliverySystem.update(dt, carPos);
+    this.deliverySystem.update(dt, vanPos);
 
-    // 7. Audio Engine, Drift Screech & Subtle Brake Sound
+    // 7. Audio Engine, Drift Screech & Brake Sound
     const kmh = Math.abs(this.vehiclePhysics.speed * 3.6);
     this.audio.updateEngine(this.vehiclePhysics.speed, this.input.throttle, this.vehiclePhysics.maxSpeed);
     this.audio.updateSkid(this.vehiclePhysics.isDrifting || this.vehiclePhysics.slipSpeed > 3.0, this.vehiclePhysics.slipSpeed);
@@ -251,7 +258,7 @@ class GameApp {
 
     const currentTarget = this.deliverySystem.getCurrentSpot();
     if (currentTarget) {
-      const dist = Math.round(carPos.distanceTo(currentTarget.position));
+      const dist = Math.round(vanPos.distanceTo(currentTarget.position));
       if (this.uiOrder) this.uiOrder.innerText = `Order: ${currentTarget.name}`;
       if (this.uiTargetDist) this.uiTargetDist.innerText = `${dist}m away`;
 
@@ -266,7 +273,7 @@ class GameApp {
     }
 
     // 9. Update Minimap
-    this.updateMinimap(carPos, this.vehiclePhysics.heading, currentTarget ? currentTarget.position : null);
+    this.updateMinimap(vanPos, this.vehiclePhysics.heading, currentTarget ? currentTarget.position : null);
 
     // 10. Render Scene
     this.renderer.render(this.scene, this.camera);
