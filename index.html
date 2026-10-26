@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Checkers Hyper Sixty60 - 3D Arcade Van Delivery Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0d161b;
+      font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #ffffff;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* TOP HUD BAR */
+    #hud-top {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .hud-card {
+      background: rgba(14, 25, 33, 0.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 188, 212, 0.4);
+      border-radius: 12px;
+      padding: 10px 18px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+      pointer-events: auto;
+    }
+
+    /* BRAND LOGO */
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-badge {
+      background: #00bcd4;
+      color: #0b1a20;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 14px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+    .brand-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-style: italic;
+      font-size: 20px;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .brand-text span {
+      color: #16b84a;
+    }
+
+    /* OBJECTIVE / ORDER */
+    .order-box {
+      margin-top: 6px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #b2ebf2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .order-dist {
+      background: rgba(255, 179, 0, 0.2);
+      border: 1px solid #ffb300;
+      color: #ffd54f;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    /* RIGHT HUD: SPEEDOMETER & MINIMAP */
+    .right-hud {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .stats-card {
+      text-align: right;
+    }
+    .score-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #80deea;
+      letter-spacing: 1px;
+    }
+    .score-value {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 26px;
+      font-weight: 900;
+      color: #ffd600;
+      line-height: 1.1;
+    }
+    .speedo-wrap {
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .speedo-val {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 32px;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1;
+    }
+    .speedo-unit {
+      font-size: 13px;
+      font-weight: 700;
+      color: #00e5ff;
+    }
+
+    /* MINIMAP RADAR */
+    #minimap {
+      width: 120px;
+      height: 120px;
+      background: rgba(10, 20, 28, 0.9);
+      border: 2px solid #00bcd4;
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 16px rgba(0, 188, 212, 0.3);
+    }
+    #minimap::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(0, 188, 212, 0.25);
+    }
+    #minimap::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: rgba(0, 188, 212, 0.25);
+    }
+    #minimap-player {
+      position: absolute;
+      width: 10px;
+      height: 14px;
+      background: #00e676;
+      border-radius: 2px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 8px #00e676;
+    }
+    #minimap-target {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #ffea00;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px #ffea00;
+      animation: pulseTarget 1s infinite alternate;
+    }
+    @keyframes pulseTarget {
+      from { transform: translate(-50%, -50%) scale(0.8); }
+      to { transform: translate(-50%, -50%) scale(1.3); }
+    }
+
+    /* CENTER CONTEXT PROMPT */
+    #action-prompt {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid #00e5ff;
+      border-radius: 30px;
+      padding: 10px 24px;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 24px rgba(0, 229, 255, 0.4);
+      z-index: 20;
+      display: none;
+      animation: promptBob 1.2s infinite ease-in-out;
+      pointer-events: none;
+    }
+    @keyframes promptBob {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-5px); }
+    }
+    .key-pill {
+      background: #00bcd4;
+      color: #0b1a20;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      padding: 3px 8px;
+      border-radius: 5px;
+      margin: 0 4px;
+      font-size: 13px;
+    }
+
+    /* CELEBRATION BANNER */
+    #celebration-banner {
+      position: absolute;
+      top: 35%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.7);
+      background: rgba(14, 25, 33, 0.95);
+      border: 3px solid #ffeb3b;
+      border-radius: 20px;
+      padding: 24px 44px;
+      text-align: center;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 0 50px rgba(255, 235, 59, 0.5);
+    }
+    #celebration-banner.active {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* TOAST MESSAGE */
+    #toast-msg {
+      position: absolute;
+      top: 110px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(0, 20, 28, 0.92);
+      border-left: 4px solid #16b84a;
+      border-radius: 8px;
+      padding: 10px 22px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      opacity: 0;
+      transition: all 0.25s ease;
+      z-index: 40;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    #toast-msg.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* CONTROLS GUIDE TOP BAR BUTTONS */
+    .btn-top-action {
+      background: rgba(0, 188, 212, 0.2);
+      border: 1px solid #00bcd4;
+      color: #ffffff;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: auto;
+      transition: background 0.15s ease;
+    }
+    .btn-top-action:hover {
+      background: rgba(0, 188, 212, 0.45);
+    }
+
+    /* BOTTOM CONTROLS & MOBILE TOUCH */
+    #touch-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    /* JOYSTICK */
+    #touch-joystick-zone {
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px dashed rgba(0, 188, 212, 0.4);
+      border-radius: 50%;
+      position: relative;
+      pointer-events: auto;
+      touch-action: none;
+    }
+    #touch-joystick-nub {
+      width: 50px;
+      height: 50px;
+      background: #00bcd4;
+      border-radius: 50%;
+      position: absolute;
+      top: 35px;
+      left: 35px;
+      box-shadow: 0 0 14px rgba(0, 188, 212, 0.8);
+      pointer-events: none;
+    }
+
+    /* ACTION BUTTONS GRID */
+    .touch-btn-cluster {
+      display: grid;
+      grid-template-columns: repeat(3, 56px);
+      gap: 10px;
+      pointer-events: auto;
+    }
+    .touch-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: rgba(14, 25, 33, 0.9);
+      border: 2px solid rgba(0, 188, 212, 0.5);
+      color: #ffffff;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      touch-action: none;
+      transition: transform 0.1s, background 0.1s;
+    }
+    .touch-btn:active, .touch-btn.active {
+      transform: scale(0.92);
+      background: #00bcd4;
+      color: #0b1a20;
+    }
+    .touch-btn.btn-gas {
+      background: rgba(22, 184, 74, 0.25);
+      border-color: #16b84a;
+    }
+    .touch-btn.btn-gas:active, .touch-btn.btn-gas.active {
+      background: #16b84a;
+      color: #fff;
+    }
+    .touch-btn.btn-brake {
+      background: rgba(229, 57, 53, 0.25);
+      border-color: #e53935;
+    }
+    .touch-btn.btn-brake:active, .touch-btn.btn-brake.active {
+      background: #e53935;
+      color: #fff;
+    }
+    .touch-btn.btn-drift {
+      background: rgba(255, 179, 0, 0.25);
+      border-color: #ffb300;
+    }
+    .touch-btn.btn-drift:active, .touch-btn.btn-drift.active {
+      background: #ffb300;
+      color: #000;
+    }
+
+    /* MODAL: BLENDER RIGGING & CUSTOM MODELS */
+    #rigging-modal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    #rigging-modal.open {
+      display: flex;
+    }
+    .modal-content {
+      background: #101c24;
+      border: 1px solid #00bcd4;
+      border-radius: 16px;
+      max-width: 780px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 28px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(0, 188, 212, 0.3);
+      padding-bottom: 14px;
+    }
+    .modal-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      color: #00e5ff;
+    }
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: #b0bec5;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .guide-section {
+      margin-bottom: 20px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #cfd8dc;
+    }
+    .guide-section h3 {
+      font-size: 17px;
+      color: #ffd54f;
+      margin-bottom: 8px;
+    }
+    .code-block {
+      background: #091116;
+      border-left: 3px solid #16b84a;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      margin: 8px 0;
+      color: #80cbc4;
+    }
+    .drop-zone-box {
+      border: 2px dashed #00bcd4;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      background: rgba(0, 188, 212, 0.05);
+      cursor: pointer;
+      margin-top: 14px;
+    }
+    .drop-zone-box:hover {
+      background: rgba(0, 188, 212, 0.15);
+    }
+
+    /* KEYBOARD INSTRUCTIONS CHIP BAR */
+    #desktop-keys-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      background: rgba(10, 20, 26, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 30px;
+      padding: 8px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #eceff1;
+      z-index: 10;
+      pointer-events: none;
+    }
+    @media (max-width: 820px) {
+      #desktop-keys-bar {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 3D WEBGL CONTAINER -->
+  <div id="canvas-container"></div>
+
+  <!-- TOP HUD -->
+  <div id="hud-top">
+    <!-- LEFT: BRAND & CURRENT ORDER -->
+    <div class="hud-card">
+      <div class="brand-title">
+        <span class="brand-badge">⚡ SIXTY60</span>
+        <div class="brand-text">Checkers <span>Hyper</span></div>
+      </div>
+      <div class="order-box">
+        <span id="order-title">Order: Palm Villa</span>
+        <span class="order-dist" id="order-dist">45m</span>
+      </div>
+      <div style="margin-top: 10px; display: flex; gap: 8px;">
+        <button class="btn-top-action" id="btn-cam">📷 ISO CAM</button>
+        <button class="btn-top-action" id="btn-guide">🎨 Blender Rig Guide / Upload</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: SCORE, SPEEDOMETER & MINIMAP -->
+    <div class="right-hud">
+      <div class="hud-card stats-card">
+        <div class="score-label">Delivery Score</div>
+        <div class="score-value" id="score-value">0</div>
+        <div class="speedo-wrap">
+          <div class="speedo-val" id="speed-value">0</div>
+          <div class="speedo-unit">KM/H</div>
+        </div>
+      </div>
+
+      <!-- MINIMAP RADAR -->
+      <div id="minimap">
+        <div id="minimap-player"></div>
+        <div id="minimap-target"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DYNAMIC ACTION PROMPT -->
+  <div id="action-prompt"></div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast-msg"></div>
+
+  <!-- CELEBRATION MODAL BANNER -->
+  <div id="celebration-banner"></div>
+
+  <!-- DESKTOP KEYBOARD CONTROLS BAR -->
+  <div id="desktop-keys-bar">
+    <span><b>WASD / Arrows</b> Drive &bull; Walk</span>
+    <span><b>SPACE</b> Handbrake Drift</span>
+    <span><b>E / F</b> Enter/Exit Van</span>
+    <span><b>G</b> Rear Doors</span>
+    <span><b>H</b> Side Slide Door</span>
+    <span><b>ENTER / Q</b> Deliver Bag</span>
+    <span><b>C</b> Camera View</span>
+    <span><b>R</b> Reset Van</span>
+  </div>
+
+  <!-- MOBILE ON-SCREEN TOUCH CONTROLS -->
+  <div id="touch-controls">
+    <!-- VIRTUAL JOYSTICK (Movement & Steering) -->
+    <div id="touch-joystick-zone">
+      <div id="touch-joystick-nub"></div>
+    </div>
+
+    <!-- TOUCH BUTTONS -->
+    <div class="touch-btn-cluster">
+      <button class="touch-btn" id="btn-deliver" title="Grab / Deliver Bag">📦<br>DELIV</button>
+      <button class="touch-btn" id="btn-enter-exit" title="Enter / Exit Van">🚪<br>E / EXIT</button>
+      <button class="touch-btn btn-gas" id="btn-gas" title="Accelerate">⚡<br>GAS</button>
+
+      <button class="touch-btn" id="btn-side-door" title="Slide Side Door">↔️<br>SLIDE</button>
+      <button class="touch-btn" id="btn-rear-doors" title="Rear Doors">📂<br>REAR</button>
+      <button class="touch-btn btn-brake" id="btn-brake" title="Brake / Reverse">🛑<br>BRAKE</button>
+
+      <button class="touch-btn btn-drift" id="btn-drift" style="grid-column: span 3; width: 100%; height: 42px;" title="Drift / Handbrake">
+        💨 HANDBRAKE DRIFT
+      </button>
+    </div>
+  </div>
+
+  <!-- BLENDER RIGGING & CUSTOM MODEL GUIDE MODAL -->
+  <div id="rigging-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">Checkers Sixty60 3D Model & Rigging Blueprint</div>
+        <button class="close-btn" id="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="guide-section">
+        <h3>1. Van Rigging & Bone Hierarchy</h3>
+        <p>To ensure perfect arcade suspension, wheel spin, and door kinematics, export your Blender van model with the following hierarchy or node names:</p>
+        <div class="code-block">
+CheckersHyperVan (Root Object / Armature)<br>
+├── chassis (Base body mesh, responds to pitch/roll)<br>
+│   ├── door_driver (Hinged pivot at front-left edge: rot Z/Y 0° to 65°)<br>
+│   ├── door_slide (Sliding cargo door: translate X +0.08m, translate Z -1.05m)<br>
+│   ├── door_rear_L (Left barn door: hinged at outer pillar, rot Y -120°)<br>
+│   ├── door_rear_R (Right barn door: hinged at outer pillar, rot Y +120°)<br>
+│   ├── steering_wheel (Hinged at column: rot Z with steering)<br>
+│   └── cargo_bed (Container holding paper delivery bags)<br>
+├── wheel_FL (Front-left wheel pivot: yaw for steer, pitch for spin)<br>
+├── wheel_FR (Front-right wheel pivot: yaw for steer, pitch for spin)<br>
+├── wheel_RL (Rear-left wheel pivot: pitch for spin)<br>
+└── wheel_RR (Rear-right wheel pivot: pitch for spin)
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <h3>2. Mixamo Rigged Driver Character</h3>
+        <p>Your character uses the standard Mixamo Armature structure. When exporting from Blender, ensure:</p>
+        <ul style="margin-left: 20px; line-height: 1.8;">
+          <li><b>Real World Scale</b>: Character height ~1.80m (Blender Unit Scale: 1.0, Metric, Meters).</li>
+          <li><b>Standard Mixamo Bone Names</b>: <code>mixamorigHips</code>, <code>mixamorigSpine</code>, <code>mixamorigHead</code>, <code>mixamorigLeftHand</code>, etc.</li>
+          <li><b>Animation Clips to Include</b>: <i>Idle, Walk, Run, CarryBag, OpenDoor, SitDrive</i>.</li>
+        </ul>
+      </div>
+
+      <div class="guide-section">
+        <h3>3. Test Your Custom Blender GLB / GLTF Here!</h3>
+        <p>Drag and drop your exported <code>.glb</code> file directly into this game window, or click below to browse:</p>
+        <div class="drop-zone-box" onclick="document.getElementById('glb-file-input').click()">
+          <div style="font-size: 32px; margin-bottom: 8px;">📥</div>
+          <b>Click to Select or Drag & Drop .GLB File</b>
+          <div style="font-size: 12px; color: #80deea; margin-top: 4px;">Supports Mixamo Rigged Characters and Animated Vehicles</div>
+        </div>
+        <input type="file" id="glb-file-input" accept=".glb,.gltf" style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Rigging modal UI logic
+    const guideBtn = document.getElementById('btn-guide');
+    const modal = document.getElementById('rigging-modal');
+    const closeBtn = document.getElementById('modal-close-btn');
+
+    if (guideBtn && modal) {
+      guideBtn.addEventListener('click', () => modal.classList.add('open'));
+    }
+    if (closeBtn && modal) {
+      closeBtn.addEventListener('click', () => modal.classList.remove('open'));
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal) modal.classList.remove('open');
+    });
+  </script>
+
+  <!-- GAME SCRIPT BUNDLE VIA VITE -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
