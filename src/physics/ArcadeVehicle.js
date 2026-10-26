@@ -27,7 +27,7 @@ export class ArcadeVehicle {
     // AAA Progressive Driving Parameters
     this.maxSpeed = 38.0; // ~137 km/h
     this.reverseMaxSpeed = 12.0;
-    this.baseAccelRate = 22.0; // Progressive smooth acceleration (no sudden jerk)
+    this.baseAccelRate = 22.0; // Progressive smooth acceleration
     this.brakeRate = 50.0; // Responsive clean brakes
     this.dragCoeff = 0.984;
 
@@ -43,13 +43,11 @@ export class ArcadeVehicle {
     this.lateralVelocity = 0;
     this.slipSpeed = 0;
 
-    // Jump & Air
+    // Jump & Air Dynamics
     this.isAirborne = false;
     this.airTime = 0;
-    this.gravity = 25.0;
-
-    // Ramp launch tracker
-    this.wasClimbingRamp = false;
+    this.gravity = 22.0; // Clean ballistic arc
+    this.jumpLaunchCooldown = 0; // Prevents premature landing during liftoff
 
     // World Colliders
     this.colliders = [];
@@ -154,9 +152,9 @@ export class ArcadeVehicle {
     const absSpeed = Math.abs(this.speed);
 
     // 2. SPEED-SENSITIVE STEERING ANGLE
-    // Sharp at low speed (32 deg), smoothly tightens at high speed (13 deg) for rock-solid stability!
-    const speedRatio = Math.min(1.0, absSpeed / 28.0);
-    const maxSteerDeg = THREE.MathUtils.lerp(32.0, 13.0, speedRatio);
+    // Agile at low speeds (32 deg), smoothly tightens at high speeds (14 deg) for highway stability
+    const speedRatio = Math.min(1.0, absSpeed / 26.0);
+    const maxSteerDeg = THREE.MathUtils.lerp(32.0, 14.0, speedRatio);
     const dynamicMaxSteer = THREE.MathUtils.degToRad(maxSteerDeg);
 
     this.steerInput = THREE.MathUtils.lerp(this.steerInput, input.steer, this.steerResponse * dt);
@@ -164,7 +162,7 @@ export class ArcadeVehicle {
 
     this.isBrakingHard = input.brake > 0.35 && absSpeed > 2.5;
 
-    // 3. TWO-POINT AXLE GROUND SAMPLING (Front Axle & Rear Axle)
+    // 3. GROUND & RAMP HEIGHT SAMPLING
     const frontPos = this.position.clone().addScaledVector(forward, this.wheelBaseHalf);
     const rearPos = this.position.clone().addScaledVector(forward, -this.wheelBaseHalf);
 
@@ -172,7 +170,6 @@ export class ArcadeVehicle {
     const rearGround = this.samplePointGround(rearPos.x, rearPos.z);
     const centerGround = this.samplePointGround(this.position.x, this.position.z);
 
-    // Ground elevation: where the wheels make contact with the road/ramp surface
     const targetGroundY = Math.max(
       centerGround.height,
       (frontGround.height + rearGround.height) / 2
@@ -184,12 +181,22 @@ export class ArcadeVehicle {
 
     const isOnRamp = frontGround.isOnRamp || rearGround.isOnRamp || centerGround.isOnRamp;
 
-    // 4. VERTICAL DYNAMICS & JUMP LANDING (FIRM, ZERO BOUNCE)
-    if (this.position.y <= targetGroundY + 0.08) {
-      if (this.isAirborne) {
-        // Firm landing, instantly zero vertical bounce
+    // 4. VERTICAL DYNAMICS & TRUE JUMP LAUNCH
+    if (this.jumpLaunchCooldown > 0) {
+      this.jumpLaunchCooldown -= dt;
+    }
+
+    if (this.isAirborne) {
+      // In air: gravity pulls down
+      this.airTime += dt;
+      this.velocity.y -= this.gravity * dt;
+
+      // Check for landing ONLY after liftoff phase and when descending
+      if (this.jumpLaunchCooldown <= 0 && this.velocity.y <= 0 && this.position.y <= targetGroundY + 0.05) {
+        // Touchdown!
         this.isAirborne = false;
         this.airTime = 0;
+        this.position.y = targetGroundY;
         this.velocity.y = 0;
         this.suspensionCompress = 0.03;
         if (window.gameApp && window.gameApp.audio) {
@@ -197,58 +204,37 @@ export class ArcadeVehicle {
         }
       }
 
-      // Hard clamp: car sits directly on ground surface
-      this.position.y = Math.max(targetGroundY, this.position.y);
-      this.pitch = THREE.MathUtils.lerp(this.pitch, targetPitch, 20.0 * dt);
-
-      if (isOnRamp) {
-        const isClimbing = frontGround.height >= rearGround.height;
-        if (isClimbing && this.speed > 2.0) {
-          this.wasClimbingRamp = true;
-          this.velocity.y = Math.sin(slopeAngle) * this.speed;
-        } else {
-          this.velocity.y = 0;
-        }
-
-        // Launch over crest at speed
-        if (this.wasClimbingRamp && this.speed > 7.0 && rearGround.height > frontGround.height) {
-          this.isAirborne = true;
-          this.velocity.y = this.speed * 0.40;
-          this.wasClimbingRamp = false;
-        }
-      } else {
-        this.wasClimbingRamp = false;
-        this.velocity.y = 0;
-      }
-
-      // Aerodynamic downforce
-      const downforce = (absSpeed / this.maxSpeed) * 12.0;
-      this.velocity.y -= downforce * dt;
+      this.pitch = THREE.MathUtils.lerp(this.pitch, 0, 3.5 * dt);
 
     } else {
-      // AIRBORNE
-      this.isAirborne = true;
-      this.airTime += dt;
-      this.velocity.y -= this.gravity * dt;
+      // On ground or on ramp
+      this.position.y = targetGroundY;
+      this.pitch = THREE.MathUtils.lerp(this.pitch, targetPitch, 22.0 * dt);
 
-      // Cannot drop below ramp/ground floor
-      if (this.position.y < targetGroundY) {
-        this.position.y = targetGroundY;
-        this.velocity.y = 0;
-        this.isAirborne = false;
-        this.suspensionCompress = 0.03;
+      // Check if ramping / launching off crest
+      if (isOnRamp && this.speed > 5.5) {
+        // Check if car reached or passed the ramp crest
+        const nearCrest = centerGround.isNearPeak || (rearGround.height >= frontGround.height && centerGround.height > 0.8);
+        if (nearCrest && this.jumpLaunchCooldown <= 0) {
+          // LAUNCH INTO AIR!
+          this.isAirborne = true;
+          this.airTime = 0.01;
+          this.jumpLaunchCooldown = 0.28; // Locks airborne for 0.28s so it soars over the peak!
+          this.velocity.y = Math.max(5.5, this.speed * 0.42);
+        }
       }
 
-      this.pitch = THREE.MathUtils.lerp(this.pitch, 0, 3.5 * dt);
+      // Strong downforce keeps car glued to road
+      const downforce = (absSpeed / this.maxSpeed) * 10.0;
+      this.velocity.y -= downforce * dt;
     }
 
     // 5. PROGRESSIVE ACCELERATION & BRAKING (AAA Tuning)
     if (!this.isAirborne) {
       if (input.throttle > 0) {
         if (this.speed < this.maxSpeed) {
-          // Smooth progressive torque: builds up naturally
-          const speedFactorTorque = Math.max(0.35, 1.0 - (this.speed / this.maxSpeed) * 0.65);
-          const accel = input.throttle * this.baseAccelRate * speedFactorTorque;
+          const torqueFactor = Math.max(0.35, 1.0 - (this.speed / this.maxSpeed) * 0.65);
+          const accel = input.throttle * this.baseAccelRate * torqueFactor;
           this.velocity.addScaledVector(forward, accel * dt);
         }
       } else if (input.brake > 0) {
@@ -256,7 +242,6 @@ export class ArcadeVehicle {
           const brake = input.brake * this.brakeRate;
           this.velocity.addScaledVector(forward, -brake * dt);
         } else {
-          // Smooth reverse
           if (this.speed > -this.reverseMaxSpeed) {
             this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.6) * dt);
           }
@@ -283,13 +268,13 @@ export class ArcadeVehicle {
       // 7. YAW STEERING (NO ROTATION WHEN STOPPED)
       let turnFactor = 0;
       if (absSpeed > 0.35) {
-        turnFactor = Math.min(1.0, (absSpeed - 0.35) / 5.0);
+        turnFactor = Math.min(1.0, (absSpeed - 0.35) / 4.5);
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
       const driftBonus = this.isDrifting ? 1.75 : 1.0;
 
-      // Speed-attenuated yaw rate: stable at high speeds!
+      // Stable high-speed dampening
       const highSpeedDamp = THREE.MathUtils.lerp(3.2, 1.8, speedRatio);
       const targetYawRate = this.steerInput * turnFactor * dirSign * highSpeedDamp * driftBonus;
 
@@ -325,6 +310,7 @@ export class ArcadeVehicle {
   samplePointGround(x, z) {
     let maxHeight = 0;
     let isOnRamp = false;
+    let isNearPeak = false;
 
     for (const c of this.colliders) {
       if (c.type === 'ramp') {
@@ -336,7 +322,8 @@ export class ArcadeVehicle {
         const hw = c.width / 2;
         const hd = c.depth / 2;
 
-        if (Math.abs(localX) <= hw && localZ >= -hd && localZ <= hd) {
+        // When point is within the ramp width and depth
+        if (Math.abs(localX) <= hw && Math.abs(localZ) <= hd) {
           const distFromPeak = Math.abs(localZ);
           const progress = Math.max(0, 1.0 - (distFromPeak / hd));
           const h = progress * c.height;
@@ -344,12 +331,15 @@ export class ArcadeVehicle {
           if (h > maxHeight) {
             maxHeight = h;
             isOnRamp = true;
+            if (distFromPeak < 1.2) {
+              isNearPeak = true;
+            }
           }
         }
       }
     }
 
-    return { height: maxHeight, isOnRamp };
+    return { height: maxHeight, isOnRamp, isNearPeak };
   }
 
   resolveCollisions() {
@@ -384,7 +374,7 @@ export class ArcadeVehicle {
           }
         }
       } else if (c.type === 'ramp') {
-        // SOLID RAMP SIDE COLLISION: Prevent van from passing through triangular sides of ramp!
+        // FIXED SOLID RAMP SIDE COLLISION: Only collide if OUTSIDE the ramp width!
         const cosA = Math.cos(-c.angleY);
         const sinA = Math.sin(-c.angleY);
         const localX = (this.position.x - c.x) * cosA - (this.position.z - c.z) * sinA;
@@ -393,30 +383,29 @@ export class ArcadeVehicle {
         const hw = c.width / 2;
         const hd = c.depth / 2;
 
-        if (localZ >= -hd && localZ <= hd) {
-          // Height of ramp at this local Z
+        if (Math.abs(localZ) <= hd) {
           const distFromPeak = Math.abs(localZ);
           const rampH = Math.max(0, 1.0 - (distFromPeak / hd)) * c.height;
 
-          // If car is lower than the ramp slope edge, treat the side as a solid concrete wall!
-          if (this.position.y < rampH + 0.3) {
-            // Check left side collision
-            if (localX < 0 && localX > -hw - carRadius) {
+          // Only collide if car is physically lower than the ramp edge
+          if (this.position.y < rampH + 0.2) {
+            // Left side barrier (only if OUTSIDE left edge: localX < -hw)
+            if (localX < -hw && localX > -hw - carRadius) {
               const overlap = (hw + carRadius) - Math.abs(localX);
               const worldNormX = -Math.cos(c.angleY);
               const worldNormZ = Math.sin(c.angleY);
               this.position.x += worldNormX * overlap;
               this.position.z += worldNormZ * overlap;
-              this.velocity.multiplyScalar(0.7);
+              this.velocity.multiplyScalar(0.75);
             }
-            // Check right side collision
-            else if (localX > 0 && localX < hw + carRadius) {
+            // Right side barrier (only if OUTSIDE right edge: localX > hw)
+            else if (localX > hw && localX < hw + carRadius) {
               const overlap = (hw + carRadius) - localX;
               const worldNormX = Math.cos(c.angleY);
               const worldNormZ = -Math.sin(c.angleY);
               this.position.x += worldNormX * overlap;
               this.position.z += worldNormZ * overlap;
-              this.velocity.multiplyScalar(0.7);
+              this.velocity.multiplyScalar(0.75);
             }
           }
         }
@@ -543,6 +532,6 @@ export class ArcadeVehicle {
     this.steerAngle = 0;
     this.isDrifting = false;
     this.isAirborne = false;
-    this.wasClimbingRamp = false;
+    this.jumpLaunchCooldown = 0;
   }
 }
