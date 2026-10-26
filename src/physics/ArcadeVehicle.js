@@ -200,7 +200,9 @@ export class ArcadeVehicle {
 
     // Target surface slope pitch and roll (Negative rotation around X tilts nose UP)
     const targetSurfacePitch = -Math.atan2(hFront - hRear, this.wheelBaseHalf * 2);
-    const targetSurfaceRoll = Math.atan2(hLeft - hRight, this.trackHalfWidth * 2);
+    // Smoothly clamp surface roll (+- 22 deg) to prevent flipping or getting wedged on side edges
+    const rawRoll = Math.atan2(hLeft - hRight, this.trackHalfWidth * 2);
+    const targetSurfaceRoll = THREE.MathUtils.clamp(rawRoll, -0.38, 0.38);
 
     const isOnRamp = gFL.isOnRamp || gFR.isOnRamp || gRL.isOnRamp || gRR.isOnRamp || gCenter.isOnRamp;
     const isNearPeak = gCenter.isNearPeak || (hFront > 0.6 && hRear > 0.6 && Math.abs(hFront - hRear) < 0.35);
@@ -231,27 +233,35 @@ export class ArcadeVehicle {
       this.pitch = this.surfacePitch;
 
     } else {
-      // Solid ground contact: instant exact alignment so tires NEVER sink into road or ramp!
-      this.position.y = targetGroundY;
-      this.velocity.y = 0;
+      // Natural drop: if van drives off the side of a ramp into thin air, begin free-fall drop under gravity
+      if (this.position.y > targetGroundY + 0.15) {
+        this.isAirborne = true;
+        this.airTime = 0.01;
+        this.jumpLaunchCooldown = 0.1;
+        this.velocity.y = Math.min(0, this.velocity.y);
+      } else {
+        // Solid ground contact: instant exact alignment so tires NEVER sink into road or ramp!
+        this.position.y = targetGroundY;
+        this.velocity.y = 0;
 
-      this.surfacePitch = THREE.MathUtils.lerp(this.surfacePitch, targetSurfacePitch, 22.0 * dt);
-      this.surfaceRoll = THREE.MathUtils.lerp(this.surfaceRoll, targetSurfaceRoll, 22.0 * dt);
-      this.pitch = this.surfacePitch;
+        this.surfacePitch = THREE.MathUtils.lerp(this.surfacePitch, targetSurfacePitch, 22.0 * dt);
+        this.surfaceRoll = THREE.MathUtils.lerp(this.surfaceRoll, targetSurfaceRoll, 22.0 * dt);
+        this.pitch = this.surfacePitch;
 
-      // Launch over crest at high speed (> 5.5 m/s)
-      if (isOnRamp && this.speed > 5.5) {
-        if ((isNearPeak || (hRear >= hFront && gCenter.height > 0.6)) && this.jumpLaunchCooldown <= 0) {
-          this.isAirborne = true;
-          this.airTime = 0.01;
-          this.jumpLaunchCooldown = 0.32;
-          this.velocity.y = Math.max(5.8, this.speed * 0.44);
+        // Launch over crest at high speed (> 5.5 m/s)
+        if (isOnRamp && this.speed > 5.5) {
+          if ((isNearPeak || (hRear >= hFront && gCenter.height > 0.6)) && this.jumpLaunchCooldown <= 0) {
+            this.isAirborne = true;
+            this.airTime = 0.01;
+            this.jumpLaunchCooldown = 0.32;
+            this.velocity.y = Math.max(5.8, this.speed * 0.44);
+          }
         }
-      }
 
-      // Downforce
-      const downforce = (absSpeed / this.maxSpeed) * 10.0;
-      this.velocity.y -= downforce * dt;
+        // Downforce
+        const downforce = (absSpeed / this.maxSpeed) * 10.0;
+        this.velocity.y -= downforce * dt;
+      }
     }
 
     // 5. PROGRESSIVE ACCELERATION & BRAKING
@@ -398,7 +408,7 @@ export class ArcadeVehicle {
           }
         }
       } else if (c.type === 'ramp') {
-        // SMOOTH RAMP SIDE BARRIER: Never teleport! Only deflect when driving from road towards side wall.
+        // SMOOTH RAMP SIDE BARRIER: Prevents driving through vertical side wall from road, NEVER traps or blocks driving off!
         const dx = this.position.x - c.x;
         const dz = this.position.z - c.z;
         const cosA = Math.cos(c.angleY);
@@ -406,46 +416,57 @@ export class ArcadeVehicle {
         const localX = dx * cosA - dz * sinA;
         const localZ = dx * sinA + dz * cosA;
 
+        // Velocity in ramp local frame
+        const vLocalX = this.velocity.x * cosA - this.velocity.z * sinA;
+
         const hw = c.width / 2;
         const hd = c.depth / 2;
 
-        // Only test within ramp length, excluding flat tips (< 0.2m)
-        if (Math.abs(localZ) <= hd - 0.2) {
+        // Only test within ramp length, excluding flat entry/exit tips (< 0.4m from ends)
+        if (Math.abs(localZ) <= hd - 0.4) {
           const distFromPeak = Math.abs(localZ);
           const rampH = Math.max(0, 1.0 - (distFromPeak / hd)) * c.height;
 
-          // Only collide if car is physically lower than the ramp edge (on road outside)
-          if (this.position.y < rampH - 0.1) {
+          // Only collide if car is down on the road outside (not on top of ramp or airborne)
+          if (!this.isAirborne && this.position.y < rampH - 0.25) {
             const carR = this.halfCarWidth;
 
-            // Left side barrier (localX < -hw)
+            // Left side barrier (localX < -hw): Only block if moving INWARD into the ramp (vLocalX > 0)
             if (localX < -hw && localX > -hw - carR) {
-              const clampedLocalX = -hw - carR;
-              this.position.x = c.x + clampedLocalX * cosA + localZ * sinA;
-              this.position.z = c.z - clampedLocalX * sinA + localZ * cosA;
+              if (vLocalX > 0) {
+                const penetration = (hw + carR) - Math.abs(localX);
+                const normX = -cosA;
+                const normZ = sinA;
 
-              const normX = -cosA;
-              const normZ = sinA;
-              const vNorm = this.velocity.x * normX + this.velocity.z * normZ;
-              if (vNorm < 0) {
-                this.velocity.x -= vNorm * normX * 1.2;
-                this.velocity.z -= vNorm * normZ * 1.2;
-                this.velocity.multiplyScalar(0.92);
+                this.position.x += normX * penetration;
+                this.position.z += normZ * penetration;
+
+                // Deflect inward velocity and allow free forward/backward slide
+                const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+                if (vInward > 0) {
+                  this.velocity.x -= (-normX) * vInward * 1.2;
+                  this.velocity.z -= (-normZ) * vInward * 1.2;
+                  this.velocity.multiplyScalar(0.95);
+                }
               }
             }
-            // Right side barrier (localX > hw)
+            // Right side barrier (localX > hw): Only block if moving INWARD into the ramp (vLocalX < 0)
             else if (localX > hw && localX < hw + carR) {
-              const clampedLocalX = hw + carR;
-              this.position.x = c.x + clampedLocalX * cosA + localZ * sinA;
-              this.position.z = c.z - clampedLocalX * sinA + localZ * cosA;
+              if (vLocalX < 0) {
+                const penetration = (hw + carR) - localX;
+                const normX = cosA;
+                const normZ = -sinA;
 
-              const normX = cosA;
-              const normZ = -sinA;
-              const vNorm = this.velocity.x * normX + this.velocity.z * normZ;
-              if (vNorm < 0) {
-                this.velocity.x -= vNorm * normX * 1.2;
-                this.velocity.z -= vNorm * normZ * 1.2;
-                this.velocity.multiplyScalar(0.92);
+                this.position.x += normX * penetration;
+                this.position.z += normZ * penetration;
+
+                // Deflect inward velocity and allow free forward/backward slide
+                const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+                if (vInward > 0) {
+                  this.velocity.x -= (-normX) * vInward * 1.2;
+                  this.velocity.z -= (-normZ) * vInward * 1.2;
+                  this.velocity.multiplyScalar(0.95);
+                }
               }
             }
           }
