@@ -63,9 +63,11 @@ class GameApp {
     // Resize listener
     window.addEventListener('resize', () => this.onWindowResize());
 
-    // Audio init on user interaction
-    window.addEventListener('pointerdown', () => this.audio.init(), { once: true });
-    window.addEventListener('keydown', () => this.audio.init(), { once: true });
+    // Robust audio unlock on any user interaction
+    const unlockAudio = () => this.audio.resume();
+    window.addEventListener('pointerdown', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
 
     // Start loop
     this.animate();
@@ -141,6 +143,16 @@ class GameApp {
         this.uiCamBtn.innerText = mode === 'THIRD_PERSON' ? '📷 3RD CAM' : '📷 ISO CAM';
       }
     };
+
+    const btnAudio = document.getElementById('btn-audio');
+    if (btnAudio) {
+      btnAudio.addEventListener('click', () => {
+        const unmuted = this.audio.toggleMute();
+        btnAudio.innerText = unmuted ? '🔊 AUDIO: ON' : '🔇 AUDIO: OFF';
+        btnAudio.style.borderColor = unmuted ? '#00bcd4' : '#757575';
+        this.showToast(unmuted ? 'Audio Unmuted' : 'Audio Muted');
+      });
+    }
 
     this.input.onResetVehicle = () => {
       this.vehiclePhysics.reset(0, -40, 0);

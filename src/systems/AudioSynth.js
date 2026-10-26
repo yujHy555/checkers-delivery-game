@@ -6,13 +6,20 @@ export class AudioSynth {
   }
 
   init() {
-    if (this.initialized) return;
+    if (this.initialized) {
+      this.resume();
+      return;
+    }
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioContext();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.35;
+      this.masterGain.gain.value = 0.55;
       this.masterGain.connect(this.ctx.destination);
+
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
 
       // 1. Engine Oscillator Setup
       this.engineOsc1 = this.ctx.createOscillator();
@@ -22,19 +29,19 @@ export class AudioSynth {
       this.engineOsc1.type = 'sawtooth';
       this.engineOsc2.type = 'triangle';
 
-      this.engineOsc1.frequency.value = 45;
-      this.engineOsc2.frequency.value = 90;
+      this.engineOsc1.frequency.value = 46;
+      this.engineOsc2.frequency.value = 92;
 
       this.engineFilter = this.ctx.createBiquadFilter();
       this.engineFilter.type = 'lowpass';
-      this.engineFilter.frequency.value = 350;
+      this.engineFilter.frequency.value = 400;
 
       this.engineOsc1.connect(this.engineFilter);
       this.engineOsc2.connect(this.engineFilter);
       this.engineFilter.connect(this.engineGain);
       this.engineGain.connect(this.masterGain);
 
-      this.engineGain.gain.value = 0.08;
+      this.engineGain.gain.value = 0.12;
 
       this.engineOsc1.start();
       this.engineOsc2.start();
@@ -49,6 +56,27 @@ export class AudioSynth {
     } catch (e) {
       console.warn('AudioContext not allowed or supported yet', e);
     }
+  }
+
+  resume() {
+    if (!this.initialized) {
+      this.init();
+      return;
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+  }
+
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.55, this.ctx.currentTime, 0.05);
+    }
+    if (!this.isMuted) {
+      this.resume();
+    }
+    return !this.isMuted;
   }
 
   initTireNoise() {
@@ -110,17 +138,22 @@ export class AudioSynth {
   }
 
   updateEngine(speed, throttle, maxSpeed) {
-    if (!this.initialized || this.isMuted) return;
+    if (!this.initialized) return;
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+    if (this.isMuted) return;
+
     const normSpeed = Math.min(1.0, Math.abs(speed) / maxSpeed);
 
-    const baseFreq = 42 + normSpeed * 140 + throttle * 35;
+    const baseFreq = 46 + normSpeed * 165 + throttle * 40;
     this.engineOsc1.frequency.setTargetAtTime(baseFreq, this.ctx.currentTime, 0.05);
-    this.engineOsc2.frequency.setTargetAtTime(baseFreq * 2.05, this.ctx.currentTime, 0.05);
+    this.engineOsc2.frequency.setTargetAtTime(baseFreq * 2.02, this.ctx.currentTime, 0.05);
 
-    const targetGain = 0.04 + normSpeed * 0.08 + throttle * 0.06;
+    const targetGain = 0.10 + normSpeed * 0.22 + throttle * 0.18;
     this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.08);
 
-    this.engineFilter.frequency.setTargetAtTime(320 + normSpeed * 650, this.ctx.currentTime, 0.08);
+    this.engineFilter.frequency.setTargetAtTime(360 + normSpeed * 850, this.ctx.currentTime, 0.08);
   }
 
   updateSkid(isSkidding, slipVel) {

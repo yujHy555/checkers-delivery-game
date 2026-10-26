@@ -194,17 +194,39 @@ export class ArcadeVehicle {
     const hLeft = (gFL.height + gRL.height) * 0.5;
     const hRight = (gFR.height + gRR.height) * 0.5;
 
-    // Ground elevation under center of vehicle
-    const rawGroundH = Math.max(gCenter.height, (hFront + hRear) * 0.5);
+    // Target surface slope pitch and roll
+    // Three.js: front is +Z, rear is -Z -> nose UP requires NEGATIVE pitch!
+    const targetSurfacePitch = -Math.atan2(hFront - hRear, this.wheelBaseHalf * 2);
+    // Three.js: left is -X, right is +X -> left UP requires NEGATIVE roll!
+    const rawRoll = -Math.atan2(hLeft - hRight, this.trackHalfWidth * 2);
+    const targetSurfaceRoll = THREE.MathUtils.clamp(rawRoll, -0.42, 0.42);
+
+    // Compute kinematic wheel vertical offsets under current orientation:
+    // Delta Y = -z * sin(pitch) + x * sin(roll)
+    const sinP = Math.sin(targetSurfacePitch);
+    const sinR = Math.sin(targetSurfaceRoll);
+    const wb = this.wheelBaseHalf;
+    const tw = this.trackHalfWidth;
+
+    const dyFL = -wb * sinP - tw * sinR;
+    const dyFR = -wb * sinP + tw * sinR;
+    const dyRL = wb * sinP - tw * sinR;
+    const dyRR = wb * sinP + tw * sinR;
+
+    // Strict Non-Penetrating Ground Elevation:
+    // Guarantees Y_wheel >= g_wheel.height + roadLevel for EVERY wheel touching the ramp!
+    const rawGroundH = Math.max(
+      gCenter.height,
+      gFL.height - dyFL,
+      gFR.height - dyFR,
+      gRL.height - dyRL,
+      gRR.height - dyRR,
+      (hFront + hRear) * 0.5
+    );
     const targetGroundY = rawGroundH + this.roadLevel;
 
-    // Target surface slope pitch and roll (Negative rotation around X tilts nose UP)
-    const targetSurfacePitch = -Math.atan2(hFront - hRear, this.wheelBaseHalf * 2);
-    // Smoothly clamp surface roll (+- 22 deg) to prevent flipping or getting wedged on side edges
-    const rawRoll = Math.atan2(hLeft - hRight, this.trackHalfWidth * 2);
-    const targetSurfaceRoll = THREE.MathUtils.clamp(rawRoll, -0.38, 0.38);
-
     const isOnRamp = gFL.isOnRamp || gFR.isOnRamp || gRL.isOnRamp || gRR.isOnRamp || gCenter.isOnRamp;
+    this.isOnRamp = isOnRamp;
     const isNearPeak = gCenter.isNearPeak || (hFront > 0.6 && hRear > 0.6 && Math.abs(hFront - hRear) < 0.35);
 
     // 4. VERTICAL DYNAMICS & JUMP LAUNCH
@@ -428,7 +450,7 @@ export class ArcadeVehicle {
           const rampH = Math.max(0, 1.0 - (distFromPeak / hd)) * c.height;
 
           // Only collide if car is down on the road outside (not on top of ramp or airborne)
-          if (!this.isAirborne && this.position.y < rampH - 0.25) {
+          if (!this.isOnRamp && !this.isAirborne && this.position.y < rampH - 0.25) {
             const carR = this.halfCarWidth;
 
             // Left side barrier (localX < -hw): Only block if moving INWARD into the ramp (vLocalX > 0)
