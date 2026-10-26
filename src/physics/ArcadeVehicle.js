@@ -4,55 +4,55 @@ export class ArcadeVehicle {
   constructor(scene, options = {}) {
     this.scene = scene;
 
-    // Vehicle dimensions & physics properties (Kei van scale ~ 3.4m long, 1.48m wide, 1.95m tall)
-    this.mass = 950;
-    this.position = new THREE.Vector3(options.x || 0, options.y || 1.2, options.z || 0);
+    // Vehicle Dimensions (Kei Van scale)
+    this.length = 3.4;
+    this.width = 1.5;
+    this.height = 1.9;
+    this.wheelRadius = 0.35;
+    this.rideHeight = 0.38; // Planted ground clearance
+
+    // Position & Orientation
+    this.position = new THREE.Vector3(options.x || 0, this.rideHeight, options.z || -35);
     this.velocity = new THREE.Vector3();
     this.heading = options.heading || 0; // Yaw angle in radians
+    this.pitch = 0; // Slope pitch (ramps/jumps)
     this.angularVelocity = 0;
-    this.speed = 0; // forward speed in m/s
+    this.speed = 0; // forward speed (m/s)
 
-    // Pitch and Roll for dynamic body lean/suspension squat
-    this.bodyPitch = 0;
-    this.bodyRoll = 0;
-    this.bodyPitchVel = 0;
-    this.bodyRollVel = 0;
+    // Visual Suspension Lean (Stiff anti-roll bar)
+    this.visualRoll = 0;
+    this.visualPitch = 0;
+    this.suspensionCompress = 0;
 
-    // Driving parameters (Arcade tuning)
-    this.maxSpeed = 38.0; // ~136 km/h max speed
+    // Arcade Driving Parameters
+    this.maxSpeed = 36.0; // ~130 km/h
     this.reverseMaxSpeed = 12.0;
-    this.acceleration = 24.0; // Snappy arcade accel
-    this.brakeForce = 45.0;
+    this.accelRate = 32.0; // Snappy arcade acceleration
+    this.brakeRate = 48.0; // Strong brakes
+    this.dragCoeff = 0.985; // Rolling drag
+
+    // Steering
+    this.steerInput = 0;
     this.steerAngle = 0;
-    this.maxSteerAngle = THREE.MathUtils.degToRad(34);
-    this.steerSpeed = 6.0;
+    this.maxSteerAngle = THREE.MathUtils.degToRad(32);
+    this.steerResponse = 12.0;
 
-    // Drift & Traction
+    // Grip & Drift
     this.isDrifting = false;
-    this.driftFactor = 0; // 0 (pure grip) to 1 (full slip)
-    this.lateralFriction = 0.88;
-    this.slipVelocity = 0;
+    this.driftFactor = 0; // 0 = 100% grip, 1 = drift slide
+    this.lateralVelocity = 0;
+    this.slipSpeed = 0;
+
+    // Airborne / Jump State
     this.isAirborne = false;
-    this.groundY = 0;
+    this.airTime = 0;
+    this.gravity = 28.0; // Snappy arcade gravity (no floatiness)
 
-    // Suspension settings
-    this.suspensionRestLength = 0.45;
-    this.suspensionStiffness = 38.0;
-    this.suspensionDamping = 4.5;
-    this.wheelTravel = [0, 0, 0, 0]; // FL, FR, RL, RR
-
-    // Wheels definition (relative to chassis center)
-    this.wheelBaseHalf = 1.05; // front-back half
-    this.wheelTrackHalf = 0.65; // left-right half
-    this.wheelRadius = 0.35;
-
-    // World collision bounds
+    // Colliders (buildings, ramps, barriers)
     this.colliders = [];
 
-    // Skid marks system
+    // Skid marks & smoke
     this.initSkidmarks();
-
-    // Tire smoke particles
     this.initTireSmoke();
   }
 
@@ -61,61 +61,56 @@ export class ArcadeVehicle {
   }
 
   initSkidmarks() {
-    this.maxSkidPoints = 500;
+    this.maxSkidPoints = 600;
     this.skidGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(this.maxSkidPoints * 6); // 2 triangles per segment
-    const alphas = new Float32Array(this.maxSkidPoints * 2);
-
+    const positions = new Float32Array(this.maxSkidPoints * 6);
     this.skidGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
     this.skidMaterial = new THREE.MeshBasicMaterial({
       color: 0x111111,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.75,
       depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1
+      side: THREE.DoubleSide
     });
 
     this.skidMesh = new THREE.Mesh(this.skidGeometry, this.skidMaterial);
     this.skidMesh.frustumCulled = false;
     this.scene.add(this.skidMesh);
 
-    this.skidPointsLeft = [];
-    this.skidPointsRight = [];
-    this.lastSkidTime = 0;
+    this.skidHistoryL = [];
+    this.skidHistoryR = [];
   }
 
   initTireSmoke() {
     this.smokeParticles = [];
-    this.maxSmoke = 45;
-    const smokeGeo = new THREE.BufferGeometry();
-    const smokePositions = new Float32Array(this.maxSmoke * 3);
-    const smokeSizes = new Float32Array(this.maxSmoke);
+    this.maxSmoke = 50;
 
-    smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
-    smokeGeo.setAttribute('size', new THREE.BufferAttribute(smokeSizes, 1));
-
-    // Simple procedural smoke particle texture
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
     const ctx = canvas.getContext('2d');
     const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0, 'rgba(230,230,230,0.8)');
-    grad.addColorStop(0.5, 'rgba(200,200,200,0.3)');
-    grad.addColorStop(1, 'rgba(200,200,200,0)');
+    grad.addColorStop(0, 'rgba(240, 240, 240, 0.8)');
+    grad.addColorStop(0.4, 'rgba(210, 210, 210, 0.4)');
+    grad.addColorStop(1, 'rgba(200, 200, 200, 0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 64, 64);
 
     const smokeTex = new THREE.CanvasTexture(canvas);
+    const smokeGeo = new THREE.BufferGeometry();
+    const pos = new Float32Array(this.maxSmoke * 3);
+    const sizes = new Float32Array(this.maxSmoke);
+
+    smokeGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    smokeGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
     this.smokeMaterial = new THREE.PointsMaterial({
       map: smokeTex,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.55,
       depthWrite: false,
-      size: 1.0,
-      blending: THREE.NormalBlending
+      size: 1.2
     });
 
     this.smokeMesh = new THREE.Points(smokeGeo, this.smokeMaterial);
@@ -127,159 +122,215 @@ export class ArcadeVehicle {
       this.smokeParticles.shift();
     }
     this.smokeParticles.push({
-      x: pos.x + (Math.random() - 0.5) * 0.3,
-      y: pos.y + 0.1,
-      z: pos.z + (Math.random() - 0.5) * 0.3,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: 0.8 + Math.random() * 0.8,
-      vz: (Math.random() - 0.5) * 0.5,
-      size: 0.35,
-      maxSize: 1.6,
+      x: pos.x + (Math.random() - 0.5) * 0.25,
+      y: pos.y + 0.15,
+      z: pos.z + (Math.random() - 0.5) * 0.25,
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: 0.6 + Math.random() * 0.7,
+      vz: (Math.random() - 0.5) * 0.6,
+      size: 0.4,
+      maxSize: 1.8,
       life: 0,
-      maxLife: 0.75 + Math.random() * 0.4
+      maxLife: 0.65 + Math.random() * 0.3
     });
   }
 
   update(dt, input) {
-    if (dt > 0.1) dt = 0.1; // clamp delta time for stability
+    if (dt > 0.08) dt = 0.08;
 
-    // 1. Steering input
-    const targetSteer = input.steer * this.maxSteerAngle;
-    this.steerAngle = THREE.MathUtils.lerp(this.steerAngle, targetSteer, this.steerSpeed * dt);
-
-    // Forward and Right direction vectors
+    // 1. DIRECTION VECTORS
+    // Heading: 0 = +Z (forward). In Three.js:
+    // Forward = (sin(heading), 0, cos(heading))
+    // Right = (cos(heading), 0, -sin(heading))
     const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     const right = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-    // Current forward & lateral speed
+    // 2. STEERING INPUT (FIXED: Left is Left, Right is Right)
+    // Note: input.steer is negative for Left, positive for Right
+    // To turn Left (towards -X), heading must decrease (negative delta).
+    // Therefore steerInput = input.steer is correct!
+    this.steerInput = THREE.MathUtils.lerp(this.steerInput, input.steer, this.steerResponse * dt);
+    this.steerAngle = this.steerInput * this.maxSteerAngle;
+
+    // Forward and Lateral speeds
     this.speed = this.velocity.dot(forward);
-    const lateralSpeed = this.velocity.dot(right);
-    this.slipVelocity = Math.abs(lateralSpeed);
+    this.lateralVelocity = this.velocity.dot(right);
+    this.slipSpeed = Math.abs(this.lateralVelocity);
 
-    // 2. Check Ground / Elevation
-    const raycastY = this.sampleGroundHeight(this.position.x, this.position.z);
-    const targetHeight = raycastY + this.wheelRadius + 0.15;
+    // 3. GROUND HEIGHT & RAMP COLLISION DETECTION
+    const groundInfo = this.sampleGround(this.position.x, this.position.z);
+    const targetGroundY = groundInfo.height + this.rideHeight;
 
-    if (this.position.y <= targetHeight + 0.05) {
-      // On ground
-      this.isAirborne = false;
-      this.groundY = raycastY;
-
-      // Suspension spring response
-      const comp = targetHeight - this.position.y;
-      this.velocity.y += (comp * this.suspensionStiffness - this.velocity.y * this.suspensionDamping) * dt;
-
-      // Clamp ground sinking
-      if (this.position.y < targetHeight - 0.12) {
-        this.position.y = targetHeight - 0.12;
-        if (this.velocity.y < 0) this.velocity.y = 0;
+    if (this.position.y <= targetGroundY + 0.15) {
+      // VEHICLE IS FIRMLY ON GROUND
+      if (this.isAirborne) {
+        // Just landed from a jump!
+        this.isAirborne = false;
+        this.airTime = 0;
+        this.suspensionCompress = 0.14; // firm visual landing compression
+        if (this.velocity.y < -4.0 && window.gameApp && window.gameApp.audio) {
+          window.gameApp.audio.playJumpLand();
+        }
       }
+
+      // Snapped firmly to ground (NO floating, NO bobbing)
+      this.position.y = targetGroundY;
+      this.velocity.y = 0;
+      this.pitch = THREE.MathUtils.lerp(this.pitch, groundInfo.pitch, 14.0 * dt);
+
+      // Downforce at speed
+      const downforce = (Math.abs(this.speed) / this.maxSpeed) * 8.0;
+      this.velocity.y -= downforce * dt;
+
     } else {
-      // In air (Jump)
+      // VEHICLE IS AIRBORNE (JUMPING)
       this.isAirborne = true;
-      this.velocity.y -= 18.0 * dt; // Gravity
+      this.airTime += dt;
+      this.velocity.y -= this.gravity * dt;
+
+      // Air pitch stabilization (levels out smoothly in mid-air)
+      this.pitch = THREE.MathUtils.lerp(this.pitch, 0, 3.5 * dt);
     }
 
-    // 3. Acceleration & Braking (When on ground)
+    // 4. ACCELERATION & BRAKING (Grounded)
     if (!this.isAirborne) {
       if (input.throttle > 0) {
+        // Drive forward
         if (this.speed < this.maxSpeed) {
-          this.velocity.addScaledVector(forward, input.throttle * this.acceleration * dt);
+          const accel = input.throttle * this.accelRate;
+          this.velocity.addScaledVector(forward, accel * dt);
         }
       } else if (input.brake > 0) {
-        if (this.speed > 0.5) {
-          // Braking
-          this.velocity.addScaledVector(forward, -input.brake * this.brakeForce * dt);
+        if (this.speed > 0.8) {
+          // Hard brake
+          const brake = input.brake * this.brakeRate;
+          this.velocity.addScaledVector(forward, -brake * dt);
         } else {
           // Reverse
           if (this.speed > -this.reverseMaxSpeed) {
-            this.velocity.addScaledVector(forward, -input.brake * (this.acceleration * 0.6) * dt);
+            this.velocity.addScaledVector(forward, -input.brake * (this.accelRate * 0.6) * dt);
           }
         }
       } else {
-        // Natural rolling resistance
-        this.velocity.multiplyScalar(Math.pow(0.85, dt * 2.0));
+        // Rolling drag (grounded deceleration)
+        this.velocity.multiplyScalar(Math.pow(this.dragCoeff, dt * 60.0));
       }
 
-      // Handbrake / Drift
+      // 5. DRIFT & TRACTION HANDLING
       if (input.handbrake) {
+        // Handbrake pressed -> Initiates power slide
         this.isDrifting = true;
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 10.0 * dt);
-        // Reduce forward speed slightly when drifting
-        this.velocity.multiplyScalar(Math.pow(0.92, dt));
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 12.0 * dt);
+        // Slight forward drag during drift
+        this.velocity.multiplyScalar(Math.pow(0.96, dt * 30.0));
       } else {
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 4.0 * dt);
-        if (this.driftFactor < 0.05) this.isDrifting = false;
+        // Handbrake released -> Grip snaps back
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 6.0 * dt);
+        if (this.driftFactor < 0.08) this.isDrifting = false;
       }
 
-      // Lateral Friction (Drift vs Grip)
-      const baseGrip = 12.0;
-      const driftGrip = 3.2;
-      const currentGrip = THREE.MathUtils.lerp(baseGrip, driftGrip, this.driftFactor);
-      
-      // Kill lateral slide proportional to grip
-      const lateralDecel = -lateralSpeed * currentGrip * dt;
+      // Lateral Friction (High grip when normal, controllable slip when drifting)
+      // Normal grip kills 96% lateral slip per frame for rock-solid grounded feel!
+      const gripRate = THREE.MathUtils.lerp(35.0, 5.5, this.driftFactor);
+      const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
       this.velocity.addScaledVector(right, lateralDecel);
 
-      // Turning / Yaw angular velocity
-      let turnFactor = (this.speed / 18.0);
-      if (turnFactor > 1.0) turnFactor = 1.0;
-      if (turnFactor < -0.8) turnFactor = -0.8;
+      // 6. STEERING & YAW (Sharp, intuitive turning)
+      // Turn responsiveness scales with forward speed
+      let speedFactor = Math.abs(this.speed) / 12.0;
+      if (speedFactor > 1.0) speedFactor = 1.0;
+      if (speedFactor < 0.2) speedFactor = Math.abs(this.speed) * 0.8; // sluggish when stopped
 
-      // Extra rotation when drifting (arcade snap-in)
-      const driftTurnBonus = this.isDrifting ? 1.6 : 1.0;
-      const targetAngularVel = this.steerAngle * turnFactor * (1.7 * driftTurnBonus);
+      // Reverse inverts steer direction naturally
+      const dirSign = this.speed >= -0.2 ? 1 : -1;
 
-      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetAngularVel, 8.0 * dt);
+      // Drift increases yaw spin for thrilling arcade power slides
+      const driftBonus = this.isDrifting ? 1.75 : 1.0;
+
+      const targetYawRate = this.steerInput * speedFactor * dirSign * 2.6 * driftBonus;
+      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 14.0 * dt);
+
+      // Apply Heading update
       this.heading += this.angularVelocity * dt;
 
     } else {
-      // In air: slight air steering & pitch stabilization
-      this.heading += this.steerAngle * 0.5 * dt;
+      // In air: slight pitch & yaw stability
+      this.heading += this.steerInput * 0.6 * dt;
     }
 
-    // 4. Update Position
+    // 7. INTEGRATE POSITION
     this.position.addScaledVector(this.velocity, dt);
 
-    // 5. World Obstacle Collisions
-    this.handleCollisions();
+    // 8. WORLD OBSTACLE COLLISIONS
+    this.resolveCollisions();
 
-    // 6. Body Roll & Pitch (Dynamic suspension tilt)
-    const accelRate = (input.throttle - input.brake) * (this.acceleration / 24.0);
-    const targetPitch = THREE.MathUtils.clamp(-accelRate * 0.04 - (this.velocity.y * 0.02), -0.15, 0.15);
-    const targetRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.035), -0.14, 0.14);
+    // 9. VISUAL CHASSIS LEAN (Subtle & stiff - NO boat sway)
+    const targetRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.018), -0.05, 0.05);
+    const targetPitch = THREE.MathUtils.clamp(
+      this.pitch - (input.throttle - input.brake) * 0.035,
+      -0.45,
+      0.45
+    );
 
-    this.bodyPitch = THREE.MathUtils.lerp(this.bodyPitch, targetPitch, 8.0 * dt);
-    this.bodyRoll = THREE.MathUtils.lerp(this.bodyRoll, targetRoll, 8.0 * dt);
+    this.visualRoll = THREE.MathUtils.lerp(this.visualRoll, targetRoll, 10.0 * dt);
+    this.visualPitch = THREE.MathUtils.lerp(this.visualPitch, targetPitch, 12.0 * dt);
+    this.suspensionCompress = THREE.MathUtils.lerp(this.suspensionCompress, 0, 8.0 * dt);
 
-    // 7. Skid marks & smoke generation
-    this.updateSkidmarksAndSmoke(dt, right, forward);
+    // 10. UPDATE SKID MARKS & TIRE SMOKE
+    this.updateSkidsAndSmoke(dt, forward, right);
   }
 
-  sampleGroundHeight(x, z) {
-    // Check for ramps or elevated surfaces
-    let maxH = 0;
+  sampleGround(x, z) {
+    let maxHeight = 0;
+    let pitch = 0;
+
     for (const c of this.colliders) {
       if (c.type === 'ramp') {
-        // Ramp check
+        // Ramp AABB check
         const dx = x - c.x;
         const dz = z - c.z;
+
+        // Check if vehicle is within ramp footprint
         if (Math.abs(dx) <= c.width / 2 && Math.abs(dz) <= c.depth / 2) {
-          const t = (dz + c.depth / 2) / c.depth; // 0 to 1 along ramp
-          const rampH = c.baseY + t * c.height;
-          if (rampH > maxH) maxH = rampH;
+          // Ramp goes from -c.depth/2 (bottom) to +c.depth/2 (top) if angleY = 0
+          // Normalized progress along ramp
+          let progress = 0;
+          if (c.angleY === 0) {
+            // Slanted from south (-z) to north (+z)
+            progress = (dz + c.depth / 2) / c.depth;
+          } else if (c.angleY === Math.PI) {
+            // Slanted from north (+z) to south (-z)
+            progress = (c.depth / 2 - dz) / c.depth;
+          } else if (c.angleY === Math.PI / 2) {
+            // Slanted from west (-x) to east (+x)
+            progress = (dx + c.width / 2) / c.width;
+          } else if (c.angleY === -Math.PI / 2) {
+            // Slanted from east (+x) to west (-x)
+            progress = (c.width / 2 - dx) / c.width;
+          } else {
+            progress = (dz + c.depth / 2) / c.depth;
+          }
+
+          progress = THREE.MathUtils.clamp(progress, 0, 1);
+          const h = progress * c.height;
+
+          if (h > maxHeight) {
+            maxHeight = h;
+            // Ramp incline pitch angle
+            pitch = Math.atan2(c.height, c.depth);
+          }
         }
       }
     }
-    return maxH;
+
+    return { height: maxHeight, pitch };
   }
 
-  handleCollisions() {
-    const vanRadius = 1.25;
+  resolveCollisions() {
+    const carRadius = 1.15;
 
     for (const c of this.colliders) {
       if (c.type === 'box') {
-        // AABB / Circle collision
         const halfX = c.width / 2;
         const halfZ = c.depth / 2;
 
@@ -290,60 +341,59 @@ export class ArcadeVehicle {
         const distZ = this.position.z - closestZ;
         const distSq = distX * distX + distZ * distZ;
 
-        if (distSq < vanRadius * vanRadius && distSq > 0.0001) {
+        if (distSq < carRadius * carRadius && distSq > 0.00001) {
           const dist = Math.sqrt(distSq);
-          const overlap = vanRadius - dist;
+          const overlap = carRadius - dist;
           const normalX = distX / dist;
           const normalZ = distZ / dist;
 
-          // Push out
+          // Push car out of obstacle
           this.position.x += normalX * overlap;
           this.position.z += normalZ * overlap;
 
-          // Velocity bounce & impulse
+          // Bounce impulse
           const dot = this.velocity.x * normalX + this.velocity.z * normalZ;
           if (dot < 0) {
-            this.velocity.x -= dot * normalX * 1.35;
-            this.velocity.z -= dot * normalZ * 1.35;
-            this.velocity.multiplyScalar(0.7); // lose speed on impact
+            this.velocity.x -= dot * normalX * 1.3;
+            this.velocity.z -= dot * normalZ * 1.3;
+            this.velocity.multiplyScalar(0.75); // absorb speed
           }
         }
       }
     }
   }
 
-  updateSkidmarksAndSmoke(dt, right, forward) {
-    const isSkidding = !this.isAirborne && (this.isDrifting || this.slipVelocity > 3.5 || (this.speed < 2.0 && Math.abs(this.velocity.length()) > 3.0));
+  updateSkidsAndSmoke(dt, forward, right) {
+    const isSkidding = !this.isAirborne && (this.isDrifting || this.slipSpeed > 3.8);
 
-    // Rear wheel contact points
+    // Tire contact points
     const rlPos = this.position.clone()
-      .addScaledVector(forward, -this.wheelBaseHalf)
-      .addScaledVector(right, -this.wheelTrackHalf);
-    rlPos.y = this.groundY + 0.02;
+      .addScaledVector(forward, -1.05)
+      .addScaledVector(right, -0.65);
+    rlPos.y = this.position.y - this.rideHeight + 0.02;
 
     const rrPos = this.position.clone()
-      .addScaledVector(forward, -this.wheelBaseHalf)
-      .addScaledVector(right, this.wheelTrackHalf);
-    rrPos.y = this.groundY + 0.02;
+      .addScaledVector(forward, -1.05)
+      .addScaledVector(right, 0.65);
+    rrPos.y = this.position.y - this.rideHeight + 0.02;
 
     if (isSkidding) {
       this.spawnSmoke(rlPos);
       this.spawnSmoke(rrPos);
 
-      // Add skid mark vertices
-      this.skidPointsLeft.push(rlPos.x, rlPos.y, rlPos.z);
-      this.skidPointsRight.push(rrPos.x, rrPos.y, rrPos.z);
+      this.skidHistoryL.push(rlPos.x, rlPos.y, rlPos.z);
+      this.skidHistoryR.push(rrPos.x, rrPos.y, rrPos.z);
 
-      if (this.skidPointsLeft.length > this.maxSkidPoints * 3) {
-        this.skidPointsLeft.splice(0, 3);
-        this.skidPointsRight.splice(0, 3);
+      if (this.skidHistoryL.length > this.maxSkidPoints * 3) {
+        this.skidHistoryL.splice(0, 3);
+        this.skidHistoryR.splice(0, 3);
       }
-      this.updateSkidMesh();
+      this.updateSkidGeometry();
     }
 
-    // Update Smoke particles
-    const positions = this.smokeMesh.geometry.attributes.position.array;
-    const sizes = this.smokeMesh.geometry.attributes.size.array;
+    // Update smoke points
+    const posArr = this.smokeMesh.geometry.attributes.position.array;
+    const sizeArr = this.smokeMesh.geometry.attributes.size.array;
     let idx = 0;
 
     for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
@@ -356,67 +406,77 @@ export class ArcadeVehicle {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.z += p.vz * dt;
-      p.size = THREE.MathUtils.lerp(p.size, p.maxSize, 2.5 * dt);
+      p.size = THREE.MathUtils.lerp(p.size, p.maxSize, 3.0 * dt);
 
-      positions[idx * 3] = p.x;
-      positions[idx * 3 + 1] = p.y;
-      positions[idx * 3 + 2] = p.z;
-      sizes[idx] = p.size;
+      posArr[idx * 3] = p.x;
+      posArr[idx * 3 + 1] = p.y;
+      posArr[idx * 3 + 2] = p.z;
+      sizeArr[idx] = p.size;
       idx++;
     }
 
-    // Clear unused
     for (let i = idx; i < this.maxSmoke; i++) {
-      positions[i * 3 + 1] = -999;
-      sizes[i] = 0;
+      posArr[i * 3 + 1] = -999;
+      sizeArr[i] = 0;
     }
 
     this.smokeMesh.geometry.attributes.position.needsUpdate = true;
     this.smokeMesh.geometry.attributes.size.needsUpdate = true;
   }
 
-  updateSkidMesh() {
-    const count = Math.floor(this.skidPointsLeft.length / 3);
+  updateSkidGeometry() {
+    const count = Math.floor(this.skidHistoryL.length / 3);
     if (count < 2) return;
 
-    const positions = this.skidMesh.geometry.attributes.position.array;
+    const positions = this.skidGeometry.attributes.position.array;
     let pIdx = 0;
+    const w = 0.14; // tire width
 
     for (let i = 0; i < count - 1; i++) {
       const i3 = i * 3;
       const ni3 = (i + 1) * 3;
 
-      const lx1 = this.skidPointsLeft[i3], ly1 = this.skidPointsLeft[i3 + 1], lz1 = this.skidPointsLeft[i3 + 2];
-      const lx2 = this.skidPointsLeft[ni3], ly2 = this.skidPointsLeft[ni3 + 1], lz2 = this.skidPointsLeft[ni3 + 2];
-      
-      const rx1 = this.skidPointsRight[i3], ry1 = this.skidPointsRight[i3 + 1], rz1 = this.skidPointsRight[i3 + 2];
-      const rx2 = this.skidPointsRight[ni3], ry2 = this.skidPointsRight[ni3 + 1], rz2 = this.skidPointsRight[ni3 + 2];
+      const lx1 = this.skidHistoryL[i3], ly1 = this.skidHistoryL[i3 + 1], lz1 = this.skidHistoryL[i3 + 2];
+      const lx2 = this.skidHistoryL[ni3], ly2 = this.skidHistoryL[ni3 + 1], lz2 = this.skidHistoryL[ni3 + 2];
 
-      const w = 0.12; // tire width
-      // Triangle 1
+      const rx1 = this.skidHistoryR[i3], ry1 = this.skidHistoryR[i3 + 1], rz1 = this.skidHistoryR[i3 + 2];
+      const rx2 = this.skidHistoryR[ni3], ry2 = this.skidHistoryR[ni3 + 1], rz2 = this.skidHistoryR[ni3 + 2];
+
+      // Left tire quad
       positions[pIdx++] = lx1 - w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
       positions[pIdx++] = lx1 + w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
       positions[pIdx++] = lx2 - w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
 
-      // Triangle 2
       positions[pIdx++] = lx1 + w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
       positions[pIdx++] = lx2 + w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
       positions[pIdx++] = lx2 - w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
+
+      // Right tire quad
+      positions[pIdx++] = rx1 - w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
+      positions[pIdx++] = rx1 + w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
+      positions[pIdx++] = rx2 - w; positions[pIdx++] = ry2; positions[pIdx++] = rz2;
+
+      positions[pIdx++] = rx1 + w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
+      positions[pIdx++] = rx2 + w; positions[pIdx++] = ry2; positions[pIdx++] = rz2;
+      positions[pIdx++] = rx2 - w; positions[pIdx++] = ry2; positions[pIdx++] = rz2;
     }
 
-    this.skidMesh.geometry.attributes.position.needsUpdate = true;
-    this.skidMesh.geometry.setDrawRange(0, pIdx / 3);
+    this.skidGeometry.attributes.position.needsUpdate = true;
+    this.skidGeometry.setDrawRange(0, pIdx / 3);
   }
 
-  reset(x = 0, z = 0, heading = 0) {
-    this.position.set(x, 1.2, z);
+  reset(x = 0, z = -35, heading = 0) {
+    this.position.set(x, this.rideHeight, z);
     this.velocity.set(0, 0, 0);
     this.heading = heading;
+    this.pitch = 0;
     this.angularVelocity = 0;
     this.speed = 0;
-    this.bodyPitch = 0;
-    this.bodyRoll = 0;
+    this.visualRoll = 0;
+    this.visualPitch = 0;
+    this.steerInput = 0;
     this.steerAngle = 0;
     this.isDrifting = false;
+    this.isAirborne = false;
   }
 }

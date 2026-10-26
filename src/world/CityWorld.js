@@ -6,16 +6,15 @@ export class CityWorld {
     this.scene = scene;
     this.colliders = [];
     this.deliverySpots = [];
-    this.hubPosition = new THREE.Vector3(0, 0, 0);
 
     this.buildWorld();
   }
 
   buildWorld() {
-    // 1. Ground Plane (Grass & Terrain)
-    const groundGeo = new THREE.PlaneGeometry(300, 300);
+    // 1. Clean Ground Plane
+    const groundGeo = new THREE.PlaneGeometry(350, 350);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x4caf50,
+      color: 0x243328,
       roughness: 0.9,
       metalness: 0.05
     });
@@ -24,26 +23,23 @@ export class CityWorld {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // 2. Road Network
+    // 2. High-Readability Road Network
     this.buildRoads();
 
-    // 3. Central Checkers Supermarket Hub
-    this.buildCheckersHub();
+    // 3. SOLID 3D JUMP RAMPS (Fix: full geometry + DoubleSide + hazard texture)
+    this.buildSolidRamps();
 
-    // 4. Neighborhood Houses & Delivery Drop-offs
-    this.buildHouses();
+    // 4. Slalom Cones Area (for testing steering & grip)
+    this.buildSlalomArea();
 
-    // 5. Jump Ramps (for arcade jumps & suspension testing)
-    this.buildJumpRamps();
-
-    // 6. Street Props (Trees, Streetlights, Barriers)
-    this.buildProps();
+    // 5. Buildings & Delivery Destinations (Greybox functional)
+    this.buildBuildings();
   }
 
   buildRoads() {
     const roadMat = new THREE.MeshStandardMaterial({
       map: TextureGenerator.createAsphaltTexture(),
-      roughness: 0.85
+      roughness: 0.8
     });
 
     const createRoad = (x, z, width, length, rot = 0) => {
@@ -56,12 +52,12 @@ export class CityWorld {
 
       // Yellow Center Dash Lines
       const lineMat = new THREE.MeshBasicMaterial({ color: 0xffd54f });
-      const numDashes = Math.floor(length / 6);
+      const numDashes = Math.floor(length / 7);
       for (let i = 0; i < numDashes; i++) {
-        const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 3.2), lineMat);
+        const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 3.8), lineMat);
         dash.rotation.x = -Math.PI / 2;
         dash.rotation.z = rot;
-        const offset = (i - numDashes / 2) * 6;
+        const offset = (i - numDashes / 2) * 7;
         if (rot === 0) {
           dash.position.set(x, 0.02, z + offset);
         } else {
@@ -69,163 +65,138 @@ export class CityWorld {
         }
         this.scene.add(dash);
       }
+
+      // Concrete White Edge Curbs
+      const curbMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.7 });
+      const createCurb = (cx, cz, cw, cl, crot) => {
+        const curb = new THREE.Mesh(new THREE.BoxGeometry(cw, 0.22, cl), curbMat);
+        curb.position.set(cx, 0.11, cz);
+        curb.rotation.y = crot;
+        this.scene.add(curb);
+      };
+
+      const halfW = width / 2;
+      if (rot === 0) {
+        createCurb(x - halfW - 0.2, z, 0.4, length, 0);
+        createCurb(x + halfW + 0.2, z, 0.4, length, 0);
+      } else {
+        createCurb(x, z - halfW - 0.2, length, 0.4, 0);
+        createCurb(x, z + halfW + 0.2, length, 0.4, 0);
+      }
     };
 
-    // Main Avenue (North-South)
-    createRoad(0, 0, 16, 240, 0);
+    // Main Drag (North-South, 18m wide)
+    createRoad(0, 0, 18, 260, 0);
 
-    // Cross Boulevard (East-West)
-    createRoad(0, 40, 16, 240, Math.PI / 2);
-    createRoad(0, -60, 14, 240, Math.PI / 2);
+    // Cross Boulevards
+    createRoad(0, 50, 16, 260, Math.PI / 2);
+    createRoad(0, -65, 16, 260, Math.PI / 2);
 
-    // Suburban Winding Streets
-    createRoad(70, 0, 12, 140, 0);
-    createRoad(-70, -10, 12, 160, 0);
-    createRoad(0, 95, 12, 180, Math.PI / 2);
+    // Outer Circuit
+    createRoad(80, 0, 14, 160, 0);
+    createRoad(-80, -5, 14, 180, 0);
+    createRoad(0, 105, 14, 180, Math.PI / 2);
   }
 
-  buildCheckersHub() {
-    // Checkers Supermarket Mega Store
-    const hubGroup = new THREE.Group();
-    hubGroup.position.set(38, 0, -10);
+  buildSolidRamps() {
+    // Generate Hazard Stripe Texture (Yellow and Black chevrons)
+    const rampCanvas = document.createElement('canvas');
+    rampCanvas.width = 256;
+    rampCanvas.height = 256;
+    const ctx = rampCanvas.getContext('2d');
+    ctx.fillStyle = '#ffb300';
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = '#111111';
+    for (let y = -256; y < 512; y += 48) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(256, y + 128);
+      ctx.lineTo(256, y + 168);
+      ctx.lineTo(0, y + 40);
+      ctx.closePath();
+      ctx.fill();
+    }
+    const hazardTex = new THREE.CanvasTexture(rampCanvas);
+    hazardTex.wrapS = THREE.RepeatWrapping;
+    hazardTex.wrapT = THREE.RepeatWrapping;
+    hazardTex.repeat.set(2, 4);
 
-    // Store building
-    const storeMat = new THREE.MeshStandardMaterial({ color: 0x1c313a, roughness: 0.5 });
-    const storeMesh = new THREE.Mesh(new THREE.BoxGeometry(32, 12, 28), storeMat);
-    storeMesh.position.y = 6;
-    storeMesh.castShadow = true;
-    hubGroup.add(storeMesh);
-
-    // Sixty60 Billboard Banner
-    const bannerCanvas = document.createElement('canvas');
-    bannerCanvas.width = 512;
-    bannerCanvas.height = 128;
-    const ctx = bannerCanvas.getContext('2d');
-    ctx.fillStyle = '#00bcd4';
-    ctx.fillRect(0, 0, 512, 128);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'italic 900 42px "Arial Black", Impact';
-    ctx.fillText('Checkers Hyper SIXTY60', 16, 80);
-    const bannerTex = new THREE.CanvasTexture(bannerCanvas);
-
-    const bannerMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(28, 6),
-      new THREE.MeshBasicMaterial({ map: bannerTex })
-    );
-    bannerMesh.position.set(0, 10, -14.1);
-    bannerMesh.rotation.y = Math.PI;
-    hubGroup.add(bannerMesh);
-
-    // Loading Bay Canopies
-    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x13b843, roughness: 0.4 });
-    const canopy = new THREE.Mesh(new THREE.BoxGeometry(22, 1.2, 8), canopyMat);
-    canopy.position.set(0, 4.8, -17);
-    hubGroup.add(canopy);
-
-    this.scene.add(hubGroup);
-
-    // Register collider
-    this.colliders.push({
-      type: 'box',
-      x: hubGroup.position.x,
-      z: hubGroup.position.y,
-      width: 33,
-      depth: 29
+    const rampMat = new THREE.MeshStandardMaterial({
+      map: hazardTex,
+      roughness: 0.5,
+      metalness: 0.2,
+      side: THREE.DoubleSide // Guarantee visibility from all angles
     });
 
-    this.hubPosition.set(38, 0, -28);
-  }
+    const sideWallMat = new THREE.MeshStandardMaterial({
+      color: 0x37474f,
+      roughness: 0.7,
+      side: THREE.DoubleSide
+    });
 
-  buildHouses() {
-    const houseConfigs = [
-      { id: '1', name: 'Palm Villa', x: -35, z: 25, color: 0xf5f5f5, roof: 0xb71c1c },
-      { id: '2', name: 'Hillside Modern', x: -40, z: -35, color: 0xe0e0e0, roof: 0x263238 },
-      { id: '3', name: 'Sunny Crest Residence', x: 42, z: 65, color: 0xffecb3, roof: 0xbf360c },
-      { id: '4', name: 'Orchid Court Apartments', x: -38, z: 80, color: 0xcfd8dc, roof: 0x37474f, height: 16 },
-      { id: '5', name: 'Boutique Corner Cafe', x: 38, z: -85, color: 0xffcdd2, roof: 0x4e342e },
-      { id: '6', name: 'Pine Avenue Manor', x: -85, z: 30, color: 0xd7ccc8, roof: 0x1b5e20 }
-    ];
+    // Helper: Creates a 100% solid, closed 3D wedge with properly wound faces
+    const createSolidRampMesh = (w, d, h) => {
+      const group = new THREE.Group();
+      const hw = w / 2;
+      const hd = d / 2;
 
-    const wallMat = (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 });
-    const roofMat = (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 });
+      // 1. Top Slanted Surface
+      const topGeo = new THREE.PlaneGeometry(w, Math.hypot(d, h));
+      const topMesh = new THREE.Mesh(topGeo, rampMat);
+      topMesh.position.set(0, h / 2, 0);
+      topMesh.rotation.x = -Math.atan2(h, d);
+      topMesh.castShadow = true;
+      topMesh.receiveShadow = true;
+      group.add(topMesh);
 
-    for (const h of houseConfigs) {
-      const houseGroup = new THREE.Group();
-      houseGroup.position.set(h.x, 0, h.z);
+      // 2. Back Vertical Wall
+      const backGeo = new THREE.PlaneGeometry(w, h);
+      const backMesh = new THREE.Mesh(backGeo, sideWallMat);
+      backMesh.position.set(0, h / 2, hd);
+      backMesh.castShadow = true;
+      group.add(backMesh);
 
-      const hH = h.height || 7;
-      const bMesh = new THREE.Mesh(new THREE.BoxGeometry(14, hH, 12), wallMat(h.color));
-      bMesh.position.y = hH / 2;
-      bMesh.castShadow = true;
-      houseGroup.add(bMesh);
+      // 3. Left Side Triangular Wall
+      const leftShape = new THREE.Shape();
+      leftShape.moveTo(-hd, 0);
+      leftShape.lineTo(hd, 0);
+      leftShape.lineTo(hd, h);
+      leftShape.closePath();
+      const sideGeoL = new THREE.ShapeGeometry(leftShape);
+      const leftMesh = new THREE.Mesh(sideGeoL, sideWallMat);
+      leftMesh.position.set(-hw, 0, 0);
+      leftMesh.rotation.y = -Math.PI / 2;
+      group.add(leftMesh);
 
-      // Roof
-      const rMesh = new THREE.Mesh(new THREE.ConeGeometry(10.5, 4.5, 4), roofMat(h.roof));
-      rMesh.position.y = hH + 2.25;
-      rMesh.rotation.y = Math.PI / 4;
-      rMesh.castShadow = true;
-      houseGroup.add(rMesh);
+      // 4. Right Side Triangular Wall
+      const sideGeoR = new THREE.ShapeGeometry(leftShape);
+      const rightMesh = new THREE.Mesh(sideGeoR, sideWallMat);
+      rightMesh.position.set(hw, 0, 0);
+      rightMesh.rotation.y = Math.PI / 2;
+      group.add(rightMesh);
 
-      // Front Doorway / Porch
-      const porch = new THREE.Mesh(
-        new THREE.BoxGeometry(3.5, 0.2, 3),
-        new THREE.MeshStandardMaterial({ color: 0x78909c })
-      );
-      porch.position.set(0, 0.1, 7);
-      houseGroup.add(porch);
+      // 5. Red Safety Guard Rails on sides
+      const railMat = new THREE.MeshStandardMaterial({ color: 0xe53935 });
+      const railL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, Math.hypot(d, h)), railMat);
+      railL.position.set(-hw, h / 2 + 0.22, 0);
+      railL.rotation.x = -Math.atan2(h, d);
+      group.add(railL);
 
-      // Delivery Destination Zone: Drop-off marker on the porch
-      const dropSpot = {
-        id: h.id,
-        name: h.name,
-        position: new THREE.Vector3(h.x, 0.2, h.z + 7.2),
-        drivewayPos: new THREE.Vector3(h.x, 0, h.z + 12)
-      };
-      this.deliverySpots.push(dropSpot);
+      const railR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, Math.hypot(d, h)), railMat);
+      railR.position.set(hw, h / 2 + 0.22, 0);
+      railR.rotation.x = -Math.atan2(h, d);
+      group.add(railR);
 
-      this.scene.add(houseGroup);
+      return group;
+    };
 
-      // Register collision box
-      this.colliders.push({
-        type: 'box',
-        x: h.x,
-        z: h.z,
-        width: 15,
-        depth: 13
-      });
-    }
-  }
-
-  buildJumpRamps() {
-    // Stunt ramps placed along open roads to test jumps and suspension!
-    const rampMat = new THREE.MeshStandardMaterial({ color: 0xffb300, roughness: 0.5 });
-
-    const createRamp = (x, z, w, d, h, angleY = 0) => {
-      const rampGeo = new THREE.BufferGeometry();
-      // Wedge geometry
-      const hw = w / 2, hd = d / 2;
-      const vertices = new Float32Array([
-        // Bottom
-        -hw, 0, -hd,   hw, 0, -hd,   hw, 0, hd,
-        -hw, 0, -hd,   hw, 0, hd,   -hw, 0, hd,
-        // Slanted top ramp
-        -hw, 0, -hd,   hw, 0, -hd,   hw, h, hd,
-        -hw, 0, -hd,   hw, h, hd,   -hw, h, hd,
-        // Back wall
-        -hw, 0, hd,    hw, 0, hd,    hw, h, hd,
-        -hw, 0, hd,    hw, h, hd,   -hw, h, hd,
-      ]);
-      rampGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-      rampGeo.computeVertexNormals();
-
-      const rampMesh = new THREE.Mesh(rampGeo, rampMat);
+    const addRamp = (x, z, w, d, h, angleY = 0) => {
+      const rampMesh = createSolidRampMesh(w, d, h);
       rampMesh.position.set(x, 0, z);
       rampMesh.rotation.y = angleY;
-      rampMesh.castShadow = true;
-      rampMesh.receiveShadow = true;
       this.scene.add(rampMesh);
 
-      // Register ramp physics
+      // Register collision ramp
       this.colliders.push({
         type: 'ramp',
         x,
@@ -233,58 +204,87 @@ export class CityWorld {
         width: w,
         depth: d,
         height: h,
-        baseY: 0
+        angleY
       });
     };
 
-    // Ramp 1 on Main Avenue (facing north)
-    createRamp(0, -18, 5.5, 7.5, 2.2, 0);
+    // Ramp 1: Main Drag High-Speed Jump (launches North)
+    addRamp(0, -15, 6.5, 9.0, 2.6, 0);
 
-    // Ramp 2 on East Boulevard
-    createRamp(50, 40, 5.5, 8.0, 2.5, -Math.PI / 2);
+    // Ramp 2: East Boulevard Stunt Ramp (launches East)
+    addRamp(45, 50, 6.5, 9.5, 3.0, -Math.PI / 2);
 
-    // Ramp 3 in open park space
-    createRamp(-45, -5, 6.0, 9.0, 3.2, Math.PI / 4);
+    // Ramp 3: West Boulevard Jump (launches West)
+    addRamp(-45, -65, 6.5, 9.5, 2.8, Math.PI / 2);
+
+    // Ramp 4: Mega Stunt Ramp on the North Loop
+    addRamp(0, 80, 8.0, 11.0, 3.8, 0);
   }
 
-  buildProps() {
-    // Trees
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037 });
-    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.7 });
+  buildSlalomArea() {
+    // Slalom cones test zone (for testing sharp steering and traction)
+    const coneMat = new THREE.MeshStandardMaterial({ color: 0xff6d00, roughness: 0.4 });
+    const whiteStripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-    const treeGeoTrunk = new THREE.CylinderGeometry(0.25, 0.35, 2.8, 8);
-    const treeGeoFoliage = new THREE.SphereGeometry(1.6, 8, 8);
+    for (let i = -4; i <= 4; i++) {
+      if (Math.abs(i) < 2) continue; // leave space near center
+      const coneGroup = new THREE.Group();
+      coneGroup.position.set(0, 0, i * 14);
 
-    const createTree = (x, z) => {
-      const tree = new THREE.Group();
-      tree.position.set(x, 0, z);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.75, 12), coneMat);
+      cone.position.y = 0.375;
+      cone.castShadow = true;
+      coneGroup.add(cone);
 
-      const trunk = new THREE.Mesh(treeGeoTrunk, trunkMat);
-      trunk.position.y = 1.4;
-      trunk.castShadow = true;
+      const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.15, 12), whiteStripeMat);
+      stripe.position.y = 0.35;
+      coneGroup.add(stripe);
 
-      const leaves = new THREE.Mesh(treeGeoFoliage, foliageMat);
-      leaves.position.y = 3.6;
-      leaves.castShadow = true;
+      this.scene.add(coneGroup);
+    }
+  }
 
-      tree.add(trunk, leaves);
-      this.scene.add(tree);
+  buildBuildings() {
+    // Greybox Functional Neighborhood & Checkers Hub
+    const buildingConfigs = [
+      { id: '1', name: 'Palm Villa', x: -35, z: 25, w: 16, d: 14, h: 8, col: 0x37474f },
+      { id: '2', name: 'Hillside Modern', x: -42, z: -35, w: 18, d: 14, h: 9, col: 0x455a64 },
+      { id: '3', name: 'Sunny Crest Residence', x: 44, z: 70, w: 16, d: 16, h: 8, col: 0x546e7a },
+      { id: '4', name: 'Orchid Court Complex', x: -40, z: 85, w: 22, d: 18, h: 14, col: 0x263238 },
+      { id: '5', name: 'Checkers Mega Hub', x: 46, z: -10, w: 32, d: 28, h: 10, col: 0x1b2831 }
+    ];
 
+    for (const b of buildingConfigs) {
+      const bMat = new THREE.MeshStandardMaterial({ color: b.col, roughness: 0.7 });
+      const bMesh = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), bMat);
+      bMesh.position.set(b.x, b.h / 2, b.z);
+      bMesh.castShadow = true;
+      bMesh.receiveShadow = true;
+      this.scene.add(bMesh);
+
+      // Roof edge trim
+      const trimMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(b.w + 0.4, 0.4, b.d + 0.4),
+        new THREE.MeshStandardMaterial({ color: 0x00bcd4, roughness: 0.3 })
+      );
+      trimMesh.position.set(b.x, b.h + 0.2, b.z);
+      this.scene.add(trimMesh);
+
+      // Register collision box
       this.colliders.push({
         type: 'box',
-        x,
-        z,
-        width: 1.2,
-        depth: 1.2
+        x: b.x,
+        z: b.z,
+        width: b.w + 0.5,
+        depth: b.d + 0.5
       });
-    };
 
-    // Place trees along roads
-    for (let z = -100; z <= 100; z += 30) {
-      if (Math.abs(z - 40) > 12 && Math.abs(z + 60) > 12) {
-        createTree(-11, z);
-        createTree(11, z);
-      }
+      // Delivery Destination Zone
+      this.deliverySpots.push({
+        id: b.id,
+        name: b.name,
+        position: new THREE.Vector3(b.x, 0.2, b.z + b.d / 2 + 5.5)
+      });
     }
   }
 }

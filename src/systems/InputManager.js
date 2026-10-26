@@ -2,26 +2,20 @@ export class InputManager {
   constructor() {
     this.keys = {};
 
-    // Standardized input values
+    // Standardized drive input
     this.throttle = 0;
     this.brake = 0;
     this.steer = 0;
     this.handbrake = false;
-    this.sprint = false;
 
-    // Foot movement
-    this.moveX = 0;
-    this.moveZ = 0;
-
-    // Triggers / Events
-    this.onEnterExit = null;
+    // Callbacks
     this.onToggleSideDoor = null;
     this.onToggleRearDoors = null;
     this.onActionDeliver = null;
     this.onToggleCamera = null;
     this.onResetVehicle = null;
 
-    // Virtual Joystick state
+    // Virtual Touch Joystick
     this.joystickActive = false;
     this.joystickOrigin = { x: 0, y: 0 };
     this.joystickPos = { x: 0, y: 0 };
@@ -34,9 +28,7 @@ export class InputManager {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
 
-      if (e.code === 'KeyE' || e.code === 'KeyF') {
-        if (this.onEnterExit) this.onEnterExit();
-      } else if (e.code === 'KeyG') {
+      if (e.code === 'KeyG') {
         if (this.onToggleRearDoors) this.onToggleRearDoors();
       } else if (e.code === 'KeyH') {
         if (this.onToggleSideDoor) this.onToggleSideDoor();
@@ -44,7 +36,7 @@ export class InputManager {
         if (this.onToggleCamera) this.onToggleCamera();
       } else if (e.code === 'KeyR') {
         if (this.onResetVehicle) this.onResetVehicle();
-      } else if (e.code === 'Enter' || e.code === 'KeyQ') {
+      } else if (e.code === 'Enter' || e.code === 'KeyQ' || e.code === 'KeyE') {
         if (this.onActionDeliver) this.onActionDeliver();
       }
     });
@@ -55,7 +47,6 @@ export class InputManager {
   }
 
   bindTouchControls() {
-    // Virtual touch joystick setup
     const joystickZone = document.getElementById('touch-joystick-zone');
     const joystickNub = document.getElementById('touch-joystick-nub');
 
@@ -92,7 +83,6 @@ export class InputManager {
           const ny = Math.sin(angle) * clampedDist;
 
           joystickNub.style.transform = `translate(${nx}px, ${ny}px)`;
-
           this.joystickPos.x = nx / maxRadius;
           this.joystickPos.y = ny / maxRadius;
         }
@@ -118,7 +108,6 @@ export class InputManager {
     this.bindButton('btn-gas', (active) => { this.btnGas = active; });
     this.bindButton('btn-brake', (active) => { this.btnBrake = active; });
     this.bindButton('btn-drift', (active) => { this.btnDrift = active; });
-    this.bindButtonClick('btn-enter-exit', () => { if (this.onEnterExit) this.onEnterExit(); });
     this.bindButtonClick('btn-deliver', () => { if (this.onActionDeliver) this.onActionDeliver(); });
     this.bindButtonClick('btn-cam', () => { if (this.onToggleCamera) this.onToggleCamera(); });
     this.bindButtonClick('btn-side-door', () => { if (this.onToggleSideDoor) this.onToggleSideDoor(); });
@@ -151,41 +140,29 @@ export class InputManager {
     }, { passive: false });
   }
 
-  update(isOnFoot = false) {
-    // 1. Driving controls
+  update() {
     let t = 0;
     let b = 0;
     let s = 0;
 
+    // Acceleration & Braking
     if (this.keys['KeyW'] || this.keys['ArrowUp'] || this.btnGas) t += 1;
     if (this.keys['KeyS'] || this.keys['ArrowDown'] || this.btnBrake) b += 1;
+
+    // Steering: A / Left Arrow = -1 (Steer Left), D / Right Arrow = +1 (Steer Right)
     if (this.keys['KeyA'] || this.keys['ArrowLeft']) s -= 1;
     if (this.keys['KeyD'] || this.keys['ArrowRight']) s += 1;
 
-    // Joystick contribution
+    // Virtual Joystick contribution
     if (this.joystickActive) {
-      if (isOnFoot) {
-        this.moveX = this.joystickPos.x;
-        this.moveZ = -this.joystickPos.y;
-      } else {
-        s += this.joystickPos.x;
-        if (this.joystickPos.y < -0.15) t += -this.joystickPos.y;
-        if (this.joystickPos.y > 0.15) b += this.joystickPos.y;
-      }
-    } else if (isOnFoot) {
-      let mx = 0, mz = 0;
-      if (this.keys['KeyA'] || this.keys['ArrowLeft']) mx -= 1;
-      if (this.keys['KeyD'] || this.keys['ArrowRight']) mx += 1;
-      if (this.keys['KeyW'] || this.keys['ArrowUp']) mz += 1;
-      if (this.keys['KeyS'] || this.keys['ArrowDown']) mz -= 1;
-      this.moveX = mx;
-      this.moveZ = mz;
+      s += this.joystickPos.x;
+      if (this.joystickPos.y < -0.15) t += -this.joystickPos.y;
+      if (this.joystickPos.y > 0.15) b += this.joystickPos.y;
     }
 
     this.throttle = Math.min(1.0, Math.max(0.0, t));
     this.brake = Math.min(1.0, Math.max(0.0, b));
     this.steer = Math.min(1.0, Math.max(-1.0, s));
     this.handbrake = Boolean(this.keys['Space'] || this.btnDrift);
-    this.sprint = Boolean(this.keys['ShiftLeft'] || this.keys['ShiftRight']);
   }
 }
