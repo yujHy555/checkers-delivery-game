@@ -104,14 +104,11 @@ export class InputManager {
     window.addEventListener('touchend', endTouch);
     window.addEventListener('touchcancel', endTouch);
 
-    // Bind on-screen touch buttons
     this.bindButton('btn-gas', (active) => { this.btnGas = active; });
     this.bindButton('btn-brake', (active) => { this.btnBrake = active; });
     this.bindButton('btn-drift', (active) => { this.btnDrift = active; });
     this.bindButtonClick('btn-deliver', () => { if (this.onActionDeliver) this.onActionDeliver(); });
     this.bindButtonClick('btn-cam', () => { if (this.onToggleCamera) this.onToggleCamera(); });
-    this.bindButtonClick('btn-side-door', () => { if (this.onToggleSideDoor) this.onToggleSideDoor(); });
-    this.bindButtonClick('btn-rear-doors', () => { if (this.onToggleRearDoors) this.onToggleRearDoors(); });
   }
 
   bindButton(id, callback) {
@@ -149,13 +146,15 @@ export class InputManager {
     if (this.keys['KeyW'] || this.keys['ArrowUp'] || this.btnGas) t += 1;
     if (this.keys['KeyS'] || this.keys['ArrowDown'] || this.btnBrake) b += 1;
 
-    // Steering: A / Left Arrow = -1 (Steer Left), D / Right Arrow = +1 (Steer Right)
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) s -= 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) s += 1;
+    // STEERING DIRECTION (SWAPPED as requested by user)
+    // Pressing KeyA / ArrowLeft turns vehicle to user's intended Left
+    // Pressing KeyD / ArrowRight turns vehicle to user's intended Right
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) s += 1;
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) s -= 1;
 
-    // Virtual Joystick contribution
+    // Virtual Joystick (Swapped horizontally to match)
     if (this.joystickActive) {
-      s += this.joystickPos.x;
+      s -= this.joystickPos.x;
       if (this.joystickPos.y < -0.15) t += -this.joystickPos.y;
       if (this.joystickPos.y > 0.15) b += this.joystickPos.y;
     }

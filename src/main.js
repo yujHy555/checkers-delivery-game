@@ -11,7 +11,7 @@ class GameApp {
   constructor() {
     this.container = document.getElementById('canvas-container');
 
-    // 1. Three.js Scene & Renderer
+    // 1. Scene & WebGL Renderer
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x90caf9);
     this.scene.fog = new THREE.FogExp2(0x90caf9, 0.0035);
@@ -29,7 +29,7 @@ class GameApp {
     this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
     this.cameraManager = new CameraManager(this.camera, this.renderer.domElement);
 
-    // 3. Lighting (Crisp directional sunlight + ambient sky)
+    // 3. Directional Lighting with Grounded Shadows
     this.setupLighting();
 
     // 4. World Environment with Solid Ramps & Slalom Area
@@ -45,10 +45,10 @@ class GameApp {
     // 7. Delivery Mission System
     this.deliverySystem = new DeliverySystem(this.scene, this.world.deliverySpots);
 
-    // 8. Audio Synth
+    // 8. Audio Synth (Engine, Skids, and Subtle Brake Squeal)
     this.audio = new AudioSynth();
 
-    // 9. Input Manager
+    // 9. Input Manager (Swapped steer controls)
     this.input = new InputManager();
 
     // Setup Callbacks
@@ -76,40 +76,41 @@ class GameApp {
     hemiLight.position.set(0, 50, 0);
     this.scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff8e7, 1.5);
-    dirLight.position.set(60, 90, 50);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 300;
-    dirLight.shadow.camera.left = -90;
-    dirLight.shadow.camera.right = 90;
-    dirLight.shadow.camera.top = 90;
-    dirLight.shadow.camera.bottom = -90;
-    dirLight.shadow.bias = -0.0004;
-    this.scene.add(dirLight);
+    // Optimized Directional Sun Shadow
+    this.dirLight = new THREE.DirectionalLight(0xfff8e7, 1.5);
+    this.dirLight.position.set(40, 80, 40);
+    this.dirLight.castShadow = true;
+    this.dirLight.shadow.mapSize.width = 2048;
+    this.dirLight.shadow.mapSize.height = 2048;
+    this.dirLight.shadow.camera.near = 0.5;
+    this.dirLight.shadow.camera.far = 250;
+    
+    // Tight shadow frustum around car for maximum ground shadow sharpness
+    this.dirLight.shadow.camera.left = -40;
+    this.dirLight.shadow.camera.right = 40;
+    this.dirLight.shadow.camera.top = 40;
+    this.dirLight.shadow.camera.bottom = -40;
+    this.dirLight.shadow.bias = -0.0006;
+    this.dirLight.shadow.radius = 1.5;
+    this.scene.add(this.dirLight);
 
     const ambient = new THREE.AmbientLight(0xdcf8ff, 0.4);
     this.scene.add(ambient);
   }
 
   setupInputCallbacks() {
-    // Toggle Side Slide Door
     this.input.onToggleSideDoor = () => {
       this.audio.playDoorSlide();
       const isOpen = this.vanModel.toggleSideDoor();
       this.showToast(isOpen ? 'Side Sliding Door: OPEN' : 'Side Sliding Door: CLOSED');
     };
 
-    // Toggle Rear Barn Doors
     this.input.onToggleRearDoors = () => {
       this.audio.playDoorSlide();
       const isOpen = this.vanModel.toggleRearDoors();
       this.showToast(isOpen ? 'Rear Barn Doors: OPEN' : 'Rear Barn Doors: CLOSED');
     };
 
-    // Action: Deliver Groceries
     this.input.onActionDeliver = () => {
       const currentTarget = this.deliverySystem.getCurrentSpot();
       if (!currentTarget) return;
@@ -124,7 +125,6 @@ class GameApp {
       }
     };
 
-    // Toggle Camera (Third-Person Chase <-> Isometric)
     this.input.onToggleCamera = () => {
       const mode = this.cameraManager.toggleMode();
       this.showToast(`Camera: ${mode === 'THIRD_PERSON' ? 'Third-Person Chase' : '3D Isometric'}`);
@@ -133,7 +133,6 @@ class GameApp {
       }
     };
 
-    // Reset Vehicle upright
     this.input.onResetVehicle = () => {
       this.vehiclePhysics.reset(0, -40, 0);
       this.showToast('Van reset on center road!');
@@ -228,16 +227,25 @@ class GameApp {
     // 4. Update Dynamic Camera
     this.cameraManager.update(dt, this.vanModel.root, this.vehiclePhysics);
 
-    // 5. Update Delivery System
+    // 5. Update Sun Shadow follow position (tight sharp shadow on vehicle)
+    if (this.dirLight) {
+      this.dirLight.position.x = this.vehiclePhysics.position.x + 40;
+      this.dirLight.position.z = this.vehiclePhysics.position.z + 40;
+      this.dirLight.target.position.copy(this.vehiclePhysics.position);
+      this.dirLight.target.updateMatrixWorld();
+    }
+
+    // 6. Update Delivery System
     const carPos = this.vanModel.root.position;
     this.deliverySystem.update(dt, carPos);
 
-    // 6. Audio Engine & Skid Sound
+    // 7. Audio Engine, Drift Screech & Subtle Brake Sound
     const kmh = Math.abs(this.vehiclePhysics.speed * 3.6);
     this.audio.updateEngine(this.vehiclePhysics.speed, this.input.throttle, this.vehiclePhysics.maxSpeed);
-    this.audio.updateSkid(this.vehiclePhysics.isDrifting || this.vehiclePhysics.slipSpeed > 3.8, this.vehiclePhysics.slipSpeed);
+    this.audio.updateSkid(this.vehiclePhysics.isDrifting || this.vehiclePhysics.slipSpeed > 3.0, this.vehiclePhysics.slipSpeed);
+    this.audio.updateBrake(this.vehiclePhysics.isBrakingHard, this.vehiclePhysics.speed);
 
-    // 7. Update HUD
+    // 8. Update HUD
     if (this.uiSpeed) this.uiSpeed.innerText = Math.round(kmh);
     if (this.uiScore) this.uiScore.innerText = this.deliverySystem.score;
 
@@ -247,7 +255,6 @@ class GameApp {
       if (this.uiOrder) this.uiOrder.innerText = `Order: ${currentTarget.name}`;
       if (this.uiTargetDist) this.uiTargetDist.innerText = `${dist}m away`;
 
-      // Interactive Action Prompt near delivery zone
       if (this.uiPrompt) {
         if (dist < 12.0) {
           this.uiPrompt.innerHTML = `<span class="key-pill">ENTER / E</span> Deliver Paper Bags!`;
@@ -258,10 +265,10 @@ class GameApp {
       }
     }
 
-    // 8. Update Minimap
+    // 9. Update Minimap
     this.updateMinimap(carPos, this.vehiclePhysics.heading, currentTarget ? currentTarget.position : null);
 
-    // 9. Render Scene
+    // 10. Render Scene
     this.renderer.render(this.scene, this.camera);
   }
 }

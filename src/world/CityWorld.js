@@ -11,11 +11,11 @@ export class CityWorld {
   }
 
   buildWorld() {
-    // 1. Clean Ground Plane
+    // 1. Ground Plane (Receives shadow)
     const groundGeo = new THREE.PlaneGeometry(350, 350);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x243328,
-      roughness: 0.9,
+      color: 0x27352b,
+      roughness: 0.95,
       metalness: 0.05
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -23,16 +23,16 @@ export class CityWorld {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // 2. High-Readability Road Network
+    // 2. Road Network
     this.buildRoads();
 
-    // 3. SOLID 3D JUMP RAMPS (Fix: full geometry + DoubleSide + hazard texture)
+    // 3. SOLID SIMPLE UNTEXTURED 3D JUMP RAMPS
     this.buildSolidRamps();
 
-    // 4. Slalom Cones Area (for testing steering & grip)
+    // 4. Slalom Cones Area
     this.buildSlalomArea();
 
-    // 5. Buildings & Delivery Destinations (Greybox functional)
+    // 5. Buildings & Delivery Destinations
     this.buildBuildings();
   }
 
@@ -66,26 +66,27 @@ export class CityWorld {
         this.scene.add(dash);
       }
 
-      // Concrete White Edge Curbs
+      // Concrete White Edge Curbs (cast and receive shadows)
       const curbMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.7 });
-      const createCurb = (cx, cz, cw, cl, crot) => {
+      const halfW = width / 2;
+      const createCurb = (cx, cz, cw, cl) => {
         const curb = new THREE.Mesh(new THREE.BoxGeometry(cw, 0.22, cl), curbMat);
         curb.position.set(cx, 0.11, cz);
-        curb.rotation.y = crot;
+        curb.castShadow = true;
+        curb.receiveShadow = true;
         this.scene.add(curb);
       };
 
-      const halfW = width / 2;
       if (rot === 0) {
-        createCurb(x - halfW - 0.2, z, 0.4, length, 0);
-        createCurb(x + halfW + 0.2, z, 0.4, length, 0);
+        createCurb(x - halfW - 0.2, z, 0.4, length);
+        createCurb(x + halfW + 0.2, z, 0.4, length);
       } else {
-        createCurb(x, z - halfW - 0.2, length, 0.4, 0);
-        createCurb(x, z + halfW + 0.2, length, 0.4, 0);
+        createCurb(x, z - halfW - 0.2, length, 0.4);
+        createCurb(x, z + halfW + 0.2, length, 0.4);
       }
     };
 
-    // Main Drag (North-South, 18m wide)
+    // Main Drag (North-South)
     createRoad(0, 0, 18, 260, 0);
 
     // Cross Boulevards
@@ -99,102 +100,79 @@ export class CityWorld {
   }
 
   buildSolidRamps() {
-    // Generate Hazard Stripe Texture (Yellow and Black chevrons)
-    const rampCanvas = document.createElement('canvas');
-    rampCanvas.width = 256;
-    rampCanvas.height = 256;
-    const ctx = rampCanvas.getContext('2d');
-    ctx.fillStyle = '#ffb300';
-    ctx.fillRect(0, 0, 256, 256);
-    ctx.fillStyle = '#111111';
-    for (let y = -256; y < 512; y += 48) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(256, y + 128);
-      ctx.lineTo(256, y + 168);
-      ctx.lineTo(0, y + 40);
-      ctx.closePath();
-      ctx.fill();
-    }
-    const hazardTex = new THREE.CanvasTexture(rampCanvas);
-    hazardTex.wrapS = THREE.RepeatWrapping;
-    hazardTex.wrapT = THREE.RepeatWrapping;
-    hazardTex.repeat.set(2, 4);
-
+    // Solid simple untextured matte material (clean vibrant orange/amber)
     const rampMat = new THREE.MeshStandardMaterial({
-      map: hazardTex,
+      color: 0xff8f00, // Solid bright orange
       roughness: 0.5,
-      metalness: 0.2,
-      side: THREE.DoubleSide // Guarantee visibility from all angles
-    });
-
-    const sideWallMat = new THREE.MeshStandardMaterial({
-      color: 0x37474f,
-      roughness: 0.7,
+      metalness: 0.1,
       side: THREE.DoubleSide
     });
 
-    // Helper: Creates a 100% solid, closed 3D wedge with properly wound faces
-    const createSolidRampMesh = (w, d, h) => {
+    const sideMat = new THREE.MeshStandardMaterial({
+      color: 0x37474f, // Solid dark grey sides
+      roughness: 0.6,
+      side: THREE.DoubleSide
+    });
+
+    // Creates an airtight, solid triangular prism wedge
+    const createSolidWedge = (w, d, h) => {
       const group = new THREE.Group();
       const hw = w / 2;
       const hd = d / 2;
 
-      // 1. Top Slanted Surface
-      const topGeo = new THREE.PlaneGeometry(w, Math.hypot(d, h));
-      const topMesh = new THREE.Mesh(topGeo, rampMat);
-      topMesh.position.set(0, h / 2, 0);
-      topMesh.rotation.x = -Math.atan2(h, d);
-      topMesh.castShadow = true;
-      topMesh.receiveShadow = true;
-      group.add(topMesh);
+      // 6 Vertices of triangular prism:
+      // Bottom 4: (-hw, 0, -hd), (hw, 0, -hd), (hw, 0, hd), (-hw, 0, hd)
+      // Top lip 2: (-hw, h, hd), (hw, h, hd)
+      const positions = new Float32Array([
+        // Face 1: Top Slanted Incline (2 triangles)
+        -hw, 0, -hd,   hw, 0, -hd,   hw, h, hd,
+        -hw, 0, -hd,   hw, h, hd,   -hw, h, hd,
 
-      // 2. Back Vertical Wall
-      const backGeo = new THREE.PlaneGeometry(w, h);
-      const backMesh = new THREE.Mesh(backGeo, sideWallMat);
-      backMesh.position.set(0, h / 2, hd);
-      backMesh.castShadow = true;
-      group.add(backMesh);
+        // Face 2: Back Vertical Wall (2 triangles)
+        -hw, 0, hd,    hw, h, hd,    hw, 0, hd,
+        -hw, 0, hd,   -hw, h, hd,    hw, h, hd,
 
-      // 3. Left Side Triangular Wall
-      const leftShape = new THREE.Shape();
-      leftShape.moveTo(-hd, 0);
-      leftShape.lineTo(hd, 0);
-      leftShape.lineTo(hd, h);
-      leftShape.closePath();
-      const sideGeoL = new THREE.ShapeGeometry(leftShape);
-      const leftMesh = new THREE.Mesh(sideGeoL, sideWallMat);
-      leftMesh.position.set(-hw, 0, 0);
-      leftMesh.rotation.y = -Math.PI / 2;
-      group.add(leftMesh);
+        // Face 3: Bottom Base (2 triangles)
+        -hw, 0, -hd,   hw, 0, hd,    hw, 0, -hd,
+        -hw, 0, -hd,  -hw, 0, hd,    hw, 0, hd,
 
-      // 4. Right Side Triangular Wall
-      const sideGeoR = new THREE.ShapeGeometry(leftShape);
-      const rightMesh = new THREE.Mesh(sideGeoR, sideWallMat);
-      rightMesh.position.set(hw, 0, 0);
-      rightMesh.rotation.y = Math.PI / 2;
-      group.add(rightMesh);
+        // Face 4: Left Side Triangle
+        -hw, 0, -hd,  -hw, h, hd,   -hw, 0, hd,
 
-      // 5. Red Safety Guard Rails on sides
-      const railMat = new THREE.MeshStandardMaterial({ color: 0xe53935 });
-      const railL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, Math.hypot(d, h)), railMat);
-      railL.position.set(-hw, h / 2 + 0.22, 0);
-      railL.rotation.x = -Math.atan2(h, d);
-      group.add(railL);
+        // Face 5: Right Side Triangle
+        hw, 0, -hd,   hw, 0, hd,    hw, h, hd
+      ]);
 
-      const railR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, Math.hypot(d, h)), railMat);
-      railR.position.set(hw, h / 2 + 0.22, 0);
-      railR.rotation.x = -Math.atan2(h, d);
-      group.add(railR);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.computeVertexNormals();
+
+      const mesh = new THREE.Mesh(geo, rampMat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+
+      // Solid side guard walls to make ramps clearly visible
+      const sideWallL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, Math.hypot(d, h)), sideMat);
+      sideWallL.position.set(-hw, h / 2 + 0.22, 0);
+      sideWallL.rotation.x = -Math.atan2(h, d);
+      sideWallL.castShadow = true;
+      group.add(sideWallL);
+
+      const sideWallR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, Math.hypot(d, h)), sideMat);
+      sideWallR.position.set(hw, h / 2 + 0.22, 0);
+      sideWallR.rotation.x = -Math.atan2(h, d);
+      sideWallR.castShadow = true;
+      group.add(sideWallR);
 
       return group;
     };
 
     const addRamp = (x, z, w, d, h, angleY = 0) => {
-      const rampMesh = createSolidRampMesh(w, d, h);
-      rampMesh.position.set(x, 0, z);
-      rampMesh.rotation.y = angleY;
-      this.scene.add(rampMesh);
+      const wedge = createSolidWedge(w, d, h);
+      wedge.position.set(x, 0, z);
+      wedge.rotation.y = angleY;
+      this.scene.add(wedge);
 
       // Register collision ramp
       this.colliders.push({
@@ -208,30 +186,29 @@ export class CityWorld {
       });
     };
 
-    // Ramp 1: Main Drag High-Speed Jump (launches North)
-    addRamp(0, -15, 6.5, 9.0, 2.6, 0);
+    // Ramp 1: Main Drag High-Speed Stunt Jump (Straight ahead, launches North)
+    addRamp(0, -12, 6.5, 9.0, 2.8, 0);
 
-    // Ramp 2: East Boulevard Stunt Ramp (launches East)
+    // Ramp 2: East Boulevard Jump (launches East)
     addRamp(45, 50, 6.5, 9.5, 3.0, -Math.PI / 2);
 
     // Ramp 3: West Boulevard Jump (launches West)
     addRamp(-45, -65, 6.5, 9.5, 2.8, Math.PI / 2);
 
-    // Ramp 4: Mega Stunt Ramp on the North Loop
+    // Ramp 4: Mega Stunt Launch Ramp on North Loop
     addRamp(0, 80, 8.0, 11.0, 3.8, 0);
   }
 
   buildSlalomArea() {
-    // Slalom cones test zone (for testing sharp steering and traction)
-    const coneMat = new THREE.MeshStandardMaterial({ color: 0xff6d00, roughness: 0.4 });
+    const coneMat = new THREE.MeshStandardMaterial({ color: 0xff5722, roughness: 0.4 });
     const whiteStripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
     for (let i = -4; i <= 4; i++) {
-      if (Math.abs(i) < 2) continue; // leave space near center
+      if (Math.abs(i) < 2) continue;
       const coneGroup = new THREE.Group();
       coneGroup.position.set(0, 0, i * 14);
 
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.75, 12), coneMat);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.75, 12), coneMat);
       cone.position.y = 0.375;
       cone.castShadow = true;
       coneGroup.add(cone);
@@ -245,7 +222,6 @@ export class CityWorld {
   }
 
   buildBuildings() {
-    // Greybox Functional Neighborhood & Checkers Hub
     const buildingConfigs = [
       { id: '1', name: 'Palm Villa', x: -35, z: 25, w: 16, d: 14, h: 8, col: 0x37474f },
       { id: '2', name: 'Hillside Modern', x: -42, z: -35, w: 18, d: 14, h: 9, col: 0x455a64 },
@@ -262,7 +238,6 @@ export class CityWorld {
       bMesh.receiveShadow = true;
       this.scene.add(bMesh);
 
-      // Roof edge trim
       const trimMesh = new THREE.Mesh(
         new THREE.BoxGeometry(b.w + 0.4, 0.4, b.d + 0.4),
         new THREE.MeshStandardMaterial({ color: 0x00bcd4, roughness: 0.3 })
@@ -270,7 +245,6 @@ export class CityWorld {
       trimMesh.position.set(b.x, b.h + 0.2, b.z);
       this.scene.add(trimMesh);
 
-      // Register collision box
       this.colliders.push({
         type: 'box',
         x: b.x,
@@ -279,7 +253,6 @@ export class CityWorld {
         depth: b.d + 0.5
       });
 
-      // Delivery Destination Zone
       this.deliverySpots.push({
         id: b.id,
         name: b.name,
