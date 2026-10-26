@@ -20,7 +20,7 @@ class GameApp {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // AAA soft shadow filtering
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // AAA Soft Shadows
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     this.container.appendChild(this.renderer.domElement);
@@ -29,18 +29,18 @@ class GameApp {
     this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
     this.cameraManager = new CameraManager(this.camera, this.renderer.domElement);
 
-    // 3. World Environment with Solid Ramps & Slalom Area
+    // 3. World Environment with Double-Sided Ramps
     this.world = new CityWorld(this.scene);
 
-    // 4. Arcade Vehicle Physics (Grounded, punchy, high maneuverability)
-    this.vehiclePhysics = new ArcadeVehicle(this.scene, { x: 0, y: 0.38, z: -40, heading: 0 });
+    // 4. Arcade Vehicle Physics (Grounded, zero bounce, high agility)
+    this.vehiclePhysics = new ArcadeVehicle(this.scene, { x: 0, y: 0.35, z: -40, heading: 0 });
     this.vehiclePhysics.setColliders(this.world.colliders);
 
     // 5. Van Model
     this.vanModel = new VanModel(this.scene);
 
-    // 6. SINGLE QUALITY AAA SHADOW SETUP
-    this.setupAAAShadow();
+    // 6. SINGLE QUALITY AAA OVERHEAD GROUNDED SHADOW
+    this.setupAAAGroundedShadow();
 
     // 7. Delivery Mission System
     this.deliverySystem = new DeliverySystem(this.scene, this.world.deliverySpots);
@@ -71,36 +71,37 @@ class GameApp {
     this.animate();
   }
 
-  setupAAAShadow() {
-    // Ambient fill
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x445566, 0.85);
+  setupAAAGroundedShadow() {
+    // Balanced Ambient Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3d4a52, 0.75);
     hemiLight.position.set(0, 50, 0);
     this.scene.add(hemiLight);
 
-    const ambient = new THREE.AmbientLight(0xdcf8ff, 0.35);
+    const ambient = new THREE.AmbientLight(0xdcf8ff, 0.3);
     this.scene.add(ambient);
 
-    // SINGLE QUALITY AAA DIRECTIONAL SHADOW LIGHT
-    this.sunLight = new THREE.DirectionalLight(0xfff8e7, 1.6);
+    // SINGLE QUALITY AAA DIRECTIONAL SUN LIGHT
+    // Positioned high overhead so shadow sits directly under wheels and chassis
+    this.sunLight = new THREE.DirectionalLight(0xfff8e7, 1.8);
     this.sunLight.castShadow = true;
 
-    // Ultra-sharp 2048 shadow texture
+    // High resolution 2048 shadow map
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
 
-    // Tight 14x14m frustum locked to vehicle for razor-sharp shadow resolution (>140 px/m)
-    const d = 7.0;
-    this.sunLight.shadow.camera.left = -d;
-    this.sunLight.shadow.camera.right = d;
-    this.sunLight.shadow.camera.top = d;
-    this.sunLight.shadow.camera.bottom = -d;
-    this.sunLight.shadow.camera.near = 5.0;
-    this.sunLight.shadow.camera.far = 65.0;
+    // Ultra-tight 9x9m shadow camera focused directly on the van (>220 texels/m!)
+    const boxSize = 4.5;
+    this.sunLight.shadow.camera.left = -boxSize;
+    this.sunLight.shadow.camera.right = boxSize;
+    this.sunLight.shadow.camera.top = boxSize;
+    this.sunLight.shadow.camera.bottom = -boxSize;
+    this.sunLight.shadow.camera.near = 15.0;
+    this.sunLight.shadow.camera.far = 55.0;
 
-    // Critical bias settings to eliminate both peter-panning and shadow acne
+    // Precise bias settings: eliminates shadow acne & grounds the tires to the road
     this.sunLight.shadow.bias = -0.0001;
-    this.sunLight.shadow.normalBias = 0.02;
-    this.sunLight.shadow.radius = 1.6;
+    this.sunLight.shadow.normalBias = 0.025;
+    this.sunLight.shadow.radius = 1.2;
 
     this.scene.add(this.sunLight);
     this.scene.add(this.sunLight.target);
@@ -235,10 +236,11 @@ class GameApp {
     // 4. Update Dynamic Camera
     this.cameraManager.update(dt, this.vanModel.root, this.vehiclePhysics);
 
-    // 5. UPDATE SINGLE QUALITY AAA SHADOW (Locks to vehicle position)
+    // 5. UPDATE SINGLE QUALITY AAA GROUNDED SHADOW
+    // Overhead sun positioned directly above the van for accurate ground shadow contact
     const vanPos = this.vanModel.root.position;
     if (this.sunLight) {
-      this.sunLight.position.set(vanPos.x + 16, vanPos.y + 32, vanPos.z + 14);
+      this.sunLight.position.set(vanPos.x + 4.5, vanPos.y + 35.0, vanPos.z + 4.5);
       this.sunLight.target.position.set(vanPos.x, vanPos.y, vanPos.z);
       this.sunLight.target.updateMatrixWorld();
     }

@@ -26,8 +26,8 @@ export class CityWorld {
     // 2. Road Network
     this.buildRoads();
 
-    // 3. SOLID SIMPLE UNTEXTURED 3D JUMP RAMPS
-    this.buildSolidRamps();
+    // 3. SOLID DOUBLE-SIDED 3D JUMP RAMPS (Drive smoothly up and down from both sides)
+    this.buildDoubleSidedRamps();
 
     // 4. Slalom Cones Area
     this.buildSlalomArea();
@@ -99,48 +99,52 @@ export class CityWorld {
     createRoad(0, 105, 14, 180, Math.PI / 2);
   }
 
-  buildSolidRamps() {
-    // Solid simple untextured matte material (clean vibrant orange/amber)
+  buildDoubleSidedRamps() {
+    // Solid simple untextured matte material (clean vibrant amber)
     const rampMat = new THREE.MeshStandardMaterial({
-      color: 0xff8f00, // Solid bright orange
+      color: 0xff8f00,
       roughness: 0.5,
       metalness: 0.1,
       side: THREE.DoubleSide
     });
 
     const sideMat = new THREE.MeshStandardMaterial({
-      color: 0x37474f, // Solid dark grey sides
+      color: 0x37474f,
       roughness: 0.6,
       side: THREE.DoubleSide
     });
 
-    // Creates an airtight, solid triangular prism wedge
-    const createSolidWedge = (w, d, h) => {
+    // Creates a DOUBLE-SIDED A-FRAME RAMP:
+    // Slopes up from -depth/2 to center apex (0, height, 0), then slopes down to +depth/2!
+    // Van can drive smoothly up and down from BOTH directions or launch at speed.
+    const createDoubleSidedRampMesh = (w, d, h) => {
       const group = new THREE.Group();
       const hw = w / 2;
       const hd = d / 2;
 
-      // 6 Vertices of triangular prism:
-      // Bottom 4: (-hw, 0, -hd), (hw, 0, -hd), (hw, 0, hd), (-hw, 0, hd)
-      // Top lip 2: (-hw, h, hd), (hw, h, hd)
+      // 6 Vertices of A-Frame Wedge:
+      // Base: (-hw, 0, -hd), (hw, 0, -hd), (hw, 0, hd), (-hw, 0, hd)
+      // Apex Ridge: (-hw, h, 0), (hw, h, 0)
       const positions = new Float32Array([
-        // Face 1: Top Slanted Incline (2 triangles)
-        -hw, 0, -hd,   hw, 0, -hd,   hw, h, hd,
-        -hw, 0, -hd,   hw, h, hd,   -hw, h, hd,
+        // Face 1: South Incline Slope (from -hd up to 0) - 2 triangles
+        -hw, 0, -hd,   hw, 0, -hd,   hw, h, 0,
+        -hw, 0, -hd,   hw, h, 0,    -hw, h, 0,
 
-        // Face 2: Back Vertical Wall (2 triangles)
-        -hw, 0, hd,    hw, h, hd,    hw, 0, hd,
-        -hw, 0, hd,   -hw, h, hd,    hw, h, hd,
+        // Face 2: North Decline Slope (from 0 down to +hd) - 2 triangles
+        -hw, h, 0,     hw, h, 0,     hw, 0, hd,
+        -hw, h, 0,     hw, 0, hd,   -hw, 0, hd,
 
-        // Face 3: Bottom Base (2 triangles)
+        // Face 3: Bottom Base - 2 triangles
         -hw, 0, -hd,   hw, 0, hd,    hw, 0, -hd,
         -hw, 0, -hd,  -hw, 0, hd,    hw, 0, hd,
 
-        // Face 4: Left Side Triangle
-        -hw, 0, -hd,  -hw, h, hd,   -hw, 0, hd,
+        // Face 4: Left Side Triangular Gable (2 triangles forming peak)
+        -hw, 0, -hd,  -hw, h, 0,    -hw, 0, 0,
+        -hw, 0, 0,    -hw, h, 0,    -hw, 0, hd,
 
-        // Face 5: Right Side Triangle
-        hw, 0, -hd,   hw, 0, hd,    hw, h, hd
+        // Face 5: Right Side Triangular Gable
+        hw, 0, -hd,   hw, 0, 0,     hw, h, 0,
+        hw, 0, 0,     hw, 0, hd,    hw, h, 0
       ]);
 
       const geo = new THREE.BufferGeometry();
@@ -152,31 +156,45 @@ export class CityWorld {
       mesh.receiveShadow = true;
       group.add(mesh);
 
-      // Solid side guard walls to make ramps clearly visible
-      const sideWallL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, Math.hypot(d, h)), sideMat);
-      sideWallL.position.set(-hw, h / 2 + 0.22, 0);
-      sideWallL.rotation.x = -Math.atan2(h, d);
-      sideWallL.castShadow = true;
-      group.add(sideWallL);
+      // Side Guard Rails
+      const railGeoL = new THREE.BoxGeometry(0.16, 0.4, Math.hypot(hd, h));
+      const railSouthL = new THREE.Mesh(railGeoL, sideMat);
+      railSouthL.position.set(-hw, h / 2 + 0.2, -hd / 2);
+      railSouthL.rotation.x = -Math.atan2(h, hd);
+      railSouthL.castShadow = true;
+      group.add(railSouthL);
 
-      const sideWallR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, Math.hypot(d, h)), sideMat);
-      sideWallR.position.set(hw, h / 2 + 0.22, 0);
-      sideWallR.rotation.x = -Math.atan2(h, d);
-      sideWallR.castShadow = true;
-      group.add(sideWallR);
+      const railNorthL = new THREE.Mesh(railGeoL, sideMat);
+      railNorthL.position.set(-hw, h / 2 + 0.2, hd / 2);
+      railNorthL.rotation.x = Math.atan2(h, hd);
+      railNorthL.castShadow = true;
+      group.add(railNorthL);
+
+      const railSouthR = new THREE.Mesh(railGeoL, sideMat);
+      railSouthR.position.set(hw, h / 2 + 0.2, -hd / 2);
+      railSouthR.rotation.x = -Math.atan2(h, hd);
+      railSouthR.castShadow = true;
+      group.add(railSouthR);
+
+      const railNorthR = new THREE.Mesh(railGeoL, sideMat);
+      railNorthR.position.set(hw, h / 2 + 0.2, hd / 2);
+      railNorthR.rotation.x = Math.atan2(h, hd);
+      railNorthR.castShadow = true;
+      group.add(railNorthR);
 
       return group;
     };
 
-    const addRamp = (x, z, w, d, h, angleY = 0) => {
-      const wedge = createSolidWedge(w, d, h);
-      wedge.position.set(x, 0, z);
-      wedge.rotation.y = angleY;
-      this.scene.add(wedge);
+    const addDoubleSidedRamp = (x, z, w, d, h, angleY = 0) => {
+      const rampMesh = createDoubleSidedRampMesh(w, d, h);
+      rampMesh.position.set(x, 0, z);
+      rampMesh.rotation.y = angleY;
+      this.scene.add(rampMesh);
 
-      // Register collision ramp
+      // Register double-sided collision ramp
       this.colliders.push({
         type: 'ramp',
+        isDoubleSided: true,
         x,
         z,
         width: w,
@@ -186,17 +204,17 @@ export class CityWorld {
       });
     };
 
-    // Ramp 1: Main Drag High-Speed Stunt Jump (Straight ahead, launches North)
-    addRamp(0, -12, 6.5, 9.0, 2.8, 0);
+    // Ramp 1: Main Drag Smooth Jump (Double-sided, 12m long, 2.2m high)
+    addDoubleSidedRamp(0, -10, 6.5, 12.0, 2.2, 0);
 
-    // Ramp 2: East Boulevard Jump (launches East)
-    addRamp(45, 50, 6.5, 9.5, 3.0, -Math.PI / 2);
+    // Ramp 2: East Boulevard Jump
+    addDoubleSidedRamp(45, 50, 6.5, 12.0, 2.4, -Math.PI / 2);
 
-    // Ramp 3: West Boulevard Jump (launches West)
-    addRamp(-45, -65, 6.5, 9.5, 2.8, Math.PI / 2);
+    // Ramp 3: West Boulevard Jump
+    addDoubleSidedRamp(-45, -65, 6.5, 12.0, 2.4, Math.PI / 2);
 
-    // Ramp 4: Mega Stunt Launch Ramp on North Loop
-    addRamp(0, 80, 8.0, 11.0, 3.8, 0);
+    // Ramp 4: North Loop Stunt Jump (14m long, 3.0m high)
+    addDoubleSidedRamp(0, 80, 8.0, 14.0, 3.0, 0);
   }
 
   buildSlalomArea() {
