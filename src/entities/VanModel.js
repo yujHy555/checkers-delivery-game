@@ -31,10 +31,14 @@ export class VanModel {
     const tireTex = TextureGenerator.createTireTexture();
     const rimTex = TextureGenerator.createWheelRimTexture();
 
-    // Chassis Group (Base at axle height y = 0.35, responds to pitch/roll)
+    // Vehicle Container (handles terrain slope pitch and roll for BOTH wheels and chassis)
+    this.vehicleGroup = new THREE.Group();
+    this.root.add(this.vehicleGroup);
+
+    // Chassis Group (Base at axle height y = 0.35, responds to suspension & dynamic lean)
     this.chassisGroup = new THREE.Group();
     this.chassisGroup.position.y = 0.35;
-    this.root.add(this.chassisGroup);
+    this.vehicleGroup.add(this.chassisGroup);
 
     // Standard Materials
     const bodyGreenMat = new THREE.MeshStandardMaterial({ color: 0x13b843, roughness: 0.35, metalness: 0.1 });
@@ -219,7 +223,7 @@ export class VanModel {
       spinGroup.add(tireMesh, rimMesh);
       steerPivot.add(spinGroup);
 
-      this.root.add(steerPivot);
+      this.vehicleGroup.add(steerPivot);
       this.wheels.push({
         id: wp.id,
         isFront: wp.isFront,
@@ -262,10 +266,14 @@ export class VanModel {
     this.root.position.copy(vehiclePhysics.position);
     this.root.rotation.y = vehiclePhysics.heading;
 
-    // 2. Chassis Pitch, Roll, and subtle Suspension bump
-    this.chassisGroup.position.y = 0.35 - vehiclePhysics.suspensionCompress;
-    this.chassisGroup.rotation.x = vehiclePhysics.visualPitch;
-    this.chassisGroup.rotation.z = vehiclePhysics.visualRoll;
+    // 2. Terrain Slope Alignment (applies to BOTH wheels and chassis!)
+    this.vehicleGroup.rotation.x = vehiclePhysics.surfacePitch || 0;
+    this.vehicleGroup.rotation.z = vehiclePhysics.surfaceRoll || 0;
+
+    // 3. Dynamic Chassis Suspension Lean & Landing Compression
+    this.chassisGroup.position.y = 0.35 - (vehiclePhysics.suspensionCompress || 0);
+    this.chassisGroup.rotation.x = vehiclePhysics.dynamicPitch || 0;
+    this.chassisGroup.rotation.z = vehiclePhysics.dynamicRoll || 0;
 
     // 3. Wheel Spin & Steering
     const rollDelta = (vehiclePhysics.speed / 0.35) * dt;

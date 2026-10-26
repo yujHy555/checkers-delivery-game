@@ -98,9 +98,9 @@ class GameApp {
     this.sunLight.shadow.camera.near = 15.0;
     this.sunLight.shadow.camera.far = 55.0;
 
-    // Precise bias settings: eliminates shadow acne & grounds the tires to the road
+    // Precise bias settings: eliminates shadow acne & grounds the tires firmly to the road/ramps
     this.sunLight.shadow.bias = -0.0001;
-    this.sunLight.shadow.normalBias = 0.025;
+    this.sunLight.shadow.normalBias = 0.005;
     this.sunLight.shadow.radius = 1.2;
 
     this.scene.add(this.sunLight);

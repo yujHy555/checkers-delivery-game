@@ -9,19 +9,28 @@ export class ArcadeVehicle {
     this.width = 1.5;
     this.height = 1.9;
     this.wheelRadius = 0.35;
-    this.wheelBaseHalf = 1.05; // front & rear axle distance
+    this.wheelBaseHalf = 1.05; // front & rear axle distance (2.1m wheelbase)
+    this.trackHalfWidth = 0.68; // left & right wheel track distance (1.36m track)
+    this.halfCarWidth = 0.75;
 
-    // Position represents the road contact ground elevation (0.00 on flat road)
-    this.position = new THREE.Vector3(options.x || 0, 0, options.z || -40);
+    // Road surface level is 0.015-0.02 above base plane. Bottom of tires sits on road at y = 0.025!
+    this.roadLevel = 0.025;
+    this.position = new THREE.Vector3(options.x || 0, this.roadLevel, options.z || -40);
     this.velocity = new THREE.Vector3();
     this.heading = options.heading || 0;
-    this.pitch = 0;
     this.angularVelocity = 0;
     this.speed = 0; // forward speed in m/s
 
-    // Dynamic Suspension & Visual Lean
+    // Surface alignment (terrain pitch & roll)
+    this.surfacePitch = 0;
+    this.surfaceRoll = 0;
+
+    // Dynamic Chassis Suspension Lean & Dive/Squat
+    this.dynamicPitch = 0;
+    this.dynamicRoll = 0;
     this.visualRoll = 0;
     this.visualPitch = 0;
+    this.pitch = 0; // backward compat
     this.suspensionCompress = 0;
 
     // AAA Progressive Driving Parameters
@@ -46,8 +55,8 @@ export class ArcadeVehicle {
     // Jump & Air Dynamics
     this.isAirborne = false;
     this.airTime = 0;
-    this.gravity = 22.0; // Clean ballistic arc
-    this.jumpLaunchCooldown = 0; // Prevents premature landing during liftoff
+    this.gravity = 22.0;
+    this.jumpLaunchCooldown = 0;
 
     // World Colliders
     this.colliders = [];
@@ -145,14 +154,12 @@ export class ArcadeVehicle {
     const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     const right = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-    // Forward and Lateral speeds
     this.speed = this.velocity.dot(forward);
     this.lateralVelocity = this.velocity.dot(right);
     this.slipSpeed = Math.abs(this.lateralVelocity);
     const absSpeed = Math.abs(this.speed);
 
     // 2. SPEED-SENSITIVE STEERING ANGLE
-    // Agile at low speeds (32 deg), smoothly tightens at high speeds (14 deg) for highway stability
     const speedRatio = Math.min(1.0, absSpeed / 26.0);
     const maxSteerDeg = THREE.MathUtils.lerp(32.0, 14.0, speedRatio);
     const dynamicMaxSteer = THREE.MathUtils.degToRad(maxSteerDeg);
@@ -162,74 +169,92 @@ export class ArcadeVehicle {
 
     this.isBrakingHard = input.brake > 0.35 && absSpeed > 2.5;
 
-    // 3. GROUND & RAMP HEIGHT SAMPLING
-    const frontPos = this.position.clone().addScaledVector(forward, this.wheelBaseHalf);
-    const rearPos = this.position.clone().addScaledVector(forward, -this.wheelBaseHalf);
+    // 3. 4-WHEEL GROUND & RAMP HEIGHT SAMPLING (FL, FR, RL, RR + Center)
+    const flPos = this.position.clone()
+      .addScaledVector(forward, this.wheelBaseHalf)
+      .addScaledVector(right, -this.trackHalfWidth);
+    const frPos = this.position.clone()
+      .addScaledVector(forward, this.wheelBaseHalf)
+      .addScaledVector(right, this.trackHalfWidth);
+    const rlPos = this.position.clone()
+      .addScaledVector(forward, -this.wheelBaseHalf)
+      .addScaledVector(right, -this.trackHalfWidth);
+    const rrPos = this.position.clone()
+      .addScaledVector(forward, -this.wheelBaseHalf)
+      .addScaledVector(right, this.trackHalfWidth);
 
-    const frontGround = this.samplePointGround(frontPos.x, frontPos.z);
-    const rearGround = this.samplePointGround(rearPos.x, rearPos.z);
-    const centerGround = this.samplePointGround(this.position.x, this.position.z);
+    const gFL = this.samplePointGround(flPos.x, flPos.z);
+    const gFR = this.samplePointGround(frPos.x, frPos.z);
+    const gRL = this.samplePointGround(rlPos.x, rlPos.z);
+    const gRR = this.samplePointGround(rrPos.x, rrPos.z);
+    const gCenter = this.samplePointGround(this.position.x, this.position.z);
 
-    const targetGroundY = Math.max(
-      centerGround.height,
-      (frontGround.height + rearGround.height) / 2
-    );
+    const hFront = (gFL.height + gFR.height) * 0.5;
+    const hRear = (gRL.height + gRR.height) * 0.5;
+    const hLeft = (gFL.height + gRL.height) * 0.5;
+    const hRight = (gFR.height + gRR.height) * 0.5;
 
-    // Negative rotation around X tilts nose UP, positive tilts nose DOWN
-    const slopeAngle = Math.atan2(frontGround.height - rearGround.height, this.wheelBaseHalf * 2);
-    const targetPitch = -slopeAngle;
+    // Ground elevation under center of vehicle
+    const rawGroundH = Math.max(gCenter.height, (hFront + hRear) * 0.5);
+    const targetGroundY = rawGroundH + this.roadLevel;
 
-    const isOnRamp = frontGround.isOnRamp || rearGround.isOnRamp || centerGround.isOnRamp;
+    // Target surface slope pitch and roll (Negative rotation around X tilts nose UP)
+    const targetSurfacePitch = -Math.atan2(hFront - hRear, this.wheelBaseHalf * 2);
+    const targetSurfaceRoll = Math.atan2(hLeft - hRight, this.trackHalfWidth * 2);
 
-    // 4. VERTICAL DYNAMICS & TRUE JUMP LAUNCH
+    const isOnRamp = gFL.isOnRamp || gFR.isOnRamp || gRL.isOnRamp || gRR.isOnRamp || gCenter.isOnRamp;
+    const isNearPeak = gCenter.isNearPeak || (hFront > 0.6 && hRear > 0.6 && Math.abs(hFront - hRear) < 0.35);
+
+    // 4. VERTICAL DYNAMICS & JUMP LAUNCH
     if (this.jumpLaunchCooldown > 0) {
       this.jumpLaunchCooldown -= dt;
     }
 
     if (this.isAirborne) {
-      // In air: gravity pulls down
       this.airTime += dt;
       this.velocity.y -= this.gravity * dt;
 
-      // Check for landing ONLY after liftoff phase and when descending
+      // Landing check (only when falling back down)
       if (this.jumpLaunchCooldown <= 0 && this.velocity.y <= 0 && this.position.y <= targetGroundY + 0.05) {
-        // Touchdown!
         this.isAirborne = false;
         this.airTime = 0;
         this.position.y = targetGroundY;
         this.velocity.y = 0;
-        this.suspensionCompress = 0.03;
+        this.suspensionCompress = 0.04;
         if (window.gameApp && window.gameApp.audio) {
           window.gameApp.audio.playJumpLand();
         }
       }
 
-      this.pitch = THREE.MathUtils.lerp(this.pitch, 0, 3.5 * dt);
+      this.surfacePitch = THREE.MathUtils.lerp(this.surfacePitch, 0, 4.0 * dt);
+      this.surfaceRoll = THREE.MathUtils.lerp(this.surfaceRoll, 0, 4.0 * dt);
+      this.pitch = this.surfacePitch;
 
     } else {
-      // On ground or on ramp
+      // Solid ground contact: instant exact alignment so tires NEVER sink into road or ramp!
       this.position.y = targetGroundY;
-      this.pitch = THREE.MathUtils.lerp(this.pitch, targetPitch, 22.0 * dt);
+      this.velocity.y = 0;
 
-      // Check if ramping / launching off crest
+      this.surfacePitch = THREE.MathUtils.lerp(this.surfacePitch, targetSurfacePitch, 22.0 * dt);
+      this.surfaceRoll = THREE.MathUtils.lerp(this.surfaceRoll, targetSurfaceRoll, 22.0 * dt);
+      this.pitch = this.surfacePitch;
+
+      // Launch over crest at high speed (> 5.5 m/s)
       if (isOnRamp && this.speed > 5.5) {
-        // Check if car reached or passed the ramp crest
-        const nearCrest = centerGround.isNearPeak || (rearGround.height >= frontGround.height && centerGround.height > 0.8);
-        if (nearCrest && this.jumpLaunchCooldown <= 0) {
-          // LAUNCH INTO AIR!
+        if ((isNearPeak || (hRear >= hFront && gCenter.height > 0.6)) && this.jumpLaunchCooldown <= 0) {
           this.isAirborne = true;
           this.airTime = 0.01;
-          this.jumpLaunchCooldown = 0.28; // Locks airborne for 0.28s so it soars over the peak!
-          this.velocity.y = Math.max(5.5, this.speed * 0.42);
+          this.jumpLaunchCooldown = 0.32;
+          this.velocity.y = Math.max(5.8, this.speed * 0.44);
         }
       }
 
-      // Strong downforce keeps car glued to road
+      // Downforce
       const downforce = (absSpeed / this.maxSpeed) * 10.0;
       this.velocity.y -= downforce * dt;
     }
 
-    // 5. PROGRESSIVE ACCELERATION & BRAKING (AAA Tuning)
+    // 5. PROGRESSIVE ACCELERATION & BRAKING
     if (!this.isAirborne) {
       if (input.throttle > 0) {
         if (this.speed < this.maxSpeed) {
@@ -260,7 +285,6 @@ export class ArcadeVehicle {
         if (this.driftFactor < 0.08) this.isDrifting = false;
       }
 
-      // High lateral grip prevents sliding on straightaways
       const gripRate = THREE.MathUtils.lerp(45.0, 5.5, this.driftFactor);
       const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
       this.velocity.addScaledVector(right, lateralDecel);
@@ -274,7 +298,6 @@ export class ArcadeVehicle {
       const dirSign = this.speed >= -0.1 ? 1 : -1;
       const driftBonus = this.isDrifting ? 1.75 : 1.0;
 
-      // Stable high-speed dampening
       const highSpeedDamp = THREE.MathUtils.lerp(3.2, 1.8, speedRatio);
       const targetYawRate = this.steerInput * turnFactor * dirSign * highSpeedDamp * driftBonus;
 
@@ -291,17 +314,16 @@ export class ArcadeVehicle {
     // 9. OBSTACLE & RAMP SIDE COLLISIONS
     this.resolveCollisions();
 
-    // 10. VISUAL CHASSIS LEAN (Subtle & critically damped)
-    const targetRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.012), -0.035, 0.035);
-    const targetPitchVisual = THREE.MathUtils.clamp(
-      this.pitch - (input.throttle - input.brake) * 0.02,
-      -0.45,
-      0.45
-    );
+    // 10. DYNAMIC CHASSIS SUSPENSION LEAN (Subtle & critically damped)
+    const targetDynRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.012), -0.04, 0.04);
+    const targetDynPitch = THREE.MathUtils.clamp(-(input.throttle - input.brake) * 0.02, -0.04, 0.04);
 
-    this.visualRoll = THREE.MathUtils.lerp(this.visualRoll, targetRoll, 14.0 * dt);
-    this.visualPitch = THREE.MathUtils.lerp(this.visualPitch, targetPitchVisual, 16.0 * dt);
+    this.dynamicRoll = THREE.MathUtils.lerp(this.dynamicRoll, targetDynRoll, 14.0 * dt);
+    this.dynamicPitch = THREE.MathUtils.lerp(this.dynamicPitch, targetDynPitch, 16.0 * dt);
     this.suspensionCompress = THREE.MathUtils.lerp(this.suspensionCompress, 0, 24.0 * dt);
+
+    this.visualRoll = this.surfaceRoll + this.dynamicRoll;
+    this.visualPitch = this.surfacePitch + this.dynamicPitch;
 
     // 11. ACCURATE SKID MARKS & SMOKE
     this.updateSkidsAndSmoke(dt, forward, right);
@@ -314,15 +336,17 @@ export class ArcadeVehicle {
 
     for (const c of this.colliders) {
       if (c.type === 'ramp') {
-        const cosA = Math.cos(-c.angleY);
-        const sinA = Math.sin(-c.angleY);
-        const localX = (x - c.x) * cosA - (z - c.z) * sinA;
-        const localZ = (x - c.x) * sinA + (z - c.z) * cosA;
+        const dx = x - c.x;
+        const dz = z - c.z;
+        const cosA = Math.cos(c.angleY);
+        const sinA = Math.sin(c.angleY);
+        const localX = dx * cosA - dz * sinA;
+        const localZ = dx * sinA + dz * cosA;
 
         const hw = c.width / 2;
         const hd = c.depth / 2;
 
-        // When point is within the ramp width and depth
+        // When sampling within the exact ramp footprint
         if (Math.abs(localX) <= hw && Math.abs(localZ) <= hd) {
           const distFromPeak = Math.abs(localZ);
           const progress = Math.max(0, 1.0 - (distFromPeak / hd));
@@ -331,7 +355,7 @@ export class ArcadeVehicle {
           if (h > maxHeight) {
             maxHeight = h;
             isOnRamp = true;
-            if (distFromPeak < 1.2) {
+            if (distFromPeak < 1.4) {
               isNearPeak = true;
             }
           }
@@ -374,38 +398,55 @@ export class ArcadeVehicle {
           }
         }
       } else if (c.type === 'ramp') {
-        // FIXED SOLID RAMP SIDE COLLISION: Only collide if OUTSIDE the ramp width!
-        const cosA = Math.cos(-c.angleY);
-        const sinA = Math.sin(-c.angleY);
-        const localX = (this.position.x - c.x) * cosA - (this.position.z - c.z) * sinA;
-        const localZ = (this.position.x - c.x) * sinA + (this.position.z - c.z) * cosA;
+        // SMOOTH RAMP SIDE BARRIER: Never teleport! Only deflect when driving from road towards side wall.
+        const dx = this.position.x - c.x;
+        const dz = this.position.z - c.z;
+        const cosA = Math.cos(c.angleY);
+        const sinA = Math.sin(c.angleY);
+        const localX = dx * cosA - dz * sinA;
+        const localZ = dx * sinA + dz * cosA;
 
         const hw = c.width / 2;
         const hd = c.depth / 2;
 
-        if (Math.abs(localZ) <= hd) {
+        // Only test within ramp length, excluding flat tips (< 0.2m)
+        if (Math.abs(localZ) <= hd - 0.2) {
           const distFromPeak = Math.abs(localZ);
           const rampH = Math.max(0, 1.0 - (distFromPeak / hd)) * c.height;
 
-          // Only collide if car is physically lower than the ramp edge
-          if (this.position.y < rampH + 0.2) {
-            // Left side barrier (only if OUTSIDE left edge: localX < -hw)
-            if (localX < -hw && localX > -hw - carRadius) {
-              const overlap = (hw + carRadius) - Math.abs(localX);
-              const worldNormX = -Math.cos(c.angleY);
-              const worldNormZ = Math.sin(c.angleY);
-              this.position.x += worldNormX * overlap;
-              this.position.z += worldNormZ * overlap;
-              this.velocity.multiplyScalar(0.75);
+          // Only collide if car is physically lower than the ramp edge (on road outside)
+          if (this.position.y < rampH - 0.1) {
+            const carR = this.halfCarWidth;
+
+            // Left side barrier (localX < -hw)
+            if (localX < -hw && localX > -hw - carR) {
+              const clampedLocalX = -hw - carR;
+              this.position.x = c.x + clampedLocalX * cosA + localZ * sinA;
+              this.position.z = c.z - clampedLocalX * sinA + localZ * cosA;
+
+              const normX = -cosA;
+              const normZ = sinA;
+              const vNorm = this.velocity.x * normX + this.velocity.z * normZ;
+              if (vNorm < 0) {
+                this.velocity.x -= vNorm * normX * 1.2;
+                this.velocity.z -= vNorm * normZ * 1.2;
+                this.velocity.multiplyScalar(0.92);
+              }
             }
-            // Right side barrier (only if OUTSIDE right edge: localX > hw)
-            else if (localX > hw && localX < hw + carRadius) {
-              const overlap = (hw + carRadius) - localX;
-              const worldNormX = Math.cos(c.angleY);
-              const worldNormZ = -Math.sin(c.angleY);
-              this.position.x += worldNormX * overlap;
-              this.position.z += worldNormZ * overlap;
-              this.velocity.multiplyScalar(0.75);
+            // Right side barrier (localX > hw)
+            else if (localX > hw && localX < hw + carR) {
+              const clampedLocalX = hw + carR;
+              this.position.x = c.x + clampedLocalX * cosA + localZ * sinA;
+              this.position.z = c.z - clampedLocalX * sinA + localZ * cosA;
+
+              const normX = cosA;
+              const normZ = -sinA;
+              const vNorm = this.velocity.x * normX + this.velocity.z * normZ;
+              if (vNorm < 0) {
+                this.velocity.x -= vNorm * normX * 1.2;
+                this.velocity.z -= vNorm * normZ * 1.2;
+                this.velocity.multiplyScalar(0.92);
+              }
             }
           }
         }
@@ -418,18 +459,18 @@ export class ArcadeVehicle {
     const isDriftSkid = !this.isAirborne && (this.isDrifting || this.slipSpeed > 3.0);
     const isSkidding = isBrakingSkid || isDriftSkid;
 
-    // Contact elevation right on the road/ramp surface
-    const groundY = this.position.y + 0.015;
-
     const rlPos = this.position.clone()
       .addScaledVector(forward, -1.05)
       .addScaledVector(right, -0.65);
-    rlPos.y = groundY;
-
     const rrPos = this.position.clone()
       .addScaledVector(forward, -1.05)
       .addScaledVector(right, 0.65);
-    rrPos.y = groundY;
+
+    // Accurate ground height under tires for skids
+    const gRL = this.samplePointGround(rlPos.x, rlPos.z);
+    const gRR = this.samplePointGround(rrPos.x, rrPos.z);
+    rlPos.y = gRL.height + this.roadLevel + 0.008;
+    rrPos.y = gRR.height + this.roadLevel + 0.008;
 
     if (isSkidding) {
       if (isDriftSkid) {
@@ -520,7 +561,7 @@ export class ArcadeVehicle {
   }
 
   reset(x = 0, z = -40, heading = 0) {
-    this.position.set(x, 0, z);
+    this.position.set(x, this.roadLevel, z);
     this.velocity.set(0, 0, 0);
     this.heading = heading;
     this.pitch = 0;
