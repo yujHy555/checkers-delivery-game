@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { TextureGenerator } from '../utils/TextureGenerator.js';
 
 export class VanModel {
@@ -18,11 +17,7 @@ export class VanModel {
 
     this.cargoBags = [];
 
-    // Custom 3D GLTF Body support
-    this.customBodyMesh = null;
-
     this.buildModel();
-    this.loadCustomGLTFBody();
     this.scene.add(this.root);
   }
 
@@ -45,16 +40,6 @@ export class VanModel {
     this.chassisGroup.position.y = 0.35;
     this.vehicleGroup.add(this.chassisGroup);
 
-    // Procedural Body Container (seamlessly toggles off when custom GLTF body is present)
-    this.proceduralBodyGroup = new THREE.Group();
-    this.proceduralBodyGroup.name = 'ProceduralVanBody';
-    this.chassisGroup.add(this.proceduralBodyGroup);
-
-    // Custom GLTF Body Container
-    this.customBodyGroup = new THREE.Group();
-    this.customBodyGroup.name = 'CustomVanBodyContainer';
-    this.chassisGroup.add(this.customBodyGroup);
-
     // Standard Materials
     const bodyGreenMat = new THREE.MeshStandardMaterial({ color: 0x13b843, roughness: 0.35, metalness: 0.1 });
     const bodyCyanMat = new THREE.MeshStandardMaterial({ color: 0x00a3b8, roughness: 0.35, metalness: 0.1 });
@@ -73,48 +58,48 @@ export class VanModel {
     const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.4 });
     const rearMat = new THREE.MeshStandardMaterial({ map: rearTex, roughness: 0.4 });
 
-    // 1. PROCEDURAL VAN BODY (Replaced automatically when custom GLTF model is provided)
+    // 1. VAN BODY
     // Lower body box
     const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.75, 3.25), bodyCyanMat);
     lowerBody.position.set(0, 0.38, 0);
     lowerBody.castShadow = true;
     lowerBody.receiveShadow = false;
-    this.proceduralBodyGroup.add(lowerBody);
+    this.chassisGroup.add(lowerBody);
 
-    // Upper cargo box
+    // Upper cargo box (does not cast shadow to avoid tall cube shadow on ramps)
     const upperBody = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.85, 3.1), bodyGreenMat);
     upperBody.position.set(0, 1.15, -0.05);
     upperBody.castShadow = false;
-    this.proceduralBodyGroup.add(upperBody);
+    this.chassisGroup.add(upperBody);
 
     // Textured Side Panels
     const sidePanelGeo = new THREE.PlaneGeometry(3.1, 1.45);
     const leftPanel = new THREE.Mesh(sidePanelGeo, sideMatLeft);
     leftPanel.position.set(-0.715, 0.8, -0.05);
     leftPanel.rotation.y = -Math.PI / 2;
-    this.proceduralBodyGroup.add(leftPanel);
+    this.chassisGroup.add(leftPanel);
 
     const rightPanel = new THREE.Mesh(sidePanelGeo, sideMatRight);
     rightPanel.position.set(0.715, 0.8, -0.05);
     rightPanel.rotation.y = Math.PI / 2;
-    this.proceduralBodyGroup.add(rightPanel);
+    this.chassisGroup.add(rightPanel);
 
     // Front Slanted Nose
     const frontFascia = new THREE.Mesh(new THREE.BoxGeometry(1.40, 0.75, 0.35), frontMat);
     frontFascia.position.set(0, 0.45, 1.55);
-    this.proceduralBodyGroup.add(frontFascia);
+    this.chassisGroup.add(frontFascia);
 
     // Slanted Front Windshield
     const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.32, 0.82), glassMat);
     windshield.position.set(0, 1.15, 1.42);
     windshield.rotation.x = -THREE.MathUtils.degToRad(32);
-    this.proceduralBodyGroup.add(windshield);
+    this.chassisGroup.add(windshield);
 
     // Roof
     const roofPanel = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 2.85), roofMat);
     roofPanel.position.set(0, 1.58, -0.15);
     roofPanel.rotation.x = -Math.PI / 2;
-    this.proceduralBodyGroup.add(roofPanel);
+    this.chassisGroup.add(roofPanel);
 
     // Aerodynamic Rear Roof Wing / Spoiler
     const wingGroup = new THREE.Group();
@@ -125,13 +110,13 @@ export class VanModel {
     const strutRight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.22), darkTrimMat);
     strutRight.position.set(0.55, -0.08, 0);
     wingGroup.add(wingBlade, strutLeft, strutRight);
-    this.proceduralBodyGroup.add(wingGroup);
+    this.chassisGroup.add(wingGroup);
 
     // Front Bumper
     const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.46, 0.28, 0.3), darkTrimMat);
     bumper.position.set(0, 0.15, 1.68);
     bumper.castShadow = true;
-    this.proceduralBodyGroup.add(bumper);
+    this.chassisGroup.add(bumper);
 
     // Black Flared Wheel Arches
     const createFender = (x, z) => {
@@ -139,40 +124,11 @@ export class VanModel {
       fender.position.set(x, 0.18, z);
       return fender;
     };
-    this.proceduralBodyGroup.add(createFender(-0.73, 1.05));
-    this.proceduralBodyGroup.add(createFender(0.73, 1.05));
-    this.proceduralBodyGroup.add(createFender(-0.73, -1.05));
-    this.proceduralBodyGroup.add(createFender(0.73, -1.05));
+    this.chassisGroup.add(createFender(-0.73, 1.05));
+    this.chassisGroup.add(createFender(0.73, 1.05));
+    this.chassisGroup.add(createFender(-0.73, -1.05));
+    this.chassisGroup.add(createFender(0.73, -1.05));
 
-    // Side Sliding Cargo Door
-    this.sideSlideDoor = new THREE.Group();
-    this.sideSlideDoor.position.set(0.72, 0.75, 0.15);
-    const slideDoorMesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.25, 1.1), sideMatRight);
-    this.sideSlideDoor.add(slideDoorMesh);
-    this.proceduralBodyGroup.add(this.sideSlideDoor);
-
-    // Rear Barn Doors
-    this.rearDoorLeftPivot = new THREE.Group();
-    this.rearDoorLeftPivot.position.set(-0.68, 0.75, -1.62);
-    const rearDoorLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.35, 0.05), rearMat);
-    rearDoorLMesh.position.set(0.33, 0, 0);
-    this.rearDoorLeftPivot.add(rearDoorLMesh);
-    this.proceduralBodyGroup.add(this.rearDoorLeftPivot);
-
-    this.rearDoorRightPivot = new THREE.Group();
-    this.rearDoorRightPivot.position.set(0.68, 0.75, -1.62);
-    const rearDoorRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.35, 0.05), rearMat);
-    rearDoorRMesh.position.set(-0.33, 0, 0);
-    this.rearDoorRightPivot.add(rearDoorRMesh);
-    this.proceduralBodyGroup.add(this.rearDoorRightPivot);
-
-    // Cargo interior with Paper Delivery Bags
-    this.cargoBed = new THREE.Group();
-    this.cargoBed.position.set(0, 0.45, -0.65);
-    this.proceduralBodyGroup.add(this.cargoBed);
-    this.createCargoBags();
-
-    // 2. CHASSIS HARDWARE, LIGHTS & COCKPIT (Preserved across all models!)
     // Headlights
     this.headlightL = new THREE.SpotLight(0xffffff, 2.5, 30, Math.PI / 6, 0.4);
     this.headlightL.position.set(-0.5, 0.48, 1.7);
@@ -213,6 +169,35 @@ export class VanModel {
     this.steeringWheelPivot.add(wheelTorus);
     this.chassisGroup.add(this.steeringWheelPivot);
 
+    // 2. ANIMATED DOORS
+    // Side Sliding Cargo Door
+    this.sideSlideDoor = new THREE.Group();
+    this.sideSlideDoor.position.set(0.72, 0.75, 0.15);
+    const slideDoorMesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.25, 1.1), sideMatRight);
+    this.sideSlideDoor.add(slideDoorMesh);
+    this.chassisGroup.add(this.sideSlideDoor);
+
+    // Rear Barn Doors
+    this.rearDoorLeftPivot = new THREE.Group();
+    this.rearDoorLeftPivot.position.set(-0.68, 0.75, -1.62);
+    const rearDoorLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.35, 0.05), rearMat);
+    rearDoorLMesh.position.set(0.33, 0, 0);
+    this.rearDoorLeftPivot.add(rearDoorLMesh);
+    this.chassisGroup.add(this.rearDoorLeftPivot);
+
+    this.rearDoorRightPivot = new THREE.Group();
+    this.rearDoorRightPivot.position.set(0.68, 0.75, -1.62);
+    const rearDoorRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.35, 0.05), rearMat);
+    rearDoorRMesh.position.set(-0.33, 0, 0);
+    this.rearDoorRightPivot.add(rearDoorRMesh);
+    this.chassisGroup.add(this.rearDoorRightPivot);
+
+    // Cargo interior with Paper Delivery Bags
+    this.cargoBed = new THREE.Group();
+    this.cargoBed.position.set(0, 0.45, -0.65);
+    this.chassisGroup.add(this.cargoBed);
+    this.createCargoBags();
+
     // 3. FOUR ALL-TERRAIN WHEELS (Radius = 0.35, Center at y = 0.35, Bottom touches y = 0.00 exactly!)
     this.wheels = [];
     const wheelPositions = [
@@ -251,101 +236,6 @@ export class VanModel {
         spinGroup
       });
     }
-  }
-
-  loadCustomGLTFBody() {
-    const loader = new GLTFLoader();
-    const candidatePaths = [
-      '/models/checkers_van_body_01.glb',
-      '/models/checkers_van_body_01.gltf',
-      '/assets/checkers_van_body_01.glb',
-      '/assets/checkers_van_body_01.gltf',
-      'checkers_van_body_01.glb',
-      'checkers_van_body_01.gltf'
-    ];
-
-    const tryLoad = (index) => {
-      if (index >= candidatePaths.length) {
-        console.info('ℹ️ Custom GLTF body not found in /models/ or /assets/. Using procedural van body.');
-        return;
-      }
-      const path = candidatePaths[index];
-      loader.load(
-        path,
-        (gltf) => {
-          console.log(`✅ Loaded custom van body model from: ${path}`);
-          const model = gltf.scene;
-          model.name = 'CustomVanBody';
-
-          // Align model baseline with chassis (Blender ground y=0 -> offset by -0.35m relative to chassisGroup at y=0.35m)
-          model.position.set(0, -0.35, 0);
-
-          // Find the baked van body mesh (Cube.001 with diffuse & normal texture)
-          // Hide reference objects from Blender: standing character, ground plane, duplicate meshes, and static wheels
-          let bakedBodyFound = false;
-
-          model.traverse((child) => {
-            const name = child.name || '';
-            const lowerName = name.toLowerCase();
-
-            // Always hide reference character, ground planes, or camera/light nodes
-            if (lowerName.includes('standing') || lowerName.includes('male') || lowerName.includes('plane') || lowerName.includes('camera') || lowerName.includes('light')) {
-              child.visible = false;
-              return;
-            }
-
-            // Always hide static Blender wheels (our dynamic animated physics wheels handle driving, steering and spinning)
-            if (lowerName.startsWith('wheel') || lowerName.includes('tire') || lowerName.includes('rim')) {
-              child.visible = false;
-              return;
-            }
-
-            // Check if this is the baked body mesh (Cube.001)
-            if (name === 'Cube.001' || (child.material && child.material.name === 'Material.002')) {
-              child.visible = true;
-              bakedBodyFound = true;
-            } else if (name === 'Cube' || name === 'node_0' || lowerName.includes('tripo')) {
-              // Hide duplicate/unbaked source geometry if the baked body is present
-              child.visible = false;
-            }
-
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-              if (child.material) {
-                child.material.side = THREE.DoubleSide;
-                // Ensure proper normal map scaling and depth
-                if (child.material.normalMap) {
-                  child.material.normalScale.set(1.0, 1.0);
-                  child.material.needsUpdate = true;
-                }
-              }
-            }
-          });
-
-          // Fallback: If Cube.001 wasn't identified by name, ensure non-reference meshes are visible
-          if (!bakedBodyFound) {
-            model.traverse((child) => {
-              const lowerName = (child.name || '').toLowerCase();
-              if (!lowerName.includes('standing') && !lowerName.includes('male') && !lowerName.includes('plane') && !lowerName.startsWith('wheel')) {
-                child.visible = true;
-              }
-            });
-          }
-
-          this.customBodyMesh = model;
-          this.customBodyGroup.add(model);
-          // Hide procedural body meshes now that custom body is active
-          this.proceduralBodyGroup.visible = false;
-        },
-        undefined,
-        () => {
-          tryLoad(index + 1);
-        }
-      );
-    };
-
-    tryLoad(0);
   }
 
   createCargoBags() {
