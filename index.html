@@ -300,17 +300,17 @@
       background: rgba(0, 188, 212, 0.45);
     }
 
-    /* MAIN START MENU SCREEN */
+    /* MAIN START MENU SCREEN: 100% Fullscreen & Adaptive across all resolutions & browsers */
     #main-menu-screen {
       position: fixed;
       inset: 0;
       width: 100vw;
       height: 100vh;
-      background: #03080c;
+      background: #03080c url('/assets/main-menu-bg.jpg') center center / cover no-repeat;
       z-index: 50000;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-end;
       transition: opacity 0.35s ease, visibility 0.35s ease;
       overflow: hidden;
       user-select: none;
@@ -321,67 +321,46 @@
       pointer-events: none;
     }
 
-    /* 16:9 Aspect Ratio Menu Stage Container matching blank_menu */
-    .menu-stage-wrapper {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      max-width: 177.78vh; /* 16:9 aspect ratio */
-      max-height: 56.25vw;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
-    }
-
-    .menu-bg-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      pointer-events: none;
-    }
-
-    /* Menu Buttons Cluster (positioned on the right side in front of the bay) */
+    /* Menu Buttons Cluster: Enriched larger size & responsive positioning */
     .menu-buttons-cluster {
       position: absolute;
-      right: 4.8%;
-      top: 40.2%;
+      right: clamp(28px, 6vw, 110px);
+      top: clamp(140px, 39vh, 360px);
       display: flex;
       flex-direction: column;
-      gap: 7px;
-      width: 142px;
+      gap: 12px;
+      width: clamp(185px, 17vw, 245px);
       z-index: 10;
     }
 
     .menu-btn {
       width: 100%;
-      padding: 7px 10px;
-      background: rgba(12, 22, 29, 0.76);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1.5px solid rgba(0, 229, 255, 0.65);
-      border-radius: 6px;
+      padding: 13px 20px;
+      background: rgba(10, 20, 28, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 2px solid rgba(0, 229, 255, 0.7);
+      border-radius: 8px;
       color: #ffffff;
       font-family: 'Montserrat', sans-serif;
       font-weight: 800;
-      font-size: 10.5px;
-      letter-spacing: 0.8px;
+      font-size: 13px;
+      letter-spacing: 0.9px;
       text-transform: uppercase;
       text-align: center;
       cursor: pointer;
       outline: none;
-      box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
-      transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(0, 229, 255, 0.28);
+      transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .menu-btn:hover {
-      transform: translateX(-3px) scale(1.02);
-      background: rgba(0, 229, 255, 0.32);
+      transform: translateX(-4px) scale(1.03);
+      background: rgba(0, 229, 255, 0.35);
       border-color: #00e5ff;
-      box-shadow: 0 0 18px rgba(0, 229, 255, 0.6);
+      box-shadow: 0 6px 24px rgba(0, 229, 255, 0.65);
       color: #ffffff;
     }
     .menu-btn:active {
@@ -390,25 +369,25 @@
 
     /* Top Button: CONTINUE CAREER with vibrant green accent matching design */
     .menu-btn.btn-career {
-      border-color: rgba(74, 222, 128, 0.85);
-      box-shadow: 0 0 12px rgba(74, 222, 128, 0.35);
+      border-color: rgba(74, 222, 128, 0.9);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 16px rgba(74, 222, 128, 0.4);
     }
     .menu-btn.btn-career:hover {
-      background: rgba(74, 222, 128, 0.35);
+      background: rgba(74, 222, 128, 0.38);
       border-color: #4ade80;
-      box-shadow: 0 0 20px rgba(74, 222, 128, 0.7);
+      box-shadow: 0 6px 26px rgba(74, 222, 128, 0.75);
     }
 
     /* Bottom Button: QUIT GAME with subtle orange/red accent matching design */
     .menu-btn.btn-quit {
-      border-color: rgba(239, 68, 68, 0.7);
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+      border-color: rgba(239, 68, 68, 0.8);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 14px rgba(239, 68, 68, 0.3);
       color: #fca5a5;
     }
     .menu-btn.btn-quit:hover {
-      background: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.38);
       border-color: #ef4444;
-      box-shadow: 0 0 20px rgba(239, 68, 68, 0.7);
+      box-shadow: 0 6px 26px rgba(239, 68, 68, 0.75);
       color: #ffffff;
     }
 
@@ -460,24 +439,25 @@
     /* Responsive scaling for mobile & tablet */
     @media (max-width: 900px) {
       .menu-buttons-cluster {
-        right: 4.2%;
-        top: 38%;
-        width: 125px;
-        gap: 5px;
+        right: 24px;
+        top: 32%;
+        width: 165px;
+        gap: 8px;
       }
       .menu-btn {
-        padding: 5px 8px;
-        font-size: 9px;
+        padding: 10px 14px;
+        font-size: 11px;
       }
     }
     @media (max-width: 600px) {
       .menu-buttons-cluster {
-        width: 110px;
-        gap: 4px;
+        right: 16px;
+        width: 145px;
+        gap: 6px;
       }
       .menu-btn {
-        padding: 4px 6px;
-        font-size: 8px;
+        padding: 8px 10px;
+        font-size: 10px;
       }
     }
 
@@ -1093,30 +1073,26 @@
 
   <!-- MAIN START MENU SCREEN (CHECKERS HYPER SIXTY60) -->
   <div id="main-menu-screen">
-    <div class="menu-stage-wrapper">
-      <img src="/assets/main-menu-bg.jpg" alt="Checkers Hyper Sixty60 Delivery Run" class="menu-bg-img" />
-
-      <!-- MENU BUTTONS STACK (Exact match to menu_buttons design) -->
-      <div class="menu-buttons-cluster">
-        <button class="menu-btn btn-career" id="btn-menu-career" tabindex="-1">
-          <span>CONTINUE CAREER</span>
-        </button>
-        <button class="menu-btn" id="btn-menu-new" tabindex="-1">
-          <span>NEW GAME</span>
-        </button>
-        <button class="menu-btn" id="btn-menu-freeroam" tabindex="-1">
-          <span>FREE ROAM</span>
-        </button>
-        <button class="menu-btn" id="btn-menu-garage" tabindex="-1">
-          <span>GARAGE & UPGRADES</span>
-        </button>
-        <button class="menu-btn" id="btn-menu-options" tabindex="-1">
-          <span>OPTIONS</span>
-        </button>
-        <button class="menu-btn btn-quit" id="btn-menu-quit" tabindex="-1">
-          <span>QUIT GAME</span>
-        </button>
-      </div>
+    <!-- MENU BUTTONS STACK (Adaptive, responsive & prominent) -->
+    <div class="menu-buttons-cluster">
+      <button class="menu-btn btn-career" id="btn-menu-career" tabindex="-1">
+        <span>CONTINUE CAREER</span>
+      </button>
+      <button class="menu-btn" id="btn-menu-new" tabindex="-1">
+        <span>NEW GAME</span>
+      </button>
+      <button class="menu-btn" id="btn-menu-freeroam" tabindex="-1">
+        <span>FREE ROAM</span>
+      </button>
+      <button class="menu-btn" id="btn-menu-garage" tabindex="-1">
+        <span>GARAGE & UPGRADES</span>
+      </button>
+      <button class="menu-btn" id="btn-menu-options" tabindex="-1">
+        <span>OPTIONS</span>
+      </button>
+      <button class="menu-btn btn-quit" id="btn-menu-quit" tabindex="-1">
+        <span>QUIT GAME</span>
+      </button>
     </div>
   </div>
 

@@ -58,14 +58,21 @@ class GameApp {
     // UI Cache
     this.cacheUIElements();
 
+    // Menu State: Start in Main Menu with engine audio strictly silenced
+    this.inMainMenu = true;
+
     // Clock
     this.clock = new THREE.Clock();
 
     // Resize listener
     window.addEventListener('resize', () => this.onWindowResize());
 
-    // Robust audio unlock on any user interaction
-    const unlockAudio = () => this.audio.resume();
+    // Robust audio unlock on user interaction (only once active in game)
+    const unlockAudio = () => {
+      if (!this.inMainMenu) {
+        this.audio.resume();
+      }
+    };
     window.addEventListener('pointerdown', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
     window.addEventListener('touchstart', unlockAudio);
@@ -259,6 +266,7 @@ class GameApp {
     this.isFreeRoam = false;
 
     const startDriving = (mode = 'career') => {
+      this.inMainMenu = false;
       if (mainMenu) mainMenu.classList.add('hidden');
       if (garageModal) garageModal.classList.remove('open');
       if (optionsModal) optionsModal.classList.remove('open');
@@ -351,6 +359,8 @@ class GameApp {
 
     if (btnOpenMainMenu) {
       btnOpenMainMenu.addEventListener('click', () => {
+        this.inMainMenu = true;
+        this.audio.silenceEngine();
         if (mainMenu) mainMenu.classList.remove('hidden');
       });
     }
@@ -373,8 +383,12 @@ class GameApp {
         if (mainMenu) {
           if (mainMenu.classList.contains('hidden')) {
             mainMenu.classList.remove('hidden');
+            this.inMainMenu = true;
+            this.audio.silenceEngine();
           } else {
             mainMenu.classList.add('hidden');
+            this.inMainMenu = false;
+            this.audio.resume();
           }
         }
       }
@@ -439,6 +453,13 @@ class GameApp {
 
   animate() {
     requestAnimationFrame(() => this.animate());
+
+    // When on the main menu, silence all vehicle audio and skip simulation updates
+    if (this.inMainMenu) {
+      if (this.audio) this.audio.silenceEngine();
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
 
     const dt = Math.min(this.clock.getDelta(), 0.08);
 

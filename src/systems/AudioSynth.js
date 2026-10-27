@@ -58,6 +58,25 @@ export class AudioSynth {
     }
   }
 
+  silenceEngine() {
+    if (!this.initialized || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      if (this.engineGain) {
+        this.engineGain.gain.cancelScheduledValues(now);
+        this.engineGain.gain.setValueAtTime(0, now);
+      }
+      if (this.skidGain) {
+        this.skidGain.gain.cancelScheduledValues(now);
+        this.skidGain.gain.setValueAtTime(0, now);
+      }
+      if (this.brakeGain) {
+        this.brakeGain.gain.cancelScheduledValues(now);
+        this.brakeGain.gain.setValueAtTime(0, now);
+      }
+    } catch (e) {}
+  }
+
   resume() {
     if (!this.initialized) {
       this.init();
@@ -134,15 +153,6 @@ export class AudioSynth {
     this.brakeGain.connect(this.masterGain);
 
     this.brakeNoise.start();
-  }
-
-  resume() {
-    if (!this.initialized) {
-      this.init();
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
   }
 
   updateEngine(speed, throttle, maxSpeed) {
