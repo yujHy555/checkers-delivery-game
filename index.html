@@ -607,7 +607,14 @@
       pointer-events: none;
     }
 
-    /* LEFT: TRIANGULAR STEERING BUTTONS */
+    /* LEFT: STEERING & HANDBRAKE CLUSTER */
+    .mobile-left-cluster {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: auto;
+    }
     .steer-cluster {
       display: flex;
       align-items: center;
@@ -660,32 +667,18 @@
       filter: drop-shadow(0 0 12px #ef4444);
     }
 
-    /* RIGHT: RACING PEDALS & HANDBRAKE */
-    .pedal-cluster {
-      display: flex;
-      align-items: flex-end;
-      gap: 16px;
-      pointer-events: auto;
-    }
-    .brake-drift-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* Handbrake Turn Button */
+    /* Handbrake Turn Button (Positioned on Left Side) */
     .handbrake-btn {
-      width: 82px;
-      height: 38px;
-      background: rgba(245, 158, 11, 0.28);
+      width: 94px;
+      height: 40px;
+      background: rgba(245, 158, 11, 0.32);
       border: 2px solid #f59e0b;
       border-radius: 12px;
       color: #fbbf24;
       font-family: 'Montserrat', sans-serif;
       font-weight: 900;
-      font-size: 11px;
-      letter-spacing: 0.6px;
+      font-size: 12px;
+      letter-spacing: 0.8px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -694,12 +687,21 @@
       cursor: pointer;
       outline: none;
       transition: transform 0.08s ease, background 0.08s ease;
+      margin-left: 2px;
     }
     .handbrake-btn:active, .handbrake-btn.active {
       transform: scale(0.92);
       background: #f59e0b;
       color: #0b1a20;
       box-shadow: 0 0 20px #f59e0b;
+    }
+
+    /* RIGHT: RACING PEDALS (Dual Pedal Setup) */
+    .pedal-cluster {
+      display: flex;
+      align-items: flex-end;
+      gap: 18px;
+      pointer-events: auto;
     }
 
     /* Red Brake Pedal with 6 perforated circular holes */
@@ -1117,21 +1119,29 @@
 
   <!-- MOBILE TOUCH CONTROLS (Authentic Racing Setup: Triangles & Pedals) -->
   <div id="touch-controls">
-    <!-- LEFT: TRIANGULAR STEERING ARROWS -->
-    <div class="steer-cluster">
-      <!-- Left Triangle Button (Grey/White) -->
-      <button class="touch-steer-btn btn-left" id="btn-steer-left" aria-label="Steer Left" tabindex="-1">
-        <svg viewBox="0 0 100 85" class="steer-svg">
-          <polygon points="85,8 85,77 15,42.5" class="arrow-shape arrow-left" />
-        </svg>
+    <!-- LEFT: STEERING & HANDBRAKE CLUSTER -->
+    <div class="mobile-left-cluster">
+      <!-- Handbrake Turn Button (Moved to Left Side of Screen) -->
+      <button class="handbrake-btn" id="btn-drift" aria-label="Handbrake Turn" tabindex="-1">
+        <span>(P) DRIFT</span>
       </button>
 
-      <!-- Right Triangle Button (Red) -->
-      <button class="touch-steer-btn btn-right" id="btn-steer-right" aria-label="Steer Right" tabindex="-1">
-        <svg viewBox="0 0 100 85" class="steer-svg">
-          <polygon points="15,8 15,77 85,42.5" class="arrow-shape arrow-right" />
-        </svg>
-      </button>
+      <!-- Left / Right Triangular Steering Arrows -->
+      <div class="steer-cluster">
+        <!-- Left Triangle Button (Grey/White) -->
+        <button class="touch-steer-btn btn-left" id="btn-steer-left" aria-label="Steer Left" tabindex="-1">
+          <svg viewBox="0 0 100 85" class="steer-svg">
+            <polygon points="85,8 85,77 15,42.5" class="arrow-shape arrow-left" />
+          </svg>
+        </button>
+
+        <!-- Right Triangle Button (Red) -->
+        <button class="touch-steer-btn btn-right" id="btn-steer-right" aria-label="Steer Right" tabindex="-1">
+          <svg viewBox="0 0 100 85" class="steer-svg">
+            <polygon points="15,8 15,77 85,42.5" class="arrow-shape arrow-right" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- CENTER CONTEXTUAL: MOBILE DELIVER BUTTON -->
@@ -1141,22 +1151,15 @@
       </button>
     </div>
 
-    <!-- RIGHT: RACING PEDALS & HANDBRAKE -->
+    <!-- RIGHT: RACING PEDALS (Dual Pedal Setup) -->
     <div class="pedal-cluster">
-      <div class="brake-drift-col">
-        <!-- Handbrake Turn Button -->
-        <button class="handbrake-btn" id="btn-drift" aria-label="Handbrake Turn" tabindex="-1">
-          <span>(P) DRIFT</span>
-        </button>
-
-        <!-- Red Brake Pedal (6 perforated holes) -->
-        <button class="racing-pedal pedal-brake" id="btn-brake" aria-label="Brake" tabindex="-1">
-          <div class="pedal-holes-brake">
-            <span></span><span></span><span></span>
-            <span></span><span></span><span></span>
-          </div>
-        </button>
-      </div>
+      <!-- Red Brake Pedal (6 perforated holes) -->
+      <button class="racing-pedal pedal-brake" id="btn-brake" aria-label="Brake" tabindex="-1">
+        <div class="pedal-holes-brake">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </div>
+      </button>
 
       <!-- Silver Accelerator Pedal (8 perforated holes) -->
       <button class="racing-pedal pedal-gas" id="btn-gas" aria-label="Gas / Accelerate" tabindex="-1">

@@ -82,7 +82,65 @@ export class CityWorld {
 
     const lineMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
 
-    // Creates a straight road segment with elevated 3D alternating white & turquoise curbs and crisp dashes
+    // Creates reusable geometry for curb rumble blocks with smooth rounded corners & soft top bevel
+    const createRoundedCurbGeo = (w, l, h = 0.095, radius = 0.08, bevel = 0.015) => {
+      const shape = new THREE.Shape();
+      const hw = w / 2;
+      const hl = l / 2;
+      const r = Math.min(radius, hw * 0.35, hl * 0.35);
+
+      shape.moveTo(-hw + r, -hl);
+      shape.lineTo(hw - r, -hl);
+      shape.quadraticCurveTo(hw, -hl, hw, -hl + r);
+      shape.lineTo(hw, hl - r);
+      shape.quadraticCurveTo(hw, hl, hw - r, hl);
+      shape.lineTo(-hw + r, hl);
+      shape.quadraticCurveTo(-hw, hl, -hw, hl - r);
+      shape.lineTo(-hw, -hl + r);
+      shape.quadraticCurveTo(-hw, -hl, -hw + r, -hl);
+
+      const extrudeSettings = {
+        curveSegments: 3,
+        depth: h - bevel * 2,
+        bevelEnabled: true,
+        bevelSegments: 1,
+        steps: 1,
+        bevelSize: bevel,
+        bevelThickness: bevel
+      };
+
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geo.center();
+      geo.computeVertexNormals();
+      return geo;
+    };
+
+    const straightCurbGeo = createRoundedCurbGeo(0.90, 2.30, 0.095, 0.08, 0.015);
+
+    // Road Junction Clearing Zones (Curbs never cross into active intersections)
+    const junctions = [
+      { minX: -10.2, maxX: 10.2, minZ: 100.5, maxZ: 119.5 }, // Center Spine & North Straight
+      { minX: -10.2, maxX: 10.2, minZ: -109.5, maxZ: -90.5 }, // Center Spine & South Straight
+      { minX: -10.2, maxX: 10.2, minZ: 40.5, maxZ: 59.5 },    // Center Spine & North Cross
+      { minX: -10.2, maxX: 10.2, minZ: -74.5, maxZ: -55.5 },  // Center Spine & South Cross
+      { minX: 62.5, maxX: 81.5, minZ: 40.5, maxZ: 59.5 },     // East Straight & North Cross
+      { minX: -81.5, maxX: -62.5, minZ: 40.5, maxZ: 59.5 },   // West Straight & North Cross
+      { minX: 62.5, maxX: 81.5, minZ: -74.5, maxZ: -55.5 },   // East Straight & South Cross
+      { minX: -81.5, maxX: -62.5, minZ: -74.5, maxZ: -55.5 }   // West Straight & South Cross
+    ];
+
+    const isInsideAnyJunction = (minX, maxX, minZ, maxZ) => {
+      for (const j of junctions) {
+        const xOver = Math.min(maxX, j.maxX) - Math.max(minX, j.minX);
+        const zOver = Math.min(maxZ, j.maxZ) - Math.max(minZ, j.minZ);
+        if (xOver > 0.05 && zOver > 0.05) return true;
+      }
+      return false;
+    };
+
+    const placedCurbBoxes = [];
+
+    // Creates a straight road segment with elevated 3D rounded-corner alternating white & turquoise curbs
     const createStraightRoad = (x, z, width, length, rot = 0) => {
       const road = new THREE.Mesh(new THREE.PlaneGeometry(width, length), roadMat);
       road.rotation.x = -Math.PI / 2;
@@ -92,41 +150,81 @@ export class CityWorld {
       this.scene.add(road);
 
       // Elevated 3D Racing Rumble Strip Curbs along left and right borders
-      const curbWidth = 0.95;
+      const curbWidth = 0.90;
       const hw = width / 2;
-      const segLength = 3.2;
-      const numCurbSegs = Math.floor(length / segLength);
+      const segLength = 2.30;
+      const segStep = 2.40; // 2.30m block + 0.10m clean expansion gap
+      const numCurbSegs = Math.floor(length / segStep);
 
       [-hw - curbWidth / 2, hw + curbWidth / 2].forEach((offsetDist) => {
         for (let s = 0; s < numCurbSegs; s++) {
-          const mat = (s % 2 === 0) ? curbWhiteMat : curbTurquoiseMat;
-          const posAlong = (s - numCurbSegs / 2 + 0.5) * segLength;
+          const posAlong = (s - numCurbSegs / 2 + 0.5) * segStep;
+          let curbX, curbZ;
+          if (rot === 0) {
+            curbX = x + offsetDist;
+            curbZ = z + posAlong;
+          } else {
+            curbX = x + posAlong;
+            curbZ = z + offsetDist;
+          }
 
-          // 3D Elevated Beveled Curb Block (Height 0.095m)
-          const curbGeo = new THREE.BoxGeometry(curbWidth, 0.095, segLength * 0.96);
-          const curbMesh = new THREE.Mesh(curbGeo, mat);
+          // Exact bounding box of candidate curb block
+          const halfW = (rot === 0 ? curbWidth : segLength) / 2;
+          const halfL = (rot === 0 ? segLength : curbWidth) / 2;
+          const minX = curbX - halfW;
+          const maxX = curbX + halfW;
+          const minZ = curbZ - halfL;
+          const maxZ = curbZ + halfL;
+
+          // 1. Skip if entering any intersection zone to keep roadways open
+          if (isInsideAnyJunction(minX, maxX, minZ, maxZ)) {
+            continue;
+          }
+
+          // 2. Corner tangent buffers: do not place straight curbs beyond corner boundaries
+          if (x === 72 && maxZ > 88.5) continue; // East Road south end near SE corner
+          if (x === 72 && minZ < -78.5) continue; // East Road north end near NE corner
+          if (x === -72 && maxZ > 88.5) continue; // West Road south end near SW corner
+          if (x === -72 && minZ < -78.5) continue; // West Road north end near NW corner
+          if (z === 110 && maxX > 50.5) continue; // North Road east end near SE corner
+          if (z === 110 && minX < -50.5) continue; // North Road west end near SW corner
+          if (z === -100 && maxX > 50.5) continue; // South Road east end near NE corner
+          if (z === -100 && minX < -50.5) continue; // South Road west end near NW corner
+
+          // 3. Skip if overlapping any already placed curb box (prevents ANY z-fighting flashing)
+          let overlaps = false;
+          for (const p of placedCurbBoxes) {
+            const xOver = Math.min(maxX, p.maxX) - Math.max(minX, p.minX);
+            const zOver = Math.min(maxZ, p.maxZ) - Math.max(minZ, p.minZ);
+            if (xOver > 0.05 && zOver > 0.05) {
+              overlaps = true;
+              break;
+            }
+          }
+          if (overlaps) continue;
+
+          placedCurbBoxes.push({ minX, maxX, minZ, maxZ });
+
+          const mat = (s % 2 === 0) ? curbWhiteMat : curbTurquoiseMat;
+          const curbMesh = new THREE.Mesh(straightCurbGeo, mat);
+          curbMesh.rotation.x = -Math.PI / 2;
+          if (rot !== 0) curbMesh.rotation.z = rot;
+          curbMesh.position.set(curbX, 0.095 / 2, curbZ);
           curbMesh.castShadow = true;
           curbMesh.receiveShadow = true;
-
-          if (rot === 0) {
-            curbMesh.position.set(x + offsetDist, 0.05, z + posAlong);
-          } else {
-            curbMesh.rotation.y = rot;
-            curbMesh.position.set(x + posAlong, 0.05, z + offsetDist);
-          }
           this.scene.add(curbMesh);
-        }
 
-        // Register in physical colliders for 4-wheel height sampling and suspension response
-        this.colliders.push({
-          type: 'curb_straight',
-          x: rot === 0 ? x + offsetDist : x,
-          z: rot === 0 ? z : z + offsetDist,
-          width: curbWidth,
-          length: length,
-          rot: rot,
-          height: 0.095
-        });
+          // Register in physical colliders for 4-wheel height sampling & suspension reaction
+          this.colliders.push({
+            type: 'curb_straight',
+            x: curbX,
+            z: curbZ,
+            width: curbWidth,
+            length: segLength,
+            rot: rot,
+            height: 0.095
+          });
+        }
       });
 
       // Crisp White Dashes (Strictly skipped if falling on or entering any ramp footprint)
@@ -179,12 +277,19 @@ export class CityWorld {
       mesh.receiveShadow = true;
       this.scene.add(mesh);
 
-      // Elevated 3D Alternating White & Turquoise Racing Rumble Strip Curbs along apex and outer curve
+      // Elevated 3D Alternating White & Turquoise Racing Rumble Strip Curbs with Rounded Beveled Edges
       const createElevatedCurbArc = (rInner, rOuter, isInsideApex) => {
-        const curbSegs = 18;
+        const curbSegs = 14;
+        const padAngle = 0.035; // ~0.7m buffer from corner entry/exit so curbs never touch straight roads
+        const startA = a1 + padAngle;
+        const endA = a2 - padAngle;
+        const arcSpan = endA - startA;
+        const dAngle = arcSpan / curbSegs;
+        const gap = dAngle * 0.10; // 10% expansion gap between alternating rumble strips
+
         for (let i = 0; i < curbSegs; i++) {
-          const t1 = a1 + (i / curbSegs) * (a2 - a1);
-          const t2 = a1 + ((i + 1) / curbSegs) * (a2 - a1);
+          const t1 = startA + i * dAngle + gap / 2;
+          const t2 = startA + (i + 1) * dAngle - gap / 2;
           const mat = (i % 2 === 0) ? curbWhiteMat : curbTurquoiseMat;
 
           const c1 = Math.cos(t1), s1 = Math.sin(t1);
@@ -194,7 +299,7 @@ export class CityWorld {
           const rGrass = isInsideApex ? rInner : rOuter;
           const rMid = (rRoad + rGrass) * 0.5;
 
-          // 3D Beveled Ridge: Road lip y = 0.018m, Ridge crest y = 0.095m, Back lip y = 0.025m
+          // 3D Beveled Ridge Profile with rounded endcaps
           const pRoad1 = [cx + rRoad * c1, 0.018, cz + rRoad * s1];
           const pRoad2 = [cx + rRoad * c2, 0.018, cz + rRoad * s2];
           const pMid1  = [cx + rMid * c1,  0.095, cz + rMid * s1];
@@ -208,7 +313,11 @@ export class CityWorld {
             ...pRoad2, ...pMid2, ...pMid1,
             // Back bevel face (from ridge crest to grass edge)
             ...pMid1, ...pMid2, ...pGrass1,
-            ...pMid2, ...pGrass2, ...pGrass1
+            ...pMid2, ...pGrass2, ...pGrass1,
+            // Endcap 1 beveled face
+            ...pRoad1, ...pMid1, ...pGrass1,
+            // Endcap 2 beveled face
+            ...pRoad2, ...pGrass2, ...pMid2
           ]);
 
           const curbBlockGeo = new THREE.BufferGeometry();
@@ -227,8 +336,8 @@ export class CityWorld {
           cz,
           rMin: Math.min(rInner, rOuter),
           rMax: Math.max(rInner, rOuter),
-          a1: Math.min(a1, a2),
-          a2: Math.max(a1, a2),
+          a1: startA,
+          a2: endA,
           height: 0.095
         });
       };
