@@ -411,37 +411,109 @@ export class ArcadeVehicle {
   }
 
   resolveCollisions() {
-    const carRadius = 1.15;
+    // Exact Van Oriented Bounding Box (OBB) extents (including front bumper, fenders & mirrors)
+    const halfL = 1.90; // Front bumper reaches to z = 1.83m (+0.07m buffer)
+    const halfW = 0.82; // Outer wheel arches & mirrors reach to x = 0.79m (+0.03m buffer)
+    const maxBoundRadius = 2.20; // Circumscribed radius for fast broadphase
 
-    for (const c of this.colliders) {
-      if (c.type === 'box') {
-        const halfX = c.width / 2;
-        const halfZ = c.depth / 2;
+    const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
+    const right = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-        const closestX = THREE.MathUtils.clamp(this.position.x, c.x - halfX, c.x + halfX);
-        const closestZ = THREE.MathUtils.clamp(this.position.z, c.z - halfZ, c.z + halfZ);
+    for (let iter = 0; iter < 2; iter++) {
+      for (const c of this.colliders) {
+        if (c.type === 'box') {
+          const halfX = c.width / 2;
+          const halfZ = c.depth / 2;
 
-        const distX = this.position.x - closestX;
-        const distZ = this.position.z - closestZ;
-        const distSq = distX * distX + distZ * distZ;
+          const cdx = this.position.x - c.x;
+          const cdz = this.position.z - c.z;
+          if (Math.abs(cdx) > halfX + maxBoundRadius || Math.abs(cdz) > halfZ + maxBoundRadius) {
+            continue;
+          }
 
-        if (distSq < carRadius * carRadius && distSq > 0.00001) {
-          const dist = Math.sqrt(distSq);
-          const overlap = carRadius - dist;
-          const normalX = distX / dist;
-          const normalZ = distZ / dist;
+          // 4 World Corners of the Oriented Van
+          const cFLx = this.position.x + forward.x * halfL - right.x * halfW;
+          const cFLz = this.position.z + forward.z * halfL - right.z * halfW;
+          const cFRx = this.position.x + forward.x * halfL + right.x * halfW;
+          const cFRz = this.position.z + forward.z * halfL + right.z * halfW;
+          const cRLx = this.position.x - forward.x * halfL - right.x * halfW;
+          const cRLz = this.position.z - forward.z * halfL - right.z * halfW;
+          const cRRx = this.position.x - forward.x * halfL + right.x * halfW;
+          const cRRz = this.position.z - forward.z * halfL + right.z * halfW;
 
-          this.position.x += normalX * overlap;
-          this.position.z += normalZ * overlap;
+          const bMinX = c.x - halfX;
+          const bMaxX = c.x + halfX;
+          const bMinZ = c.z - halfZ;
+          const bMaxZ = c.z + halfZ;
 
+          // Axis 1: World X
+          const vMinX = Math.min(cFLx, cFRx, cRLx, cRRx);
+          const vMaxX = Math.max(cFLx, cFRx, cRLx, cRRx);
+          const overlapX = Math.min(vMaxX - bMinX, bMaxX - vMinX);
+          if (overlapX <= 0) continue;
+
+          // Axis 2: World Z
+          const vMinZ = Math.min(cFLz, cFRz, cRLz, cRRz);
+          const vMaxZ = Math.max(cFLz, cFRz, cRLz, cRRz);
+          const overlapZ = Math.min(vMaxZ - bMinZ, bMaxZ - vMinZ);
+          if (overlapZ <= 0) continue;
+
+          // Axis 3: Van Right Axis
+          const p1 = (bMinX - this.position.x) * right.x + (bMinZ - this.position.z) * right.z;
+          const p2 = (bMaxX - this.position.x) * right.x + (bMinZ - this.position.z) * right.z;
+          const p3 = (bMinX - this.position.x) * right.x + (bMaxZ - this.position.z) * right.z;
+          const p4 = (bMaxX - this.position.x) * right.x + (bMaxZ - this.position.z) * right.z;
+          const bMinR = Math.min(p1, p2, p3, p4);
+          const bMaxR = Math.max(p1, p2, p3, p4);
+          const overlapR = Math.min(halfW - bMinR, bMaxR - (-halfW));
+          if (overlapR <= 0) continue;
+
+          // Axis 4: Van Forward Axis
+          const f1 = (bMinX - this.position.x) * forward.x + (bMinZ - this.position.z) * forward.z;
+          const f2 = (bMaxX - this.position.x) * forward.x + (bMinZ - this.position.z) * forward.z;
+          const f3 = (bMinX - this.position.x) * forward.x + (bMaxZ - this.position.z) * forward.z;
+          const f4 = (bMaxX - this.position.x) * forward.x + (bMaxZ - this.position.z) * forward.z;
+          const bMinF = Math.min(f1, f2, f3, f4);
+          const bMaxF = Math.max(f1, f2, f3, f4);
+          const overlapF = Math.min(halfL - bMinF, bMaxF - (-halfL));
+          if (overlapF <= 0) continue;
+
+          // Minimum Translation Vector (MTV)
+          let minOverlap = overlapX;
+          let normalX = cdx > 0 ? 1 : -1;
+          let normalZ = 0;
+
+          if (overlapZ < minOverlap) {
+            minOverlap = overlapZ;
+            normalX = 0;
+            normalZ = cdz > 0 ? 1 : -1;
+          }
+          if (overlapR < minOverlap) {
+            minOverlap = overlapR;
+            const signR = (bMaxR + bMinR) < 0 ? 1 : -1;
+            normalX = right.x * signR;
+            normalZ = right.z * signR;
+          }
+          if (overlapF < minOverlap) {
+            minOverlap = overlapF;
+            const signF = (bMaxF + bMinF) < 0 ? 1 : -1;
+            normalX = forward.x * signF;
+            normalZ = forward.z * signF;
+          }
+
+          // Push van cleanly outside building boundary (guarantees front nose never enters wall)
+          const pushDist = minOverlap + 0.02;
+          this.position.x += normalX * pushDist;
+          this.position.z += normalZ * pushDist;
+
+          // Physical impulse bounce off building facade
           const dot = this.velocity.x * normalX + this.velocity.z * normalZ;
           if (dot < 0) {
             this.velocity.x -= dot * normalX * 1.35;
             this.velocity.z -= dot * normalZ * 1.35;
-            this.velocity.multiplyScalar(0.75);
+            this.velocity.multiplyScalar(0.70);
           }
-        }
-      } else if (c.type === 'ramp') {
+        } else if (c.type === 'ramp' && iter === 0) {
         // SMOOTH RAMP SIDE BARRIER: Prevents driving through vertical side wall from road, NEVER traps or blocks driving off!
         const dx = this.position.x - c.x;
         const dz = this.position.z - c.z;
@@ -503,6 +575,7 @@ export class ArcadeVehicle {
         }
       }
     }
+  }
   }
 
   updateSkidsAndSmoke(dt, forward, right, input) {

@@ -286,18 +286,18 @@ export class CityWorld {
       root.model = model;
 
       const coneMat = new THREE.MeshStandardMaterial({
-        color: 0x64748b, // Modern matte slate-grey
-        roughness: 0.45,
-        metalness: 0.05
+        color: 0x06b6d4, // Vibrant modern turquoise
+        roughness: 0.35,
+        metalness: 0.08
       });
       const stripeMat = new THREE.MeshStandardMaterial({
-        color: 0xf8fafc, // Crisp off-white reflective collar
-        roughness: 0.25,
+        color: 0xffffff, // Pure crisp reflective white collar & accents
+        roughness: 0.20,
         metalness: 0.05
       });
       const baseRimMat = new THREE.MeshStandardMaterial({
-        color: 0x334155, // Architectural dark slate rounded base
-        roughness: 0.6,
+        color: 0x0891b2, // Deep rich architectural turquoise base
+        roughness: 0.50,
         metalness: 0.05
       });
 
@@ -310,9 +310,9 @@ export class CityWorld {
       baseMesh.receiveShadow = true;
       model.add(baseMesh);
 
-      // 2. Soft rounded toroidal edge rim around base plate
+      // 2. Soft rounded toroidal edge rim around base plate (crisp white accent)
       const torusGeo = new THREE.TorusGeometry(0.50, 0.035, 8, 24);
-      const torusMesh = new THREE.Mesh(torusGeo, baseRimMat);
+      const torusMesh = new THREE.Mesh(torusGeo, stripeMat);
       torusMesh.rotation.x = Math.PI / 2;
       torusMesh.position.y = 0.05 - 0.28; // -0.23m
       model.add(torusMesh);
