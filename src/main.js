@@ -91,19 +91,20 @@ class GameApp {
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
 
-    // Ultra-tight 9x9m shadow camera focused directly on the van (>220 texels/m!)
-    const boxSize = 4.5;
+    // Generous 48x48m shadow camera: completely eliminates cube/box shadow frustum clipping artifacts on ramps
+    const boxSize = 24.0;
     this.sunLight.shadow.camera.left = -boxSize;
     this.sunLight.shadow.camera.right = boxSize;
     this.sunLight.shadow.camera.top = boxSize;
     this.sunLight.shadow.camera.bottom = -boxSize;
-    this.sunLight.shadow.camera.near = 15.0;
-    this.sunLight.shadow.camera.far = 55.0;
+    this.sunLight.shadow.camera.near = 5.0;
+    this.sunLight.shadow.camera.far = 80.0;
+    this.sunLight.shadow.camera.updateProjectionMatrix();
 
     // Precise bias settings: eliminates shadow acne & grounds the tires firmly to the road/ramps
     this.sunLight.shadow.bias = -0.0001;
-    this.sunLight.shadow.normalBias = 0.005;
-    this.sunLight.shadow.radius = 1.2;
+    this.sunLight.shadow.normalBias = 0.004;
+    this.sunLight.shadow.radius = 1.0;
 
     this.scene.add(this.sunLight);
     this.scene.add(this.sunLight.target);
@@ -249,10 +250,10 @@ class GameApp {
     this.cameraManager.update(dt, this.vanModel.root, this.vehiclePhysics);
 
     // 5. UPDATE SINGLE QUALITY AAA GROUNDED SHADOW
-    // Overhead sun positioned directly above the van for accurate ground shadow contact
+    // Overhead sun positioned directly above the van for accurate ground shadow contact without elongated box silhouettes
     const vanPos = this.vanModel.root.position;
     if (this.sunLight) {
-      this.sunLight.position.set(vanPos.x + 4.5, vanPos.y + 35.0, vanPos.z + 4.5);
+      this.sunLight.position.set(vanPos.x + 2.0, vanPos.y + 42.0, vanPos.z + 2.0);
       this.sunLight.target.position.set(vanPos.x, vanPos.y, vanPos.z);
       this.sunLight.target.updateMatrixWorld();
     }

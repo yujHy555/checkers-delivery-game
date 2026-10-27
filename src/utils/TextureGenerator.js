@@ -500,4 +500,36 @@ export class TextureGenerator {
     const texture = new THREE.CanvasTexture(canvas);
     return texture;
   }
+
+  static createGrassTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Rich vibrant lawn base
+    ctx.fillStyle = '#2e7d32';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Organic dual-tone blades and natural noise
+    for (let i = 0; i < 4500; i++) {
+      const x = Math.random() * 256;
+      const y = Math.random() * 256;
+      const rand = Math.random();
+      if (rand > 0.65) {
+        ctx.fillStyle = '#43a047'; // fresh emerald green
+      } else if (rand > 0.35) {
+        ctx.fillStyle = '#388e3c'; // lush park green
+      } else {
+        ctx.fillStyle = '#1b5e20'; // deep shadow blade
+      }
+      ctx.fillRect(x, y, 1.5 + Math.random() * 2, 2.5 + Math.random() * 3);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(35, 35);
+    return texture;
+  }
 }

@@ -255,14 +255,14 @@ export class ArcadeVehicle {
       this.pitch = this.surfacePitch;
 
     } else {
-      // Natural drop: if van drives off the side of a ramp into thin air, begin free-fall drop under gravity
-      if (this.position.y > targetGroundY + 0.15) {
+      // Natural drop: only when the vehicle has completely driven off an elevated ramp into thin air
+      if (!this.isOnRamp && this.position.y > targetGroundY + 0.25) {
         this.isAirborne = true;
         this.airTime = 0.01;
-        this.jumpLaunchCooldown = 0.1;
+        this.jumpLaunchCooldown = 0.12;
         this.velocity.y = Math.min(0, this.velocity.y);
       } else {
-        // Solid ground contact: instant exact alignment so tires NEVER sink into road or ramp!
+        // Solid ground contact: instant exact alignment so tires NEVER sink into road or ramp, with ZERO bounce when driving slowly!
         this.position.y = targetGroundY;
         this.velocity.y = 0;
 
@@ -384,7 +384,12 @@ export class ArcadeVehicle {
           const progress = Math.max(0, 1.0 - (distFromPeak / hd));
           const h = progress * c.height;
 
-          if (h > maxHeight) {
+          // PHYSICAL ENTRY CHECK:
+          // A car on the road can only drive onto the ramp where the ramp height is low (<= 0.35m at slope entries).
+          // If the car is on the road and this spot is a high vertical wall (> 0.35m), the car cannot climb it from the side!
+          const canAccessRamp = this.isOnRamp || (h <= 0.35) || (this.position.y >= h - 0.35);
+
+          if (canAccessRamp && h > maxHeight) {
             maxHeight = h;
             isOnRamp = true;
             if (distFromPeak < 1.4) {
@@ -450,45 +455,41 @@ export class ArcadeVehicle {
           const rampH = Math.max(0, 1.0 - (distFromPeak / hd)) * c.height;
 
           // Only collide if car is down on the road outside (not on top of ramp or airborne)
-          if (!this.isOnRamp && !this.isAirborne && this.position.y < rampH - 0.25) {
+          if (!this.isOnRamp && !this.isAirborne && this.position.y < rampH - 0.15) {
             const carR = this.halfCarWidth;
 
-            // Left side barrier (localX < -hw): Only block if moving INWARD into the ramp (vLocalX > 0)
+            // Left side barrier (localX < -hw): outside left edge trying to penetrate
             if (localX < -hw && localX > -hw - carR) {
-              if (vLocalX > 0) {
-                const penetration = (hw + carR) - Math.abs(localX);
-                const normX = -cosA;
-                const normZ = sinA;
+              const penetration = (hw + carR) - Math.abs(localX);
+              const normX = -cosA;
+              const normZ = sinA;
 
-                this.position.x += normX * penetration;
-                this.position.z += normZ * penetration;
+              this.position.x += normX * penetration;
+              this.position.z += normZ * penetration;
 
-                // Deflect inward velocity and allow free forward/backward slide
-                const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
-                if (vInward > 0) {
-                  this.velocity.x -= (-normX) * vInward * 1.2;
-                  this.velocity.z -= (-normZ) * vInward * 1.2;
-                  this.velocity.multiplyScalar(0.95);
-                }
+              // Deflect inward velocity and allow free forward/backward slide
+              const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+              if (vInward > 0) {
+                this.velocity.x -= (-normX) * vInward * 1.2;
+                this.velocity.z -= (-normZ) * vInward * 1.2;
+                this.velocity.multiplyScalar(0.92);
               }
             }
-            // Right side barrier (localX > hw): Only block if moving INWARD into the ramp (vLocalX < 0)
+            // Right side barrier (localX > hw): outside right edge trying to penetrate
             else if (localX > hw && localX < hw + carR) {
-              if (vLocalX < 0) {
-                const penetration = (hw + carR) - localX;
-                const normX = cosA;
-                const normZ = -sinA;
+              const penetration = (hw + carR) - localX;
+              const normX = cosA;
+              const normZ = -sinA;
 
-                this.position.x += normX * penetration;
-                this.position.z += normZ * penetration;
+              this.position.x += normX * penetration;
+              this.position.z += normZ * penetration;
 
-                // Deflect inward velocity and allow free forward/backward slide
-                const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
-                if (vInward > 0) {
-                  this.velocity.x -= (-normX) * vInward * 1.2;
-                  this.velocity.z -= (-normZ) * vInward * 1.2;
-                  this.velocity.multiplyScalar(0.95);
-                }
+              // Deflect inward velocity and allow free forward/backward slide
+              const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+              if (vInward > 0) {
+                this.velocity.x -= (-normX) * vInward * 1.2;
+                this.velocity.z -= (-normZ) * vInward * 1.2;
+                this.velocity.multiplyScalar(0.92);
               }
             }
           }

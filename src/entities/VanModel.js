@@ -63,7 +63,7 @@ export class VanModel {
     const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.75, 3.25), bodyCyanMat);
     lowerBody.position.set(0, 0.38, 0);
     lowerBody.castShadow = true;
-    lowerBody.receiveShadow = true;
+    lowerBody.receiveShadow = false;
     this.chassisGroup.add(lowerBody);
 
     // Upper cargo box

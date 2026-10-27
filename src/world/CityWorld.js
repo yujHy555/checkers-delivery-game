@@ -11,19 +11,21 @@ export class CityWorld {
   }
 
   buildWorld() {
-    // 1. Ground Plane (Receives shadow)
+    // 1. Lush Vibrant Green Grass Ground Plane (Receives shadow)
+    const grassTex = TextureGenerator.createGrassTexture();
     const groundGeo = new THREE.PlaneGeometry(350, 350);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x27352b,
-      roughness: 0.95,
-      metalness: 0.05
+      map: grassTex,
+      color: 0x388e3c, // Rich, healthy, pleasant lawn green
+      roughness: 0.82,
+      metalness: 0.02
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // 2. Road Network
+    // 2. Road Network (clean open edges, no grey barriers)
     this.buildRoads();
 
     // 3. SOLID DOUBLE-SIDED 3D JUMP RAMPS (NO RAILINGS, clean open geometry)
@@ -64,25 +66,6 @@ export class CityWorld {
           dash.position.set(x + offset, 0.02, z);
         }
         this.scene.add(dash);
-      }
-
-      // Concrete White Edge Curbs (cast and receive shadows)
-      const curbMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.7 });
-      const halfW = width / 2;
-      const createCurb = (cx, cz, cw, cl) => {
-        const curb = new THREE.Mesh(new THREE.BoxGeometry(cw, 0.22, cl), curbMat);
-        curb.position.set(cx, 0.11, cz);
-        curb.castShadow = true;
-        curb.receiveShadow = true;
-        this.scene.add(curb);
-      };
-
-      if (rot === 0) {
-        createCurb(x - halfW - 0.2, z, 0.4, length);
-        createCurb(x + halfW + 0.2, z, 0.4, length);
-      } else {
-        createCurb(x, z - halfW - 0.2, length, 0.4);
-        createCurb(x, z + halfW + 0.2, length, 0.4);
       }
     };
 
