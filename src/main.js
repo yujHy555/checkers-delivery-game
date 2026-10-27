@@ -157,6 +157,9 @@ class GameApp {
 
     this.input.onResetVehicle = () => {
       this.vehiclePhysics.reset(0, -40, 0);
+      if (this.cityWorld && this.cityWorld.resetCones) {
+        this.cityWorld.resetCones();
+      }
       this.showToast('Van reset on center road!');
     };
   }
@@ -261,13 +264,19 @@ class GameApp {
     // 6. Update Delivery System
     this.deliverySystem.update(dt, vanPos);
 
-    // 7. Audio Engine, Drift Screech & Brake Sound
+    // 7. Update Dynamic World Elements (Accurate Traffic Cone Physics & Collisions)
+    if (this.cityWorld && this.cityWorld.update) {
+      this.cityWorld.update(dt, this.vehiclePhysics, this.audio);
+    }
+
+    // 8. Audio Engine, Handbrake Screech & Punchy Brake Sound
     const kmh = Math.abs(this.vehiclePhysics.speed * 3.6);
     this.audio.updateEngine(this.vehiclePhysics.speed, this.input.throttle, this.vehiclePhysics.maxSpeed);
-    this.audio.updateSkid(this.vehiclePhysics.isDrifting || this.vehiclePhysics.slipSpeed > 3.0, this.vehiclePhysics.slipSpeed);
-    this.audio.updateBrake(this.vehiclePhysics.isBrakingHard, this.vehiclePhysics.speed);
+    const isSkidding = (this.input.handbrake || this.vehiclePhysics.isDrifting || this.vehiclePhysics.slipSpeed > 2.5) && Math.abs(this.vehiclePhysics.speed) > 1.2;
+    this.audio.updateSkid(isSkidding, Math.max(3.5, this.vehiclePhysics.slipSpeed));
+    this.audio.updateBrake(this.vehiclePhysics.isBrakingHard || (this.input.brake > 0.35 && Math.abs(this.vehiclePhysics.speed) > 1.8), this.vehiclePhysics.speed);
 
-    // 8. Update HUD
+    // 9. Update HUD
     if (this.uiSpeed) this.uiSpeed.innerText = Math.round(kmh);
     if (this.uiScore) this.uiScore.innerText = this.deliverySystem.score;
 

@@ -121,20 +121,32 @@ export class AudioSynth {
     this.brakeNoise.buffer = noiseBuffer;
     this.brakeNoise.loop = true;
 
-    // Resonant bandpass filter around 2800 Hz for pad friction
+    // Resonant dual-bandpass filter around 2400 Hz for pad friction & squeal
     this.brakeFilter = this.ctx.createBiquadFilter();
     this.brakeFilter.type = 'bandpass';
-    this.brakeFilter.frequency.value = 2750;
-    this.brakeFilter.Q.value = 6.0;
+    this.brakeFilter.frequency.value = 2450;
+    this.brakeFilter.Q.value = 4.0;
+
+    // Resonant high-pitched squeal oscillator
+    this.brakeOsc = this.ctx.createOscillator();
+    this.brakeOsc.type = 'sine';
+    this.brakeOsc.frequency.value = 2850;
 
     this.brakeGain = this.ctx.createGain();
     this.brakeGain.gain.value = 0;
 
     this.brakeNoise.connect(this.brakeFilter);
     this.brakeFilter.connect(this.brakeGain);
+
+    const oscSubGain = this.ctx.createGain();
+    oscSubGain.gain.value = 0.35;
+    this.brakeOsc.connect(oscSubGain);
+    oscSubGain.connect(this.brakeGain);
+
     this.brakeGain.connect(this.masterGain);
 
     this.brakeNoise.start();
+    this.brakeOsc.start();
   }
 
   updateEngine(speed, throttle, maxSpeed) {
@@ -158,15 +170,37 @@ export class AudioSynth {
 
   updateSkid(isSkidding, slipVel) {
     if (!this.initialized || !this.tireGain || this.isMuted) return;
-    const targetGain = isSkidding ? Math.min(0.20, (slipVel / 10.0) * 0.20) : 0;
-    this.tireGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.04);
+    // Visceral, noticeably louder tire screech / handbrake drift sound
+    const intensity = Math.min(1.0, Math.max(0.45, slipVel / 5.5));
+    const targetGain = isSkidding ? 0.38 * intensity : 0;
+    this.tireGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.03);
   }
 
   updateBrake(isBrakingHard, speed) {
     if (!this.initialized || !this.brakeGain || this.isMuted) return;
-    // Subtle brake squeal: only when braking hard with speed > 2.5 m/s
-    const targetGain = (isBrakingHard && Math.abs(speed) > 2.5) ? 0.09 : 0;
-    this.brakeGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.06);
+    // Punchy, louder brake pad friction & squeal when braking
+    const targetGain = (isBrakingHard && Math.abs(speed) > 1.8) ? 0.28 : 0;
+    this.brakeGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.04);
+  }
+
+  playConeHit(impactSpeed = 5) {
+    if (!this.initialized || this.isMuted) return;
+    // Dynamic plastic traffic cone thump & hollow clatter
+    const vol = Math.min(0.38, 0.14 + (impactSpeed / 25.0) * 0.24);
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(75, this.ctx.currentTime + 0.18);
+
+    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.19);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.20);
   }
 
   playDoorSlide() {
