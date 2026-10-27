@@ -226,6 +226,16 @@ export class ArcadeVehicle {
     this.isOnRamp = isOnRamp;
     const isNearPeak = gCenter.isNearPeak || (hFront > 0.6 && hRear > 0.6 && Math.abs(hFront - hRear) < 0.35);
 
+    const isOnCurb = gFL.isOnCurb || gFR.isOnCurb || gRL.isOnCurb || gRR.isOnCurb || gCenter.isOnCurb;
+    this.isOnCurb = isOnCurb;
+    if (isOnCurb && absSpeed > 1.8 && !this.isAirborne) {
+      // Subtle physical rumble suspension vibration when clipping racing curbs
+      this.suspensionCompress += Math.sin(Date.now() * 0.045) * 0.015;
+      if (window.gameApp && window.gameApp.audio && window.gameApp.audio.playCurbRumble) {
+        window.gameApp.audio.playCurbRumble(absSpeed);
+      }
+    }
+
     // 4. VERTICAL DYNAMICS & JUMP LAUNCH
     if (this.jumpLaunchCooldown > 0) {
       this.jumpLaunchCooldown -= dt;
@@ -372,6 +382,7 @@ export class ArcadeVehicle {
     let maxHeight = 0;
     let isOnRamp = false;
     let isNearPeak = false;
+    let isOnCurb = false;
 
     for (const c of this.colliders) {
       if (c.type === 'ramp') {
@@ -404,10 +415,44 @@ export class ArcadeVehicle {
             }
           }
         }
+      } else if (c.type === 'curb_arc') {
+        const dx = x - c.cx;
+        const dz = z - c.cz;
+        const dist = Math.hypot(dx, dz);
+        if (dist >= c.rMin && dist <= c.rMax) {
+          let angle = Math.atan2(dz, dx);
+          while (angle < c.a1) angle += Math.PI * 2;
+          while (angle > c.a2 + 0.01) angle -= Math.PI * 2;
+          if (angle >= c.a1 - 0.01 && angle <= c.a2 + 0.01) {
+            const t = (dist - c.rMin) / (c.rMax - c.rMin);
+            const curbh = Math.sin(t * Math.PI) * c.height;
+            if (curbh > maxHeight) {
+              maxHeight = curbh;
+              isOnCurb = true;
+            }
+          }
+        }
+      } else if (c.type === 'curb_straight') {
+        const dx = x - c.x;
+        const dz = z - c.z;
+        const cosA = Math.cos(c.rot);
+        const sinA = Math.sin(c.rot);
+        const lx = dx * cosA + dz * sinA;
+        const lz = -dx * sinA + dz * cosA;
+        const hw = c.width / 2;
+        const hl = c.length / 2;
+        if (Math.abs(lz) <= hl && Math.abs(lx) <= hw) {
+          const t = 1.0 - (Math.abs(lx) / hw);
+          const curbh = Math.sin(t * Math.PI * 0.5) * c.height;
+          if (curbh > maxHeight) {
+            maxHeight = curbh;
+            isOnCurb = true;
+          }
+        }
       }
     }
 
-    return { height: maxHeight, isOnRamp, isNearPeak };
+    return { height: maxHeight, isOnRamp, isNearPeak, isOnCurb };
   }
 
   resolveCollisions() {

@@ -44,14 +44,22 @@ export class CityWorld {
       metalness: 0.05
     });
 
-    const curbMat = new THREE.MeshStandardMaterial({
-      color: 0xcbd5e1, // Modern rounded edge border curb
-      roughness: 0.8
+    // AAA Racing Track Curbs (Alternating White & Turquoise Rumble Strips)
+    const curbWhiteMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.40,
+      metalness: 0.05
+    });
+
+    const curbTurquoiseMat = new THREE.MeshStandardMaterial({
+      color: 0x06b6d4, // Vibrant modern turquoise
+      roughness: 0.35,
+      metalness: 0.08
     });
 
     const lineMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
 
-    // Creates a straight road segment with modern rounded edge borders and crisp dashed lines
+    // Creates a straight road segment with elevated 3D alternating white & turquoise curbs and crisp dashes
     const createStraightRoad = (x, z, width, length, rot = 0) => {
       const road = new THREE.Mesh(new THREE.PlaneGeometry(width, length), roadMat);
       road.rotation.x = -Math.PI / 2;
@@ -60,20 +68,42 @@ export class CityWorld {
       road.receiveShadow = true;
       this.scene.add(road);
 
-      // Rounded edge borders
-      const curbWidth = 0.45;
+      // Elevated 3D Racing Rumble Strip Curbs along left and right borders
+      const curbWidth = 0.95;
       const hw = width / 2;
-      [-hw, hw].forEach((offset) => {
-        const curb = new THREE.Mesh(new THREE.PlaneGeometry(curbWidth, length), curbMat);
-        curb.rotation.x = -Math.PI / 2;
-        curb.rotation.z = rot;
-        if (rot === 0) {
-          curb.position.set(x + offset, 0.018, z);
-        } else {
-          curb.position.set(x, 0.018, z + offset);
+      const segLength = 3.2;
+      const numCurbSegs = Math.floor(length / segLength);
+
+      [-hw - curbWidth / 2, hw + curbWidth / 2].forEach((offsetDist) => {
+        for (let s = 0; s < numCurbSegs; s++) {
+          const mat = (s % 2 === 0) ? curbWhiteMat : curbTurquoiseMat;
+          const posAlong = (s - numCurbSegs / 2 + 0.5) * segLength;
+
+          // 3D Elevated Beveled Curb Block (Height 0.095m)
+          const curbGeo = new THREE.BoxGeometry(curbWidth, 0.095, segLength * 0.96);
+          const curbMesh = new THREE.Mesh(curbGeo, mat);
+          curbMesh.castShadow = true;
+          curbMesh.receiveShadow = true;
+
+          if (rot === 0) {
+            curbMesh.position.set(x + offsetDist, 0.05, z + posAlong);
+          } else {
+            curbMesh.rotation.y = rot;
+            curbMesh.position.set(x + posAlong, 0.05, z + offsetDist);
+          }
+          this.scene.add(curbMesh);
         }
-        curb.receiveShadow = true;
-        this.scene.add(curb);
+
+        // Register in physical colliders for 4-wheel height sampling and suspension response
+        this.colliders.push({
+          type: 'curb_straight',
+          x: rot === 0 ? x + offsetDist : x,
+          z: rot === 0 ? z : z + offsetDist,
+          width: curbWidth,
+          length: length,
+          rot: rot,
+          height: 0.095
+        });
       });
 
       // Crisp White Dashes
@@ -93,7 +123,7 @@ export class CityWorld {
     };
 
     // Creates a smooth curved corner road arc connecting straights into a seamless closed circuit
-    const createCurvedRoadCorner = (cx, cz, rIn, rOut, a1, a2, segs = 20) => {
+    const createCurvedRoadCorner = (cx, cz, rIn, rOut, a1, a2, segs = 24) => {
       const pos = [];
       const Rc = (rIn + rOut) * 0.5;
 
@@ -122,42 +152,74 @@ export class CityWorld {
       mesh.receiveShadow = true;
       this.scene.add(mesh);
 
-      // Curved outer and inner curbs
-      const createCurbArc = (radius, width) => {
-        const curbPos = [];
-        const r1 = radius - width / 2;
-        const r2 = radius + width / 2;
-        for (let i = 0; i < segs; i++) {
-          const t1 = a1 + (i / segs) * (a2 - a1);
-          const t2 = a1 + ((i + 1) / segs) * (a2 - a1);
+      // Elevated 3D Alternating White & Turquoise Racing Rumble Strip Curbs along apex and outer curve
+      const createElevatedCurbArc = (rInner, rOuter, isInsideApex) => {
+        const curbSegs = 18;
+        for (let i = 0; i < curbSegs; i++) {
+          const t1 = a1 + (i / curbSegs) * (a2 - a1);
+          const t2 = a1 + ((i + 1) / curbSegs) * (a2 - a1);
+          const mat = (i % 2 === 0) ? curbWhiteMat : curbTurquoiseMat;
+
           const c1 = Math.cos(t1), s1 = Math.sin(t1);
           const c2 = Math.cos(t2), s2 = Math.sin(t2);
-          const cp1 = [cx + r1 * c1, 0.018, cz + r1 * s1];
-          const cp2 = [cx + r2 * c1, 0.018, cz + r2 * s1];
-          const cp3 = [cx + r1 * c2, 0.018, cz + r1 * s2];
-          const cp4 = [cx + r2 * c2, 0.018, cz + r2 * s2];
-          curbPos.push(...cp1, ...cp3, ...cp2, ...cp2, ...cp3, ...cp4);
+
+          const rRoad = isInsideApex ? rOuter : rInner;
+          const rGrass = isInsideApex ? rInner : rOuter;
+          const rMid = (rRoad + rGrass) * 0.5;
+
+          // 3D Beveled Ridge: Road lip y = 0.018m, Ridge crest y = 0.095m, Back lip y = 0.025m
+          const pRoad1 = [cx + rRoad * c1, 0.018, cz + rRoad * s1];
+          const pRoad2 = [cx + rRoad * c2, 0.018, cz + rRoad * s2];
+          const pMid1  = [cx + rMid * c1,  0.095, cz + rMid * s1];
+          const pMid2  = [cx + rMid * c2,  0.095, cz + rMid * s2];
+          const pGrass1= [cx + rGrass * c1, 0.025, cz + rGrass * s1];
+          const pGrass2= [cx + rGrass * c2, 0.025, cz + rGrass * s2];
+
+          const verts = new Float32Array([
+            // Incline face (from road to ridge crest)
+            ...pRoad1, ...pRoad2, ...pMid1,
+            ...pRoad2, ...pMid2, ...pMid1,
+            // Back bevel face (from ridge crest to grass edge)
+            ...pMid1, ...pMid2, ...pGrass1,
+            ...pMid2, ...pGrass2, ...pGrass1
+          ]);
+
+          const curbBlockGeo = new THREE.BufferGeometry();
+          curbBlockGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+          curbBlockGeo.computeVertexNormals();
+          const curbBlockMesh = new THREE.Mesh(curbBlockGeo, mat);
+          curbBlockMesh.castShadow = true;
+          curbBlockMesh.receiveShadow = true;
+          this.scene.add(curbBlockMesh);
         }
-        const curbGeo = new THREE.BufferGeometry();
-        curbGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(curbPos), 3));
-        curbGeo.computeVertexNormals();
-        const curbMesh = new THREE.Mesh(curbGeo, curbMat);
-        curbMesh.receiveShadow = true;
-        this.scene.add(curbMesh);
+
+        // Register in physical colliders for 4-wheel height sampling & suspension reaction
+        this.colliders.push({
+          type: 'curb_arc',
+          cx,
+          cz,
+          rMin: Math.min(rInner, rOuter),
+          rMax: Math.max(rInner, rOuter),
+          a1: Math.min(a1, a2),
+          a2: Math.max(a1, a2),
+          height: 0.095
+        });
       };
 
-      createCurbArc(rIn, 0.45);
-      createCurbArc(rOut, 0.45);
+      // Inner apex curb: width 1.2m (from radius 10.8m to 12.0m)
+      createElevatedCurbArc(10.8, 12.0, true);
+      // Outer exit/entry curb: width 1.2m (from radius 28.0m to 29.2m)
+      createElevatedCurbArc(28.0, 29.2, false);
 
-      // Curved lane dashes along centerline radius
-      const numCornerDashes = 4;
+      // Curved lane dashes along centerline radius (exact tangent curve alignment!)
+      const numCornerDashes = 7;
       for (let j = 0; j < numCornerDashes; j++) {
         const angle = a1 + ((j + 0.5) / numCornerDashes) * (a2 - a1);
         const dx = cx + Rc * Math.cos(angle);
         const dz = cz + Rc * Math.sin(angle);
         const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 3.2), lineMat);
         dash.rotation.x = -Math.PI / 2;
-        dash.rotation.z = -angle + Math.PI / 2;
+        dash.rotation.z = -angle; // Exactly follows curve tangent with 0 error!
         dash.position.set(dx, 0.02, dz);
         this.scene.add(dash);
       }

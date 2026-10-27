@@ -300,95 +300,322 @@
       background: rgba(0, 188, 212, 0.45);
     }
 
-    /* MOBILE TOUCH CONTROLS */
+    /* WIDESCREEN ORIENTATION ENFORCEMENT OVERLAY */
+    #rotate-device-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #091217;
+      z-index: 99999;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 24px;
+      user-select: none;
+    }
+    @media screen and (orientation: portrait) and (max-width: 1024px) {
+      #rotate-device-modal {
+        display: flex;
+      }
+    }
+    .rotate-phone-anim {
+      width: 54px;
+      height: 92px;
+      border: 3.5px solid #00e5ff;
+      border-radius: 12px;
+      position: relative;
+      margin-bottom: 22px;
+      animation: rotatePhone 2.2s infinite ease-in-out;
+      box-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
+    }
+    .rotate-phone-anim::before {
+      content: '';
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 3px;
+      background: #00e5ff;
+      border-radius: 2px;
+    }
+    @keyframes rotatePhone {
+      0%, 20% { transform: rotate(0deg); }
+      50%, 80% { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .rotate-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 20px;
+      color: #ffffff;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .rotate-sub {
+      font-size: 15px;
+      font-weight: 600;
+      color: #80deea;
+      max-width: 290px;
+      line-height: 1.35;
+    }
+
+    /* MOBILE RACING TOUCH CONTROLS (Triangular Steer Arrows & Perforated Pedals) */
     #touch-controls {
       position: absolute;
-      bottom: 20px;
+      bottom: 22px;
       left: 20px;
       right: 20px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      z-index: 15;
+      z-index: 25;
       pointer-events: none;
     }
 
-    #touch-joystick-zone {
-      width: 120px;
-      height: 120px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 2px dashed rgba(0, 188, 212, 0.4);
-      border-radius: 50%;
-      position: relative;
+    /* LEFT: TRIANGULAR STEERING BUTTONS */
+    .steer-cluster {
+      display: flex;
+      align-items: center;
+      gap: 16px;
       pointer-events: auto;
+    }
+    .touch-steer-btn {
+      width: 86px;
+      height: 74px;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 0;
+      cursor: pointer;
       touch-action: none;
+      transition: transform 0.08s ease;
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
     }
-    #touch-joystick-nub {
-      width: 50px;
-      height: 50px;
-      background: #00bcd4;
-      border-radius: 50%;
-      position: absolute;
-      top: 35px;
-      left: 35px;
-      box-shadow: 0 0 14px rgba(0, 188, 212, 0.8);
-      pointer-events: none;
+    .touch-steer-btn:active, .touch-steer-btn.active {
+      transform: scale(0.92);
+    }
+    .steer-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    .arrow-shape {
+      transition: fill 0.1s ease, filter 0.1s ease;
+    }
+    /* Left arrow: grey/white triangular chevron */
+    .arrow-left {
+      fill: rgba(226, 232, 240, 0.65);
+      stroke: rgba(255, 255, 255, 0.9);
+      stroke-width: 3.5;
+      stroke-linejoin: round;
+    }
+    .touch-steer-btn.btn-left:active .arrow-left, .touch-steer-btn.btn-left.active .arrow-left {
+      fill: #ffffff;
+      filter: drop-shadow(0 0 10px #ffffff);
+    }
+    /* Right arrow: vibrant red triangular chevron */
+    .arrow-right {
+      fill: #dc2626;
+      stroke: #b91c1c;
+      stroke-width: 3.5;
+      stroke-linejoin: round;
+    }
+    .touch-steer-btn.btn-right:active .arrow-right, .touch-steer-btn.btn-right.active .arrow-right {
+      fill: #ef4444;
+      filter: drop-shadow(0 0 12px #ef4444);
     }
 
-    .touch-btn-cluster {
-      display: grid;
-      grid-template-columns: repeat(2, 64px);
-      gap: 12px;
+    /* RIGHT: RACING PEDALS & HANDBRAKE */
+    .pedal-cluster {
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
       pointer-events: auto;
     }
-    .touch-btn {
-      width: 64px;
-      height: 64px;
-      border-radius: 14px;
-      background: rgba(14, 25, 33, 0.9);
-      border: 2px solid rgba(0, 188, 212, 0.5);
-      color: #ffffff;
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      font-size: 14px;
+    .brake-drift-col {
       display: flex;
       flex-direction: column;
       align-items: center;
+      gap: 10px;
+    }
+
+    /* Handbrake Turn Button */
+    .handbrake-btn {
+      width: 82px;
+      height: 38px;
+      background: rgba(245, 158, 11, 0.28);
+      border: 2px solid #f59e0b;
+      border-radius: 12px;
+      color: #fbbf24;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 11px;
+      letter-spacing: 0.6px;
+      display: flex;
+      align-items: center;
       justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
       touch-action: none;
-      transition: transform 0.1s, background 0.1s;
+      cursor: pointer;
       outline: none;
+      transition: transform 0.08s ease, background 0.08s ease;
     }
-    .touch-btn:active, .touch-btn.active {
+    .handbrake-btn:active, .handbrake-btn.active {
       transform: scale(0.92);
-      background: #00bcd4;
+      background: #f59e0b;
       color: #0b1a20;
+      box-shadow: 0 0 20px #f59e0b;
     }
-    .touch-btn.btn-gas {
-      background: rgba(22, 184, 74, 0.3);
-      border-color: #16b84a;
+
+    /* Red Brake Pedal with 6 perforated circular holes */
+    .pedal-brake {
+      width: 82px;
+      height: 82px;
+      background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+      border: 3.5px solid #7f1d1d;
+      border-radius: 22px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      cursor: pointer;
+      outline: none;
+      transition: transform 0.08s ease;
     }
-    .touch-btn.btn-gas:active, .touch-btn.btn-gas.active {
-      background: #16b84a;
-      color: #fff;
+    .pedal-brake:active, .pedal-brake.active {
+      transform: scale(0.92);
+      filter: brightness(1.15);
     }
-    .touch-btn.btn-brake {
-      background: rgba(229, 57, 53, 0.3);
-      border-color: #e53935;
+    .pedal-holes-brake {
+      display: grid;
+      grid-template-columns: repeat(3, 14px);
+      gap: 9px;
     }
-    .touch-btn.btn-brake:active, .touch-btn.btn-brake.active {
-      background: #e53935;
-      color: #fff;
+    .pedal-holes-brake span {
+      width: 14px;
+      height: 14px;
+      background: #450a0a;
+      border-radius: 50%;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.85);
     }
-    .touch-btn.btn-drift {
-      background: rgba(255, 179, 0, 0.3);
-      border-color: #ffb300;
+
+    /* Silver Accelerator Pedal with 8 perforated circular holes */
+    .pedal-gas {
+      width: 66px;
+      height: 124px;
+      background: linear-gradient(180deg, #f1f5f9 0%, #94a3b8 100%);
+      border: 3.5px solid #475569;
+      border-radius: 20px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      cursor: pointer;
+      outline: none;
+      transition: transform 0.08s ease;
     }
-    .touch-btn.btn-drift:active, .touch-btn.btn-drift.active {
-      background: #ffb300;
-      color: #000;
+    .pedal-gas:active, .pedal-gas.active {
+      transform: scale(0.92);
+      filter: brightness(1.2);
+    }
+    .pedal-holes-gas {
+      display: grid;
+      grid-template-columns: repeat(2, 14px);
+      gap: 10px 10px;
+    }
+    .pedal-holes-gas span {
+      width: 14px;
+      height: 14px;
+      background: #1e293b;
+      border-radius: 50%;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.85);
+    }
+
+    /* Mobile Contextual Deliver Button */
+    .mobile-action-center {
+      pointer-events: auto;
+    }
+    .mobile-deliver-btn {
+      background: linear-gradient(135deg, #00e5ff 0%, #00b0ff 100%);
+      color: #0b1a20;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 14px;
+      padding: 10px 22px;
+      border-radius: 26px;
+      border: 2px solid #ffffff;
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.6);
+      cursor: pointer;
+      touch-action: none;
+      margin-bottom: 12px;
+      animation: promptBob 1.2s infinite ease-in-out;
+    }
+
+    /* MOBILE RESPONSIVE TWEAKS FOR UNCLUTTERED GAME VIEW */
+    @media (max-width: 900px) {
+      #hud-top {
+        top: 10px;
+        left: 12px;
+        right: 12px;
+      }
+      .hud-card {
+        padding: 6px 12px;
+      }
+      .brand-text {
+        font-size: 16px;
+      }
+      .order-box {
+        font-size: 13px;
+      }
+      .score-value {
+        font-size: 20px;
+      }
+      .speedo-val {
+        font-size: 24px;
+      }
+      #minimap {
+        width: 80px;
+        height: 80px;
+      }
+      #touch-controls {
+        bottom: 12px;
+        left: 12px;
+        right: 12px;
+      }
+      .touch-steer-btn {
+        width: 76px;
+        height: 66px;
+      }
+      .pedal-brake {
+        width: 72px;
+        height: 72px;
+      }
+      .pedal-gas {
+        width: 58px;
+        height: 110px;
+      }
+      .handbrake-btn {
+        width: 72px;
+        height: 34px;
+        font-size: 10px;
+      }
+      #desktop-keys-bar {
+        display: none !important;
+      }
+    }
+
+    /* Hide touch controls on desktop mouse devices without touch */
+    @media (hover: hover) and (pointer: fine) and (min-width: 1025px) {
+      #touch-controls {
+        display: none;
+      }
     }
 
     /* KEYBOARD & GAMEPAD INSTRUCTIONS BAR */
@@ -468,6 +695,13 @@
   <!-- CELEBRATION MODAL BANNER -->
   <div id="celebration-banner"></div>
 
+  <!-- WIDESCREEN ORIENTATION ENFORCEMENT OVERLAY (Mobile) -->
+  <div id="rotate-device-modal">
+    <div class="rotate-phone-anim"></div>
+    <div class="rotate-title">PLEASE ROTATE YOUR DEVICE</div>
+    <div class="rotate-sub">Checkers Hyper Sixty60 requires Widescreen Landscape orientation to play</div>
+  </div>
+
   <!-- DESKTOP KEYBOARD & GAMEPAD CONTROLS BAR -->
   <div id="desktop-keys-bar">
     <span><b>W / S</b> Drive &bull; Brake</span>
@@ -479,22 +713,57 @@
     <span style="color: #00e5ff; margin-left: 6px;"><b>🎮 Gamepad Supported</b> (Triggers = RT/LT, Stick = Steer, B/X = Drift)</span>
   </div>
 
-  <!-- MOBILE TOUCH CONTROLS -->
+  <!-- MOBILE TOUCH CONTROLS (Authentic Racing Setup: Triangles & Pedals) -->
   <div id="touch-controls">
-    <!-- VIRTUAL JOYSTICK -->
-    <div id="touch-joystick-zone">
-      <div id="touch-joystick-nub"></div>
+    <!-- LEFT: TRIANGULAR STEERING ARROWS -->
+    <div class="steer-cluster">
+      <!-- Left Triangle Button (Grey/White) -->
+      <button class="touch-steer-btn btn-left" id="btn-steer-left" aria-label="Steer Left" tabindex="-1">
+        <svg viewBox="0 0 100 85" class="steer-svg">
+          <polygon points="85,8 85,77 15,42.5" class="arrow-shape arrow-left" />
+        </svg>
+      </button>
+
+      <!-- Right Triangle Button (Red) -->
+      <button class="touch-steer-btn btn-right" id="btn-steer-right" aria-label="Steer Right" tabindex="-1">
+        <svg viewBox="0 0 100 85" class="steer-svg">
+          <polygon points="15,8 15,77 85,42.5" class="arrow-shape arrow-right" />
+        </svg>
+      </button>
     </div>
 
-    <!-- ACTION BUTTONS -->
-    <div class="touch-btn-cluster">
-      <button class="touch-btn btn-gas" id="btn-gas" tabindex="-1" onfocus="this.blur()" title="Accelerate">⚡<br>GAS</button>
-      <button class="touch-btn btn-brake" id="btn-brake" tabindex="-1" onfocus="this.blur()" title="Brake / Reverse">🛑<br>BRAKE</button>
-      <button class="touch-btn btn-drift" id="btn-drift" tabindex="-1" onfocus="this.blur()" style="grid-column: span 2; width: 100%; height: 46px;" title="Drift / Handbrake">
-        💨 HANDBRAKE TURN
+    <!-- CENTER CONTEXTUAL: MOBILE DELIVER BUTTON -->
+    <div class="mobile-action-center">
+      <button class="mobile-deliver-btn" id="mobile-btn-deliver" style="display: none;" tabindex="-1">
+        📦 DELIVER
       </button>
-      <button class="touch-btn" id="btn-deliver" tabindex="-1" onfocus="this.blur()" style="grid-column: span 2; width: 100%; height: 44px; background: rgba(0, 188, 212, 0.25);" title="Deliver Groceries">
-        📦 DELIVER BAGS
+    </div>
+
+    <!-- RIGHT: RACING PEDALS & HANDBRAKE -->
+    <div class="pedal-cluster">
+      <div class="brake-drift-col">
+        <!-- Handbrake Turn Button -->
+        <button class="handbrake-btn" id="btn-drift" aria-label="Handbrake Turn" tabindex="-1">
+          <span>(P) DRIFT</span>
+        </button>
+
+        <!-- Red Brake Pedal (6 perforated holes) -->
+        <button class="racing-pedal pedal-brake" id="btn-brake" aria-label="Brake" tabindex="-1">
+          <div class="pedal-holes-brake">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Silver Accelerator Pedal (8 perforated holes) -->
+      <button class="racing-pedal pedal-gas" id="btn-gas" aria-label="Gas / Accelerate" tabindex="-1">
+        <div class="pedal-holes-gas">
+          <span></span><span></span>
+          <span></span><span></span>
+          <span></span><span></span>
+          <span></span><span></span>
+        </div>
       </button>
     </div>
   </div>

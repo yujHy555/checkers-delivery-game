@@ -171,6 +171,7 @@ class GameApp {
     this.uiOrder = document.getElementById('order-title');
     this.uiTargetDist = document.getElementById('order-dist');
     this.uiPrompt = document.getElementById('action-prompt');
+    this.uiMobileDeliverBtn = document.getElementById('mobile-btn-deliver');
     this.uiCamBtn = document.getElementById('btn-cam');
     this.uiMinimapPin = document.getElementById('minimap-target');
     this.uiMinimapVan = document.getElementById('minimap-player');
@@ -298,8 +299,10 @@ class GameApp {
         if (dist < 12.0) {
           this.uiPrompt.innerHTML = `<span class="key-pill">ENTER / E</span> Deliver Paper Bags!`;
           this.uiPrompt.style.display = 'block';
+          if (this.uiMobileDeliverBtn) this.uiMobileDeliverBtn.style.display = 'inline-block';
         } else {
           this.uiPrompt.style.display = 'none';
+          if (this.uiMobileDeliverBtn) this.uiMobileDeliverBtn.style.display = 'none';
         }
       }
     }

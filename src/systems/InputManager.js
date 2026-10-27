@@ -24,6 +24,13 @@ export class InputManager {
     this.joystickOrigin = { x: 0, y: 0 };
     this.joystickPos = { x: 0, y: 0 };
 
+    // Mobile Button States
+    this.btnSteerLeft = false;
+    this.btnSteerRight = false;
+    this.btnGas = false;
+    this.btnBrake = false;
+    this.btnDrift = false;
+
     this.bindKeyboard();
     this.bindTouchControls();
     this.bindGamepad();
@@ -95,81 +102,44 @@ export class InputManager {
   }
 
   bindTouchControls() {
-    const joystickZone = document.getElementById('touch-joystick-zone');
-    const joystickNub = document.getElementById('touch-joystick-nub');
+    // Mobile Driving Controls: Left/Right Steering Triangles & Racing Pedals
+    this.bindTouchButton('btn-steer-left', (active) => { this.btnSteerLeft = active; });
+    this.bindTouchButton('btn-steer-right', (active) => { this.btnSteerRight = active; });
+    this.bindTouchButton('btn-gas', (active) => { this.btnGas = active; });
+    this.bindTouchButton('btn-brake', (active) => { this.btnBrake = active; });
+    this.bindTouchButton('btn-drift', (active) => { this.btnDrift = active; });
 
-    if (!joystickZone || !joystickNub) return;
-
-    let touchId = null;
-
-    joystickZone.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const touch = e.changedTouches[0];
-      touchId = touch.identifier;
-      const rect = joystickZone.getBoundingClientRect();
-      this.joystickOrigin = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2
-      };
-      this.joystickActive = true;
-    }, { passive: false });
-
-    window.addEventListener('touchmove', (e) => {
-      if (!this.joystickActive) return;
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.identifier === touchId) {
-          e.preventDefault();
-          const maxRadius = 45;
-          const dx = touch.clientX - this.joystickOrigin.x;
-          const dy = touch.clientY - this.joystickOrigin.y;
-          const dist = Math.hypot(dx, dy);
-          const angle = Math.atan2(dy, dx);
-          const clampedDist = Math.min(dist, maxRadius);
-
-          const nx = Math.cos(angle) * clampedDist;
-          const ny = Math.sin(angle) * clampedDist;
-
-          joystickNub.style.transform = `translate(${nx}px, ${ny}px)`;
-          this.joystickPos.x = nx / maxRadius;
-          this.joystickPos.y = ny / maxRadius;
-        }
-      }
-    }, { passive: false });
-
-    const endTouch = (e) => {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === touchId) {
-          this.joystickActive = false;
-          touchId = null;
-          joystickNub.style.transform = `translate(0px, 0px)`;
-          this.joystickPos.x = 0;
-          this.joystickPos.y = 0;
-        }
-      }
-    };
-
-    window.addEventListener('touchend', endTouch);
-    window.addEventListener('touchcancel', endTouch);
-
-    this.bindButton('btn-gas', (active) => { this.btnGas = active; });
-    this.bindButton('btn-brake', (active) => { this.btnBrake = active; });
-    this.bindButton('btn-drift', (active) => { this.btnDrift = active; });
     this.bindButtonClick('btn-deliver', () => { if (this.onActionDeliver) this.onActionDeliver(); });
+    this.bindButtonClick('mobile-btn-deliver', () => { if (this.onActionDeliver) this.onActionDeliver(); });
     this.bindButtonClick('btn-cam', () => { if (this.onToggleCamera) this.onToggleCamera(); });
   }
 
-  bindButton(id, callback) {
+  bindTouchButton(id, callback) {
     const el = document.getElementById(id);
     if (!el) return;
-    const start = (e) => { e.preventDefault(); callback(true); el.classList.add('active'); };
-    const end = (e) => { e.preventDefault(); callback(false); el.classList.remove('active'); };
+
+    const start = (e) => {
+      e.preventDefault();
+      callback(true);
+      el.classList.add('active');
+    };
+    const end = (e) => {
+      e.preventDefault();
+      callback(false);
+      el.classList.remove('active');
+    };
+
+    el.addEventListener('pointerdown', start);
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    el.addEventListener('pointerleave', end);
 
     el.addEventListener('mousedown', start);
     window.addEventListener('mouseup', end);
+
     el.addEventListener('touchstart', start, { passive: false });
-    window.addEventListener('touchend', end);
-    window.addEventListener('touchcancel', end);
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
   }
 
   bindButtonClick(id, callback) {
@@ -193,22 +163,16 @@ export class InputManager {
     let s = 0;
     let handbrakeActive = false;
 
-    // 1. Keyboard Inputs
+    // 1. Keyboard & Touch Button Inputs (Responsive multi-touch support)
     if (this.keys['KeyW'] || this.keys['ArrowUp'] || this.btnGas) t += 1;
     if (this.keys['KeyS'] || this.keys['ArrowDown'] || this.btnBrake) b += 1;
 
     // Steering (A/Left = Left, D/Right = Right)
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) s += 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) s -= 1;
+    if (this.keys['KeyA'] || this.keys['ArrowLeft'] || this.btnSteerLeft) s += 1;
+    if (this.keys['KeyD'] || this.keys['ArrowRight'] || this.btnSteerRight) s -= 1;
 
+    // Handbrake Drift
     if (this.keys['Space'] || this.btnDrift) handbrakeActive = true;
-
-    // 2. Touch Joystick Input
-    if (this.joystickActive) {
-      s -= this.joystickPos.x;
-      if (this.joystickPos.y < -0.15) t += -this.joystickPos.y;
-      if (this.joystickPos.y > 0.15) b += this.joystickPos.y;
-    }
 
     // 3. HTML5 Gamepad Input (Xbox, PlayStation, etc.)
     const gp = this.pollGamepad();

@@ -257,4 +257,33 @@ export class AudioSynth {
     osc.start();
     osc.stop(this.ctx.currentTime + 0.26);
   }
+
+  playCurbRumble(speed) {
+    if (!this.initialized || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    if (this.lastCurbRumble && now - this.lastCurbRumble < 0.08) return;
+    this.lastCurbRumble = now;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    const rumbleFreq = Math.min(180, Math.max(70, speed * 6.5));
+    osc.frequency.setValueAtTime(rumbleFreq, now);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(260, now);
+
+    const gainVal = Math.min(0.22, (speed / 20.0) * 0.20 + 0.04);
+    gain.gain.setValueAtTime(gainVal, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + 0.075);
+  }
 }
