@@ -301,10 +301,11 @@ export class CityWorld {
         metalness: 0.05
       });
 
+      // Shift all geometries so the physical Center of Mass (y = 0.28m) sits at (0, 0, 0)
       // 1. Modern rounded cylindrical base plate
       const baseGeo = new THREE.CylinderGeometry(0.50, 0.54, 0.08, 24);
       const baseMesh = new THREE.Mesh(baseGeo, baseRimMat);
-      baseMesh.position.y = 0.04;
+      baseMesh.position.y = 0.04 - 0.28; // -0.24m
       baseMesh.castShadow = true;
       baseMesh.receiveShadow = true;
       model.add(baseMesh);
@@ -313,13 +314,13 @@ export class CityWorld {
       const torusGeo = new THREE.TorusGeometry(0.50, 0.035, 8, 24);
       const torusMesh = new THREE.Mesh(torusGeo, baseRimMat);
       torusMesh.rotation.x = Math.PI / 2;
-      torusMesh.position.y = 0.05;
+      torusMesh.position.y = 0.05 - 0.28; // -0.23m
       model.add(torusMesh);
 
       // 3. Smooth tapered conical body
       const bodyGeo = new THREE.CylinderGeometry(0.12, 0.35, 0.72, 24);
       const bodyMesh = new THREE.Mesh(bodyGeo, coneMat);
-      bodyMesh.position.y = 0.42;
+      bodyMesh.position.y = 0.42 - 0.28; // +0.14m
       bodyMesh.castShadow = true;
       bodyMesh.receiveShadow = true;
       model.add(bodyMesh);
@@ -327,18 +328,44 @@ export class CityWorld {
       // 4. Crown Dome (rounded spherical tip instead of sharp cone point)
       const domeGeo = new THREE.SphereGeometry(0.12, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
       const domeMesh = new THREE.Mesh(domeGeo, coneMat);
-      domeMesh.position.y = 0.78;
+      domeMesh.position.y = 0.78 - 0.28; // +0.50m
       domeMesh.castShadow = true;
       model.add(domeMesh);
 
       // 5. Rounded reflective middle stripe band
       const stripeGeo = new THREE.CylinderGeometry(0.19, 0.24, 0.16, 24);
       const stripeMesh = new THREE.Mesh(stripeGeo, stripeMat);
-      stripeMesh.position.y = 0.42;
+      stripeMesh.position.y = 0.42 - 0.28; // +0.14m
       model.add(stripeMesh);
 
       return root;
     };
+
+    // Pre-calculate 29 convex support points in local Center-of-Mass coordinates
+    this.coneSupportPoints = [];
+    const baseRadius = 0.52;
+    const baseTopRadius = 0.50;
+    const midRadius = 0.31;
+    const topRadius = 0.12;
+    const baseBottomY = -0.28;
+    const baseTopY = -0.20;
+    const midY = 0.14;
+    const topCollarY = 0.50;
+    const apexY = 0.62;
+
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const cosA = Math.cos(a);
+      const sinA = Math.sin(a);
+      this.coneSupportPoints.push(new THREE.Vector3(cosA * baseRadius, baseBottomY, sinA * baseRadius));
+      this.coneSupportPoints.push(new THREE.Vector3(cosA * baseTopRadius, baseTopY, sinA * baseTopRadius));
+      this.coneSupportPoints.push(new THREE.Vector3(cosA * midRadius, midY, sinA * midRadius));
+    }
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      this.coneSupportPoints.push(new THREE.Vector3(Math.cos(a) * topRadius, topCollarY, Math.sin(a) * topRadius));
+    }
+    this.coneSupportPoints.push(new THREE.Vector3(0, apexY, 0));
 
     // Strategic interactive cone placements (slaloms & racing corner apexes)
     const conePositions = [
@@ -369,22 +396,21 @@ export class CityWorld {
 
     for (const pos of conePositions) {
       const coneMesh = createModernRoundedConeMesh();
-      coneMesh.position.set(pos.x, 0, pos.z);
+      // Mesh pivot is at CoM (y = 0.28), placing the base plate bottom flush on ground at y = 0.00
+      coneMesh.position.set(pos.x, 0.28, pos.z);
       this.scene.add(coneMesh);
 
       this.cones.push({
         mesh: coneMesh,
         model: coneMesh.model,
-        homePos: new THREE.Vector3(pos.x, 0, pos.z),
-        pos: new THREE.Vector3(pos.x, 0, pos.z),
+        homePos: new THREE.Vector3(pos.x, 0.28, pos.z),
+        pos: new THREE.Vector3(pos.x, 0.28, pos.z),
         vel: new THREE.Vector3(0, 0, 0),
         rot: new THREE.Euler(0, 0, 0),
         angVel: new THREE.Vector3(0, 0, 0),
-        radius: 0.45,
-        height: 0.85,
+        radius: 0.52,
+        height: 0.90,
         isSleeping: true,
-        isFallen: false,
-        fallHeading: 0,
         hitCooldown: 0
       });
     }
@@ -564,6 +590,41 @@ export class CityWorld {
     return { isOnRamp: false, height: 0 };
   }
 
+  // Exact Convex Hull Support Evaluation for Traffic Cone (Zero Object Allocation)
+  getConeLowestContact(rot) {
+    let minY = Infinity;
+    let contactLocalX = 0;
+    let contactLocalZ = 0;
+
+    const cx = Math.cos(rot.x), sx = Math.sin(rot.x);
+    const cy = Math.cos(rot.y), sy = Math.sin(rot.y);
+    const cz = Math.cos(rot.z), sz = Math.sin(rot.z);
+
+    // Three.js Euler XYZ rotation matrix entries:
+    const m00 = cy * cz;
+    const m01 = -cy * sz;
+    const m02 = sy;
+
+    const m10 = sx * sy * cz + cx * sz;
+    const m11 = -sx * sy * sz + cx * cz;
+    const m12 = -sx * cy;
+
+    const m20 = -cx * sy * cz + sx * sz;
+    const m21 = cx * sy * sz + sx * cz;
+    const m22 = cx * cy;
+
+    for (let i = 0; i < this.coneSupportPoints.length; i++) {
+      const p = this.coneSupportPoints[i];
+      const vy = m10 * p.x + m11 * p.y + m12 * p.z;
+      if (vy < minY) {
+        minY = vy;
+        contactLocalX = m00 * p.x + m01 * p.y + m02 * p.z;
+        contactLocalZ = m20 * p.x + m21 * p.y + m22 * p.z;
+      }
+    }
+    return { minY, contactLocalX, contactLocalZ, m01, m11, m21 };
+  }
+
   // Super Accurate Physics & Van-Cone Collision Response System
   update(dt, vehicle, audio) {
     if (!vehicle || !this.cones || this.cones.length === 0) return;
@@ -579,7 +640,7 @@ export class CityWorld {
     const hl = 1.95; // Half-length of van chassis with bumper
     const hw = 1.10; // Half-width of van chassis with fenders
 
-    // 1. VAN-TO-CONE IMPACT DETECTION (Does not skip physics integration of other cones!)
+    // 1. VAN-TO-CONE IMPACT DETECTION
     for (const cone of this.cones) {
       if (cone.hitCooldown > 0) {
         cone.hitCooldown -= dt;
@@ -590,14 +651,14 @@ export class CityWorld {
       const dy = cone.pos.y - vanPos.y;
 
       // Only check van collision if cone is within proximity
-      if (dx * dx + dz * dz <= 22.0) {
+      if (dx * dx + dz * dz <= 24.0) {
         const df = dx * forward.x + dz * forward.z; // Along van forward axis
         const dr = dx * right.x + dz * right.z;     // Along van right axis
 
         const overlapF = (hl + cone.radius) - Math.abs(df);
         const overlapR = (hw + cone.radius) - Math.abs(dr);
 
-        if (overlapF > 0 && overlapR > 0 && dy > -0.6 && dy < 2.0) {
+        if (overlapF > 0 && overlapR > 0 && dy > -0.8 && dy < 2.2) {
           if (cone.hitCooldown <= 0) {
             cone.hitCooldown = 0.15;
 
@@ -610,8 +671,9 @@ export class CityWorld {
             }
 
             // Push cone cleanly outside van boundary
-            cone.pos.x += pushDir.x * 0.45;
-            cone.pos.z += pushDir.z * 0.45;
+            const pushDist = overlapR > overlapF ? overlapF : overlapR;
+            cone.pos.x += pushDir.x * pushDist;
+            cone.pos.z += pushDir.z * pushDist;
 
             const impactSpeed = Math.max(3.5, absSpeed);
 
@@ -619,7 +681,7 @@ export class CityWorld {
             cone.vel.x = vanVel.x * 1.25 + pushDir.x * (impactSpeed * 0.55 + 2.5) + (Math.random() - 0.5) * 1.5;
             cone.vel.z = vanVel.z * 1.25 + pushDir.z * (impactSpeed * 0.55 + 2.5) + (Math.random() - 0.5) * 1.5;
             // Pop into air
-            cone.vel.y = Math.min(6.5, impactSpeed * 0.35 + 2.2);
+            cone.vel.y = Math.min(6.5, impactSpeed * 0.38 + 2.2);
 
             // 3D tumble angular spin
             cone.angVel.x = (Math.random() - 0.5) * impactSpeed * 2.5 + pushDir.z * impactSpeed * 1.5;
@@ -627,11 +689,6 @@ export class CityWorld {
             cone.angVel.z = (Math.random() - 0.5) * impactSpeed * 2.5 - pushDir.x * impactSpeed * 1.5;
 
             cone.isSleeping = false;
-            cone.isFallen = false;
-
-            // Reset sub-model to standard un-tilted alignment while airborne
-            cone.model.position.set(0, 0, 0);
-            cone.model.rotation.set(0, 0, 0);
 
             if (audio && audio.playConeHit) {
               audio.playConeHit(impactSpeed);
@@ -641,142 +698,146 @@ export class CityWorld {
       }
     }
 
-    // 2. PHYSICAL INTEGRATION & OBSTACLE/RAMP COLLISIONS (RUNS FOR ALL ACTIVE CONES REGARDLESS OF DISTANCE)
+    // 2. AAA CONTINUOUS RIGID-BODY SIMULATION FOR ACTIVE CONES
+    // Sub-stepping (2 steps per frame) for rock-solid stability and zero tunneling
+    const subSteps = 2;
+    const subDt = dt / subSteps;
+
     for (const cone of this.cones) {
       if (cone.isSleeping) continue;
 
-      // Gravity
-      cone.vel.y -= 19.6 * dt;
+      for (let s = 0; s < subSteps; s++) {
+        // Gravity
+        cone.vel.y -= 19.6 * subDt;
 
-      // Position update
-      cone.pos.x += cone.vel.x * dt;
-      cone.pos.y += cone.vel.y * dt;
-      cone.pos.z += cone.vel.z * dt;
+        // Position integration
+        cone.pos.x += cone.vel.x * subDt;
+        cone.pos.y += cone.vel.y * subDt;
+        cone.pos.z += cone.vel.z * subDt;
 
-      // 2A. BUILDING & RAMP SIDE-WALL COLLISIONS
-      for (const col of this.colliders) {
-        if (col.type === 'box') {
-          // Building box collision
-          const chw = col.width / 2 + cone.radius;
-          const chd = col.depth / 2 + cone.radius;
-          const cdx = cone.pos.x - col.x;
-          const cdz = cone.pos.z - col.z;
-          if (Math.abs(cdx) < chw && Math.abs(cdz) < chd) {
-            const penX = chw - Math.abs(cdx);
-            const penZ = chd - Math.abs(cdz);
-            if (penX < penZ) {
-              cone.pos.x = col.x + chw * Math.sign(cdx);
-              cone.vel.x = -cone.vel.x * 0.45;
-            } else {
-              cone.pos.z = col.z + chd * Math.sign(cdz);
-              cone.vel.z = -cone.vel.z * 0.45;
+        // Angular integration
+        cone.rot.x += cone.angVel.x * subDt;
+        cone.rot.y += cone.angVel.y * subDt;
+        cone.rot.z += cone.angVel.z * subDt;
+
+        // 2A. BUILDING OBSTACLES COLLISION
+        for (const col of this.colliders) {
+          if (col.type === 'box') {
+            const chw = col.width / 2 + cone.radius;
+            const chd = col.depth / 2 + cone.radius;
+            const cdx = cone.pos.x - col.x;
+            const cdz = cone.pos.z - col.z;
+            if (Math.abs(cdx) < chw && Math.abs(cdz) < chd) {
+              const penX = chw - Math.abs(cdx);
+              const penZ = chd - Math.abs(cdz);
+              if (penX < penZ) {
+                cone.pos.x = col.x + chw * Math.sign(cdx);
+                cone.vel.x = -cone.vel.x * 0.45;
+              } else {
+                cone.pos.z = col.z + chd * Math.sign(cdz);
+                cone.vel.z = -cone.vel.z * 0.45;
+              }
             }
-          }
-        } else if (col.type === 'ramp') {
-          // Ramp solid side-wall collision
-          const dx = cone.pos.x - col.x;
-          const dz = cone.pos.z - col.z;
-          const cosA = Math.cos(col.angleY);
-          const sinA = Math.sin(col.angleY);
-          const localX = dx * cosA - dz * sinA;
-          const localZ = dx * sinA + dz * cosA;
+          } else if (col.type === 'ramp') {
+            // RAMP SOLID SIDE WALLS COLLISION
+            const rdx = cone.pos.x - col.x;
+            const rdz = cone.pos.z - col.z;
+            const cosA = Math.cos(col.angleY);
+            const sinA = Math.sin(col.angleY);
+            const localX = rdx * cosA - rdz * sinA;
+            const localZ = rdx * sinA + rdz * cosA;
 
-          const rhw = col.width / 2;
-          const rhd = col.depth / 2;
+            const rhw = col.width / 2;
+            const rhd = col.depth / 2;
 
-          // Check if along ramp length
-          if (Math.abs(localZ) <= rhd) {
-            const distFromPeak = Math.abs(localZ);
-            const progress = Math.max(0, 1.0 - (distFromPeak / rhd));
-            const rampH = progress * col.height;
+            // If within ramp length
+            if (Math.abs(localZ) <= rhd) {
+              const slopeH = Math.max(0, 1.0 - Math.abs(localZ) / rhd) * col.height;
+              // If cone center of mass is below slope height and touching side wall from outside
+              if (Math.abs(localX) < rhw + cone.radius && cone.pos.y < slopeH) {
+                const signX = Math.sign(localX) || 1;
+                const targetLocalX = (rhw + cone.radius) * signX;
+                // Reconstruct world position pushed out from ramp wall
+                cone.pos.x = col.x + targetLocalX * cosA + localZ * sinA;
+                cone.pos.z = col.z - targetLocalX * sinA + localZ * cosA;
 
-            // If cone is at the side of the ramp and below ramp surface, bounce off solid side wall
-            if (Math.abs(localX) < rhw + cone.radius && cone.pos.y < rampH - 0.1) {
-              const signX = Math.sign(localX) || 1;
-              const newLocalX = (rhw + cone.radius) * signX;
-              cone.pos.x = col.x + newLocalX * cosA + localZ * sinA;
-              cone.pos.z = col.z - newLocalX * sinA + localZ * cosA;
-
-              // Reflect velocity off ramp wall
-              const lvx = cone.vel.x * cosA - cone.vel.z * sinA;
-              const lvz = cone.vel.x * sinA + cone.vel.z * cosA;
-              const newLvx = -lvx * 0.45;
-              cone.vel.x = newLvx * cosA + lvz * sinA;
-              cone.vel.z = -newLvx * sinA + lvz * cosA;
+                // Reflect local X velocity off solid concrete side wall
+                const lvx = cone.vel.x * cosA - cone.vel.z * sinA;
+                const lvz = cone.vel.x * sinA + cone.vel.z * cosA;
+                const newLvx = -lvx * 0.45;
+                cone.vel.x = newLvx * cosA + lvz * sinA;
+                cone.vel.z = -newLvx * sinA + lvz * cosA;
+              }
             }
           }
         }
-      }
 
-      // 2B. GROUND & RAMP SURFACE SAMPLING
-      const rampSample = this.sampleRampAt(cone.pos.x, cone.pos.z);
-      const groundY = rampSample.isOnRamp ? rampSample.height : 0.0;
+        // 2B. GROUND & RAMP TOP SURFACE COLLISION WITH CONVEX HULL CONTACT
+        const contact = this.getConeLowestContact(cone.rot);
+        const contactWorldX = cone.pos.x + contact.contactLocalX;
+        const contactWorldZ = cone.pos.z + contact.contactLocalZ;
+        const contactWorldY = cone.pos.y + contact.minY;
 
-      // Surface contact (lands on either flat road surface or ramp slope)
-      if (cone.pos.y <= groundY) {
-        cone.pos.y = groundY;
-        if (cone.vel.y < -1.0) {
-          cone.vel.y = -cone.vel.y * 0.32; // Elastic restitution bounce
+        // Sample surface height at exact lowest point (handles road or ramp slope)
+        const rampSample = this.sampleRampAt(contactWorldX, contactWorldZ);
+        const groundY = rampSample.isOnRamp ? rampSample.height : 0.015;
+
+        // Immediate penetration resolution: ensure lowest point is never below surface
+        const pen = groundY - contactWorldY;
+        if (pen > 0) {
+          cone.pos.y += pen;
+        }
+
+        // Physical ground contact dynamics
+        if (contactWorldY <= groundY + 0.015) {
+          if (cone.vel.y < -0.8) {
+            cone.vel.y = -cone.vel.y * 0.35; // Physical restitution bounce
+            cone.angVel.x += (Math.random() - 0.5) * 1.5;
+            cone.angVel.z += (Math.random() - 0.5) * 1.5;
+          } else {
+            cone.vel.y = Math.max(0, cone.vel.y);
+          }
+
+          // Ground sliding friction
+          cone.vel.x *= Math.pow(0.04, subDt);
+          cone.vel.z *= Math.pow(0.04, subDt);
+
+          // Ground rotational damping
+          cone.angVel.x *= Math.pow(0.03, subDt);
+          cone.angVel.y *= Math.pow(0.03, subDt);
+          cone.angVel.z *= Math.pow(0.03, subDt);
+
+          // Restoring torque upright if close to upright
+          if (contact.m11 > 0.85) {
+            cone.angVel.x -= contact.m21 * 24.0 * subDt;
+            cone.angVel.z += contact.m01 * 24.0 * subDt;
+          }
         } else {
-          cone.vel.y = 0;
+          // Air drag
+          cone.vel.x *= Math.pow(0.92, subDt);
+          cone.vel.z *= Math.pow(0.92, subDt);
+          cone.angVel.multiplyScalar(Math.pow(0.90, subDt));
         }
-
-        // Strong ground sliding friction
-        cone.vel.x *= Math.pow(0.06, dt);
-        cone.vel.z *= Math.pow(0.06, dt);
-        // Ground angular friction
-        cone.angVel.x *= Math.pow(0.04, dt);
-        cone.angVel.y *= Math.pow(0.04, dt);
-        cone.angVel.z *= Math.pow(0.04, dt);
-      } else {
-        // Air drag
-        cone.vel.x *= Math.pow(0.92, dt);
-        cone.vel.z *= Math.pow(0.92, dt);
-        cone.angVel.x *= Math.pow(0.90, dt);
-        cone.angVel.y *= Math.pow(0.90, dt);
-        cone.angVel.z *= Math.pow(0.90, dt);
       }
 
-      // Angular integration
-      cone.rot.x += cone.angVel.x * dt;
-      cone.rot.y += cone.angVel.y * dt;
-      cone.rot.z += cone.angVel.z * dt;
+      // 2C. SLEEP CHECK & DIRECT MESH SYNCHRONIZATION
+      const contactAfter = this.getConeLowestContact(cone.rot);
+      const lowestWorldY = cone.pos.y + contactAfter.minY;
+      const rampSampleAfter = this.sampleRampAt(cone.pos.x + contactAfter.contactLocalX, cone.pos.z + contactAfter.contactLocalZ);
+      const groundYAfter = rampSampleAfter.isOnRamp ? rampSampleAfter.height : 0.015;
 
-      // 2C. SETTLING & SLEEP CHECK (ROCKSOLID RESTING ON GROUND/RAMP SURFACE - ZERO AIR SETTLE)
       const horizSpeed = Math.hypot(cone.vel.x, cone.vel.z);
-      const angSpeed = Math.hypot(cone.angVel.x, cone.angVel.y, cone.angVel.z);
+      const angSpeed = cone.angVel.length();
 
-      if (cone.pos.y <= groundY + 0.01 && horizSpeed < 0.12 && angSpeed < 0.20) {
+      if (lowestWorldY <= groundYAfter + 0.015 && horizSpeed < 0.10 && angSpeed < 0.12) {
         cone.vel.set(0, 0, 0);
         cone.angVel.set(0, 0, 0);
-        cone.pos.y = groundY;
-
-        const tilt = Math.hypot(cone.rot.x, cone.rot.z);
-        if (tilt < 0.35) {
-          // Settled upright
-          cone.isFallen = false;
-          cone.mesh.position.set(cone.pos.x, groundY, cone.pos.z);
-          cone.mesh.rotation.set(0, cone.rot.y, 0);
-          cone.model.position.set(0, 0, 0);
-          cone.model.rotation.set(0, 0, 0);
-        } else {
-          // Settled flat on side
-          cone.isFallen = true;
-          cone.fallHeading = cone.rot.y + Math.atan2(cone.rot.x, cone.rot.z || 0.001);
-          cone.mesh.position.set(cone.pos.x, groundY, cone.pos.z);
-          cone.mesh.rotation.set(0, cone.fallHeading, 0);
-          // Precise 74 degree taper alignment so bottom edge touches ground surface perfectly
-          cone.model.position.set(0, 0.52, 0.12);
-          cone.model.rotation.set(Math.PI / 2 - 0.28, 0, 0);
-        }
         cone.isSleeping = true;
-      } else {
-        // While moving/tumbling in air
-        cone.mesh.position.set(cone.pos.x, cone.pos.y, cone.pos.z);
-        cone.mesh.rotation.copy(cone.rot);
-        cone.model.position.set(0, 0, 0);
-        cone.model.rotation.set(0, 0, 0);
       }
+
+      // Synchronize Three.js mesh directly to physical position and orientation
+      cone.mesh.position.set(cone.pos.x, cone.pos.y, cone.pos.z);
+      cone.mesh.rotation.copy(cone.rot);
     }
   }
 
@@ -788,7 +849,6 @@ export class CityWorld {
       cone.rot.set(0, 0, 0);
       cone.angVel.set(0, 0, 0);
       cone.isSleeping = true;
-      cone.isFallen = false;
       cone.hitCooldown = 0;
       cone.mesh.position.copy(cone.homePos);
       cone.mesh.rotation.set(0, 0, 0);
