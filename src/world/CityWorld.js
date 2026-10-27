@@ -798,20 +798,50 @@ export class CityWorld {
             cone.vel.y = Math.max(0, cone.vel.y);
           }
 
+          // Contact normal torque around Center of Mass: tau = r_contact x (0, N, 0)
+          const normalForce = Math.max(22.0, -cone.vel.y * 12.0 + 26.0);
+          let torqueX = -contact.contactLocalZ * normalForce;
+          let torqueZ = contact.contactLocalX * normalForce;
+
+          // Real-World Physical Stability Dynamics:
+          // A real cone can ONLY rest in two stable equilibria:
+          // 1. UPRIGHT (uy >= 0.85): Base is flat on ground, gravity pulls it upright.
+          // 2. FLAT ON SIDE (|uy| <= 0.55): Conical body is resting along its taper.
+          // Inverted on tip (uy < -0.65) or balancing on rim edge (0.55 <= uy < 0.85) are strictly unstable!
+          const ux = contact.m01;
+          const uy = contact.m11; // Up vector vertical component in world space
+          const uz = contact.m21;
+
+          if (uy >= 0.85) {
+            // Zone 1: Restoring upright torque towards vertical
+            torqueX -= uz * 38.0;
+            torqueZ += ux * 38.0;
+          } else if (uy < -0.65) {
+            // Zone 3: Inverted / on tip: powerful overturning kick to fall flat on side
+            const dirX = Math.sign(ux) || 1;
+            const dirZ = Math.sign(uz) || 1;
+            torqueX -= dirZ * 48.0;
+            torqueZ += dirX * 48.0;
+          } else if (uy >= 0.55 && uy < 0.85) {
+            // Zone 4: Balancing on rim edge: gravity topples cone onto its side
+            const dirX = Math.sign(ux) || 1;
+            const dirZ = Math.sign(uz) || 1;
+            torqueX += dirZ * 38.0;
+            torqueZ -= dirX * 38.0;
+          }
+          // Zone 2: |uy| <= 0.55 (flat on side): naturally stable equilibrium
+
+          cone.angVel.x += torqueX * subDt;
+          cone.angVel.z += torqueZ * subDt;
+
           // Ground sliding friction
           cone.vel.x *= Math.pow(0.04, subDt);
           cone.vel.z *= Math.pow(0.04, subDt);
 
           // Ground rotational damping
-          cone.angVel.x *= Math.pow(0.03, subDt);
-          cone.angVel.y *= Math.pow(0.03, subDt);
-          cone.angVel.z *= Math.pow(0.03, subDt);
-
-          // Restoring torque upright if close to upright
-          if (contact.m11 > 0.85) {
-            cone.angVel.x -= contact.m21 * 24.0 * subDt;
-            cone.angVel.z += contact.m01 * 24.0 * subDt;
-          }
+          cone.angVel.x *= Math.pow(0.015, subDt);
+          cone.angVel.y *= Math.pow(0.015, subDt);
+          cone.angVel.z *= Math.pow(0.015, subDt);
         } else {
           // Air drag
           cone.vel.x *= Math.pow(0.92, subDt);
@@ -829,10 +859,25 @@ export class CityWorld {
       const horizSpeed = Math.hypot(cone.vel.x, cone.vel.z);
       const angSpeed = cone.angVel.length();
 
-      if (lowestWorldY <= groundYAfter + 0.015 && horizSpeed < 0.10 && angSpeed < 0.12) {
+      // STRICT EQUILIBRIUM GATE: A cone can NEVER sleep on its tip or balancing on rim edge!
+      const m11 = contactAfter.m11;
+      const isStableUpright = m11 >= 0.85;
+      const isStableOnSide = Math.abs(m11) <= 0.55;
+
+      if ((isStableUpright || isStableOnSide) && lowestWorldY <= groundYAfter + 0.015 && horizSpeed < 0.12 && angSpeed < 0.16) {
         cone.vel.set(0, 0, 0);
         cone.angVel.set(0, 0, 0);
         cone.isSleeping = true;
+
+        if (isStableUpright) {
+          // Settled upright: stand square and true on base plate
+          cone.rot.x = 0;
+          cone.rot.z = 0;
+          cone.pos.y = groundYAfter + 0.28;
+        } else {
+          // Settled flat on side: ensure side taper rests flush against surface
+          cone.pos.y = groundYAfter - contactAfter.minY;
+        }
       }
 
       // Synchronize Three.js mesh directly to physical position and orientation
