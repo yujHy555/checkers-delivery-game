@@ -244,6 +244,13 @@ class GameApp {
     // 1. Process Input
     this.input.update();
 
+    // Auto-resume audio on any driving interaction
+    if (!this.audio.initialized || this.audio.ctx?.state === 'suspended') {
+      if (this.input.throttle > 0 || this.input.brake > 0 || this.input.steer !== 0 || this.input.handbrake) {
+        this.audio.resume();
+      }
+    }
+
     // 2. Update Grounded Arcade Physics
     this.vehiclePhysics.update(dt, this.input);
 

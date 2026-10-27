@@ -535,125 +535,157 @@ export class CityWorld {
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
     const right = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
 
-    const hl = 1.95; // Half-length of van chassis with bumper reach
-    const hw = 1.10; // Half-width of van chassis with fender reach
+    const hl = 1.90; // Half-length of van chassis with bumper
+    const hw = 1.05; // Half-width of van chassis with fenders
 
+    // 1. VAN-TO-CONE IMPACT DETECTION (Does not skip physics integration of other cones!)
     for (const cone of this.cones) {
       if (cone.hitCooldown > 0) {
         cone.hitCooldown -= dt;
       }
 
-      // Check collision between van oriented bounding box and traffic cone
       const dx = cone.pos.x - vanPos.x;
       const dz = cone.pos.z - vanPos.z;
       const dy = cone.pos.y - vanPos.y;
 
-      // Fast broadphase distance check
-      if (dx * dx + dz * dz > 25.0) continue;
+      // Only check van collision if cone is within proximity
+      if (dx * dx + dz * dz <= 18.0) {
+        const df = dx * forward.x + dz * forward.z; // Along van forward axis
+        const dr = dx * right.x + dz * right.z;     // Along van right axis
 
-      const df = dx * forward.x + dz * forward.z; // Along van forward axis
-      const dr = dx * right.x + dz * right.z;     // Along van right axis
+        const overlapF = (hl + cone.radius) - Math.abs(df);
+        const overlapR = (hw + cone.radius) - Math.abs(dr);
 
-      const overlapF = (hl + cone.radius) - Math.abs(df);
-      const overlapR = (hw + cone.radius) - Math.abs(dr);
+        if (overlapF > 0 && overlapR > 0 && dy > -0.6 && dy < 1.8) {
+          if (cone.hitCooldown <= 0) {
+            cone.hitCooldown = 0.15;
 
-      if (overlapF > 0 && overlapR > 0 && dy > -1.0 && dy < 2.5) {
-        // Impact confirmed!
-        if (cone.hitCooldown <= 0) {
-          cone.hitCooldown = 0.10;
+            // Compute repulsion direction away from vehicle center
+            const pushDir = new THREE.Vector3(dx, 0, dz);
+            if (pushDir.lengthSq() < 0.01) {
+              pushDir.copy(forward);
+            } else {
+              pushDir.normalize();
+            }
 
-          // Normal direction pointing away from impact face
-          let normX, normZ;
-          if (overlapF < overlapR) {
-            normX = forward.x * Math.sign(df || 1);
-            normZ = forward.z * Math.sign(df || 1);
-          } else {
-            normX = right.x * Math.sign(dr || 1);
-            normZ = right.z * Math.sign(dr || 1);
+            // Push cone cleanly outside van boundary
+            cone.pos.x += pushDir.x * 0.45;
+            cone.pos.z += pushDir.z * 0.45;
+
+            const impactSpeed = Math.max(3.5, absSpeed);
+
+            // Forward & radial momentum transfer
+            cone.vel.x = vanVel.x * 1.25 + pushDir.x * (impactSpeed * 0.55 + 2.5) + (Math.random() - 0.5) * 1.5;
+            cone.vel.z = vanVel.z * 1.25 + pushDir.z * (impactSpeed * 0.55 + 2.5) + (Math.random() - 0.5) * 1.5;
+            // Pop into air
+            cone.vel.y = Math.min(6.5, impactSpeed * 0.35 + 2.2);
+
+            // 3D tumble angular spin
+            cone.angVel.x = (Math.random() - 0.5) * impactSpeed * 2.5 + pushDir.z * impactSpeed * 1.5;
+            cone.angVel.y = (Math.random() - 0.5) * impactSpeed * 3.5;
+            cone.angVel.z = (Math.random() - 0.5) * impactSpeed * 2.5 - pushDir.x * impactSpeed * 1.5;
+
+            cone.isSleeping = false;
+
+            if (audio && audio.playConeHit) {
+              audio.playConeHit(impactSpeed);
+            }
           }
+        }
+      }
+    }
 
-          // Push cone outside van boundary to prevent penetration
-          cone.pos.x += normX * 0.45;
-          cone.pos.z += normZ * 0.45;
+    // 2. PHYSICAL INTEGRATION & OBSTACLE COLLISION (RUNS FOR ALL ACTIVE CONES REGARDLESS OF DISTANCE)
+    for (const cone of this.cones) {
+      if (cone.isSleeping) continue;
 
-          // Impact intensity
-          const impactSpeed = Math.max(4.0, absSpeed);
+      // Gravity
+      cone.vel.y -= 19.6 * dt;
 
-          // Linear velocity impulse (directional launch)
-          cone.vel.x = vanVel.x * 1.35 + normX * (impactSpeed * 0.65 + 3.0) + (Math.random() - 0.5) * 2.0;
-          cone.vel.z = vanVel.z * 1.35 + normZ * (impactSpeed * 0.65 + 3.0) + (Math.random() - 0.5) * 2.0;
-          // Upward pop (cone flies dynamically into the air)
-          cone.vel.y = Math.min(8.5, impactSpeed * 0.45 + 3.0);
+      // Position update
+      cone.pos.x += cone.vel.x * dt;
+      cone.pos.y += cone.vel.y * dt;
+      cone.pos.z += cone.vel.z * dt;
 
-          // 3D angular tumble impulse
-          cone.angVel.x = (Math.random() - 0.5) * impactSpeed * 3.0 + normZ * impactSpeed * 1.5;
-          cone.angVel.y = (Math.random() - 0.5) * impactSpeed * 4.5;
-          cone.angVel.z = (Math.random() - 0.5) * impactSpeed * 3.0 - normX * impactSpeed * 1.5;
-
-          cone.isSleeping = false;
-
-          cone.mesh.position.copy(cone.pos);
-          cone.mesh.rotation.copy(cone.rot);
-
-          // Dynamic clatter / thump audio
-          if (audio && audio.playConeHit) {
-            audio.playConeHit(impactSpeed);
+      // Obstacle collision against buildings to prevent penetrating walls
+      for (const col of this.colliders) {
+        if (col.type === 'box') {
+          const chw = col.width / 2 + cone.radius;
+          const chd = col.depth / 2 + cone.radius;
+          const cdx = cone.pos.x - col.x;
+          const cdz = cone.pos.z - col.z;
+          if (Math.abs(cdx) < chw && Math.abs(cdz) < chd) {
+            const penX = chw - Math.abs(cdx);
+            const penZ = chd - Math.abs(cdz);
+            if (penX < penZ) {
+              cone.pos.x = col.x + chw * Math.sign(cdx);
+              cone.vel.x = -cone.vel.x * 0.4;
+            } else {
+              cone.pos.z = col.z + chd * Math.sign(cdz);
+              cone.vel.z = -cone.vel.z * 0.4;
+            }
           }
         }
       }
 
-      // Physics integration for active cones
-      if (!cone.isSleeping) {
-        // Gravity
-        cone.vel.y -= 19.6 * dt;
-
-        // Position integration
-        cone.pos.x += cone.vel.x * dt;
-        cone.pos.y += cone.vel.y * dt;
-        cone.pos.z += cone.vel.z * dt;
-
-        // Ground collision & bouncing
-        if (cone.pos.y <= 0) {
-          cone.pos.y = 0;
-          if (cone.vel.y < -0.8) {
-            cone.vel.y = -cone.vel.y * 0.36; // Elastic ground restitution
-          } else {
-            cone.vel.y = 0;
-          }
-          // Ground sliding friction
-          cone.vel.x *= Math.pow(0.15, dt);
-          cone.vel.z *= Math.pow(0.15, dt);
+      // Ground collision (flat road surface y = 0)
+      if (cone.pos.y <= 0) {
+        cone.pos.y = 0;
+        if (cone.vel.y < -1.0) {
+          cone.vel.y = -cone.vel.y * 0.32; // Restitution bounce
+        } else {
+          cone.vel.y = 0;
         }
 
-        // Aerodynamic air drag
-        cone.vel.x *= Math.pow(0.85, dt);
-        cone.vel.z *= Math.pow(0.85, dt);
-
-        // Angular rotation integration
-        cone.rot.x += cone.angVel.x * dt;
-        cone.rot.y += cone.angVel.y * dt;
-        cone.rot.z += cone.angVel.z * dt;
-
-        // Angular tumble damping (fast ground settling)
-        const angDamp = cone.pos.y > 0.05 ? 0.85 : 0.04;
-        cone.angVel.x *= Math.pow(angDamp, dt);
-        cone.angVel.y *= Math.pow(angDamp, dt);
-        cone.angVel.z *= Math.pow(angDamp, dt);
-
-        // Rest / Sleep check
-        if (cone.pos.y <= 0.01 && cone.vel.length() < 0.12 && cone.angVel.length() < 0.18) {
-          cone.vel.set(0, 0, 0);
-          cone.angVel.set(0, 0, 0);
-          cone.isSleeping = true;
-        }
-
-        // Synchronize Three.js visual mesh
-        cone.mesh.position.copy(cone.pos);
-        cone.mesh.rotation.copy(cone.rot);
-        if (cone.pos.y <= 0.02) {
-          cone.mesh.position.y = 0.16 * Math.min(1.0, Math.abs(Math.sin(cone.rot.x)) + Math.abs(Math.sin(cone.rot.z)));
-        }
+        // Ground friction: strong sliding deceleration
+        cone.vel.x *= Math.pow(0.06, dt);
+        cone.vel.z *= Math.pow(0.06, dt);
+        // Ground angular friction: stabilizes rolling/tumbling
+        cone.angVel.x *= Math.pow(0.04, dt);
+        cone.angVel.y *= Math.pow(0.04, dt);
+        cone.angVel.z *= Math.pow(0.04, dt);
+      } else {
+        // Air drag
+        cone.vel.x *= Math.pow(0.92, dt);
+        cone.vel.z *= Math.pow(0.92, dt);
+        cone.angVel.x *= Math.pow(0.90, dt);
+        cone.angVel.y *= Math.pow(0.90, dt);
+        cone.angVel.z *= Math.pow(0.90, dt);
       }
+
+      // Angular integration
+      cone.rot.x += cone.angVel.x * dt;
+      cone.rot.y += cone.angVel.y * dt;
+      cone.rot.z += cone.angVel.z * dt;
+
+      // Ground rest check: settle cleanly with ZERO shaking or jitter
+      const horizSpeed = Math.hypot(cone.vel.x, cone.vel.z);
+      const angSpeed = Math.hypot(cone.angVel.x, cone.angVel.y, cone.angVel.z);
+
+      if (cone.pos.y <= 0.005 && horizSpeed < 0.12 && angSpeed < 0.20) {
+        cone.vel.set(0, 0, 0);
+        cone.angVel.set(0, 0, 0);
+        cone.pos.y = 0;
+        // Snap tilt to natural rest orientation on side
+        const tilt = Math.hypot(cone.rot.x, cone.rot.z);
+        if (tilt > 0.4) {
+          const ratio = Math.min(1.0, (Math.PI / 2) / (tilt || 1));
+          cone.rot.x *= ratio;
+          cone.rot.z *= ratio;
+        } else {
+          cone.rot.x = 0;
+          cone.rot.z = 0;
+        }
+        cone.isSleeping = true;
+      }
+
+      // Synchronize visual mesh with non-penetrating ground elevation
+      // When cone tilts on its side, the bottom of the base rim is elevated so it rests on road surface
+      const tiltAngle = Math.min(Math.PI / 2, Math.hypot(cone.rot.x, cone.rot.z));
+      const visualGroundOffset = 0.48 * Math.sin(tiltAngle);
+
+      cone.mesh.position.set(cone.pos.x, cone.pos.y + visualGroundOffset, cone.pos.z);
+      cone.mesh.rotation.copy(cone.rot);
     }
   }
 

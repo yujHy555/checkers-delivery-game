@@ -109,7 +109,6 @@ export class AudioSynth {
 
   initBrakeSound() {
     if (!this.ctx) return;
-    // High-pitched ceramic / disc pad friction squeal
     const bufferSize = this.ctx.sampleRate * 2;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
@@ -121,36 +120,35 @@ export class AudioSynth {
     this.brakeNoise.buffer = noiseBuffer;
     this.brakeNoise.loop = true;
 
-    // Resonant dual-bandpass filter around 2400 Hz for pad friction & squeal
+    // Resonant high-pitched bandpass filter for brake pad friction & squeal
     this.brakeFilter = this.ctx.createBiquadFilter();
     this.brakeFilter.type = 'bandpass';
-    this.brakeFilter.frequency.value = 2450;
-    this.brakeFilter.Q.value = 4.0;
-
-    // Resonant high-pitched squeal oscillator
-    this.brakeOsc = this.ctx.createOscillator();
-    this.brakeOsc.type = 'sine';
-    this.brakeOsc.frequency.value = 2850;
+    this.brakeFilter.frequency.value = 2650;
+    this.brakeFilter.Q.value = 5.5;
 
     this.brakeGain = this.ctx.createGain();
     this.brakeGain.gain.value = 0;
 
     this.brakeNoise.connect(this.brakeFilter);
     this.brakeFilter.connect(this.brakeGain);
-
-    const oscSubGain = this.ctx.createGain();
-    oscSubGain.gain.value = 0.35;
-    this.brakeOsc.connect(oscSubGain);
-    oscSubGain.connect(this.brakeGain);
-
     this.brakeGain.connect(this.masterGain);
 
     this.brakeNoise.start();
-    this.brakeOsc.start();
+  }
+
+  resume() {
+    if (!this.initialized) {
+      this.init();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
   }
 
   updateEngine(speed, throttle, maxSpeed) {
-    if (!this.initialized) return;
+    if (!this.initialized) {
+      this.init();
+    }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
@@ -158,19 +156,18 @@ export class AudioSynth {
 
     const normSpeed = Math.min(1.0, Math.abs(speed) / maxSpeed);
 
-    const baseFreq = 46 + normSpeed * 165 + throttle * 40;
+    const baseFreq = 48 + normSpeed * 175 + throttle * 45;
     this.engineOsc1.frequency.setTargetAtTime(baseFreq, this.ctx.currentTime, 0.05);
     this.engineOsc2.frequency.setTargetAtTime(baseFreq * 2.02, this.ctx.currentTime, 0.05);
 
-    const targetGain = 0.10 + normSpeed * 0.22 + throttle * 0.18;
+    const targetGain = 0.14 + normSpeed * 0.24 + throttle * 0.20;
     this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.08);
 
-    this.engineFilter.frequency.setTargetAtTime(360 + normSpeed * 850, this.ctx.currentTime, 0.08);
+    this.engineFilter.frequency.setTargetAtTime(400 + normSpeed * 950, this.ctx.currentTime, 0.08);
   }
 
   updateSkid(isSkidding, slipVel) {
     if (!this.initialized || !this.tireGain || this.isMuted) return;
-    // Visceral, noticeably louder tire screech / handbrake drift sound
     const intensity = Math.min(1.0, Math.max(0.45, slipVel / 5.5));
     const targetGain = isSkidding ? 0.38 * intensity : 0;
     this.tireGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.03);
@@ -178,29 +175,32 @@ export class AudioSynth {
 
   updateBrake(isBrakingHard, speed) {
     if (!this.initialized || !this.brakeGain || this.isMuted) return;
-    // Punchy, louder brake pad friction & squeal when braking
     const targetGain = (isBrakingHard && Math.abs(speed) > 1.8) ? 0.28 : 0;
     this.brakeGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.04);
   }
 
   playConeHit(impactSpeed = 5) {
-    if (!this.initialized || this.isMuted) return;
-    // Dynamic plastic traffic cone thump & hollow clatter
-    const vol = Math.min(0.38, 0.14 + (impactSpeed / 25.0) * 0.24);
+    if (!this.initialized || this.isMuted || !this.ctx) return;
+    try {
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+      const vol = Math.min(0.35, Math.max(0.08, (impactSpeed / 20.0) * 0.30));
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      const t = this.ctx.currentTime;
+      osc.frequency.setValueAtTime(320, t);
+      osc.frequency.exponentialRampToValueAtTime(75, t + 0.15);
 
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(320, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(75, this.ctx.currentTime + 0.18);
+      gain.gain.setValueAtTime(vol, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
 
-    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.19);
-
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.20);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(t);
+      osc.stop(t + 0.17);
+    } catch (e) {}
   }
 
   playDoorSlide() {
