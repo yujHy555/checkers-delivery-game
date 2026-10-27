@@ -300,6 +300,187 @@
       background: rgba(0, 188, 212, 0.45);
     }
 
+    /* MAIN START MENU SCREEN */
+    #main-menu-screen {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #03080c;
+      z-index: 50000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.35s ease, visibility 0.35s ease;
+      overflow: hidden;
+      user-select: none;
+    }
+    #main-menu-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* 16:9 Aspect Ratio Menu Stage Container matching blank_menu */
+    .menu-stage-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 177.78vh; /* 16:9 aspect ratio */
+      max-height: 56.25vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+    }
+
+    .menu-bg-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    /* Menu Buttons Cluster (positioned on the right side in front of the bay) */
+    .menu-buttons-cluster {
+      position: absolute;
+      right: 4.8%;
+      top: 40.2%;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      width: 142px;
+      z-index: 10;
+    }
+
+    .menu-btn {
+      width: 100%;
+      padding: 7px 10px;
+      background: rgba(12, 22, 29, 0.76);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(0, 229, 255, 0.65);
+      border-radius: 6px;
+      color: #ffffff;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 10.5px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      text-align: center;
+      cursor: pointer;
+      outline: none;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
+      transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .menu-btn:hover {
+      transform: translateX(-3px) scale(1.02);
+      background: rgba(0, 229, 255, 0.32);
+      border-color: #00e5ff;
+      box-shadow: 0 0 18px rgba(0, 229, 255, 0.6);
+      color: #ffffff;
+    }
+    .menu-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Top Button: CONTINUE CAREER with vibrant green accent matching design */
+    .menu-btn.btn-career {
+      border-color: rgba(74, 222, 128, 0.85);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.35);
+    }
+    .menu-btn.btn-career:hover {
+      background: rgba(74, 222, 128, 0.35);
+      border-color: #4ade80;
+      box-shadow: 0 0 20px rgba(74, 222, 128, 0.7);
+    }
+
+    /* Bottom Button: QUIT GAME with subtle orange/red accent matching design */
+    .menu-btn.btn-quit {
+      border-color: rgba(239, 68, 68, 0.7);
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+    }
+    .menu-btn.btn-quit:hover {
+      background: rgba(239, 68, 68, 0.35);
+      border-color: #ef4444;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.7);
+      color: #ffffff;
+    }
+
+    /* SUB-MODALS (GARAGE & OPTIONS) */
+    .sub-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 9, 13, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 60000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .sub-modal-overlay.open {
+      display: flex;
+    }
+    .sub-modal-card {
+      background: rgba(14, 25, 33, 0.98);
+      border: 1.5px solid rgba(0, 188, 212, 0.5);
+      border-radius: 18px;
+      padding: 22px 28px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.75), 0 0 35px rgba(0, 188, 212, 0.25);
+    }
+    .spec-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0;
+      font-size: 13.5px;
+    }
+    .spec-bar-wrap {
+      width: 130px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .spec-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00e5ff, #00e676);
+      border-radius: 4px;
+    }
+
+    /* Responsive scaling for mobile & tablet */
+    @media (max-width: 900px) {
+      .menu-buttons-cluster {
+        right: 4.2%;
+        top: 38%;
+        width: 125px;
+        gap: 5px;
+      }
+      .menu-btn {
+        padding: 5px 8px;
+        font-size: 9px;
+      }
+    }
+    @media (max-width: 600px) {
+      .menu-buttons-cluster {
+        width: 110px;
+        gap: 4px;
+      }
+      .menu-btn {
+        padding: 4px 6px;
+        font-size: 8px;
+      }
+    }
+
     /* PC & IOS CONTROLS GUIDE MODAL (STRICTLY UNSCALED 1024x576) */
     #controls-guide-modal {
       position: fixed;
@@ -910,6 +1091,149 @@
 </head>
 <body>
 
+  <!-- MAIN START MENU SCREEN (CHECKERS HYPER SIXTY60) -->
+  <div id="main-menu-screen">
+    <div class="menu-stage-wrapper">
+      <img src="/assets/main-menu-bg.jpg" alt="Checkers Hyper Sixty60 Delivery Run" class="menu-bg-img" />
+
+      <!-- MENU BUTTONS STACK (Exact match to menu_buttons design) -->
+      <div class="menu-buttons-cluster">
+        <button class="menu-btn btn-career" id="btn-menu-career" tabindex="-1">
+          <span>CONTINUE CAREER</span>
+        </button>
+        <button class="menu-btn" id="btn-menu-new" tabindex="-1">
+          <span>NEW GAME</span>
+        </button>
+        <button class="menu-btn" id="btn-menu-freeroam" tabindex="-1">
+          <span>FREE ROAM</span>
+        </button>
+        <button class="menu-btn" id="btn-menu-garage" tabindex="-1">
+          <span>GARAGE & UPGRADES</span>
+        </button>
+        <button class="menu-btn" id="btn-menu-options" tabindex="-1">
+          <span>OPTIONS</span>
+        </button>
+        <button class="menu-btn btn-quit" id="btn-menu-quit" tabindex="-1">
+          <span>QUIT GAME</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GARAGE & UPGRADES MODAL -->
+  <div class="sub-modal-overlay" id="garage-modal">
+    <div class="sub-modal-card">
+      <div class="guide-modal-header" style="margin-bottom: 16px;">
+        <div class="guide-header-title">
+          <span class="brand-badge">⚡ SIXTY60</span>
+          <div class="guide-title-text">GARAGE & <span>UPGRADES</span></div>
+        </div>
+        <button class="guide-btn-close" id="btn-close-garage" tabindex="-1">✕ CLOSE</button>
+      </div>
+
+      <div style="background: rgba(10, 18, 25, 0.7); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+          <span style="font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 16px; color: #00e5ff;">SUZUKI CARRY SIXTY60 HYPER</span>
+          <span style="font-size: 12px; color: #4ade80; font-weight: 700;">STAGE 2 TUNED</span>
+        </div>
+        <div class="spec-row">
+          <span style="color: #94a3b8;">Top Speed</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="spec-bar-wrap"><div class="spec-bar-fill" style="width: 85%;"></div></div>
+            <span style="font-family: monospace; font-weight: 700;">110 KM/H</span>
+          </div>
+        </div>
+        <div class="spec-row">
+          <span style="color: #94a3b8;">Acceleration</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="spec-bar-wrap"><div class="spec-bar-fill" style="width: 90%;"></div></div>
+            <span style="font-family: monospace; font-weight: 700;">HIGH</span>
+          </div>
+        </div>
+        <div class="spec-row">
+          <span style="color: #94a3b8;">Grip & Handling</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="spec-bar-wrap"><div class="spec-bar-fill" style="width: 94%;"></div></div>
+            <span style="font-family: monospace; font-weight: 700;">AAA RACING</span>
+          </div>
+        </div>
+        <div class="spec-row">
+          <span style="color: #94a3b8;">Power Drift Kit</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="spec-bar-wrap"><div class="spec-bar-fill" style="width: 88%;"></div></div>
+            <span style="font-family: monospace; font-weight: 700;">EQUIPPED</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+        <div style="background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 8px; padding: 10px;">
+          <div style="color: #00e5ff; font-weight: 800; font-size: 13px;">⚡ TURBOCHARGER</div>
+          <div style="color: #94a3b8; font-size: 11px; margin-top: 3px;">Instant throttle response</div>
+        </div>
+        <div style="background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 8px; padding: 10px;">
+          <div style="color: #00e5ff; font-weight: 800; font-size: 13px;">🛡️ SAT OBB CHASSIS</div>
+          <div style="color: #94a3b8; font-size: 11px; margin-top: 3px;">Anti-penetration collision</div>
+        </div>
+        <div style="background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 8px; padding: 10px;">
+          <div style="color: #00e5ff; font-weight: 800; font-size: 13px;">📦 TWIN CARGO BAYS</div>
+          <div style="color: #94a3b8; font-size: 11px; margin-top: 3px;">Sliding side & rear doors</div>
+        </div>
+        <div style="background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 8px; padding: 10px;">
+          <div style="color: #00e5ff; font-weight: 800; font-size: 13px;">🏎️ RUMBLE SENSORS</div>
+          <div style="color: #94a3b8; font-size: 11px; margin-top: 3px;">Haptic audio curb rumble</div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: center;">
+        <button class="btn-drive-start" id="btn-garage-drive" tabindex="-1">TEST DRIVE NOW</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTIONS MODAL -->
+  <div class="sub-modal-overlay" id="options-modal">
+    <div class="sub-modal-card">
+      <div class="guide-modal-header" style="margin-bottom: 16px;">
+        <div class="guide-header-title">
+          <span class="brand-badge">⚡ SIXTY60</span>
+          <div class="guide-title-text">GAME <span>OPTIONS</span></div>
+        </div>
+        <button class="guide-btn-close" id="btn-close-options" tabindex="-1">✕ CLOSE</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(10, 18, 25, 0.7); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 10px; padding: 12px 16px;">
+          <div>
+            <div style="font-weight: 800; font-size: 14px;">Audio Engine & SFX</div>
+            <div style="font-size: 12px; color: #94a3b8;">Revving, skids, delivery chimes</div>
+          </div>
+          <button class="btn-top-action" id="btn-opt-audio" tabindex="-1">🔊 AUDIO: ON</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(10, 18, 25, 0.7); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 10px; padding: 12px 16px;">
+          <div>
+            <div style="font-weight: 800; font-size: 14px;">Camera View Mode</div>
+            <div style="font-size: 12px; color: #94a3b8;">Third-Person Chase vs. 3D Isometric</div>
+          </div>
+          <button class="btn-top-action" id="btn-opt-cam" tabindex="-1">📷 3RD CAM</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(10, 18, 25, 0.7); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 10px; padding: 12px 16px;">
+          <div>
+            <div style="font-weight: 800; font-size: 14px;">Controls Reference</div>
+            <div style="font-size: 12px; color: #94a3b8;">Keyboard & Gamepad Guides</div>
+          </div>
+          <button class="btn-top-action" id="btn-opt-controls" tabindex="-1">🎮 VIEW GUIDE</button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: center;">
+        <button class="btn-drive-start" id="btn-options-back" tabindex="-1">APPLY & RETURN</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 3D WEBGL CANVAS -->
   <div id="canvas-container"></div>
 
@@ -929,6 +1253,7 @@
         <button class="btn-top-action" id="btn-cam" tabindex="-1" onfocus="this.blur()">📷 3RD CAM</button>
         <button class="btn-top-action" id="btn-audio" tabindex="-1" onfocus="this.blur()">🔊 AUDIO: ON</button>
         <button class="btn-top-action" id="btn-controls-guide" tabindex="-1" onfocus="this.blur()">🎮 CONTROLS</button>
+        <button class="btn-top-action" id="btn-open-main-menu" tabindex="-1" onfocus="this.blur()">🏠 MENU</button>
       </div>
     </div>
 

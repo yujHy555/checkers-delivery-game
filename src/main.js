@@ -235,20 +235,150 @@ class GameApp {
       });
     }
 
+    // Main Start Menu Screen & Sub-Modals
+    const mainMenu = document.getElementById('main-menu-screen');
+    const btnMenuCareer = document.getElementById('btn-menu-career');
+    const btnMenuNew = document.getElementById('btn-menu-new');
+    const btnMenuFreeroam = document.getElementById('btn-menu-freeroam');
+    const btnMenuGarage = document.getElementById('btn-menu-garage');
+    const btnMenuOptions = document.getElementById('btn-menu-options');
+    const btnMenuQuit = document.getElementById('btn-menu-quit');
+    const btnOpenMainMenu = document.getElementById('btn-open-main-menu');
+
+    const garageModal = document.getElementById('garage-modal');
+    const btnCloseGarage = document.getElementById('btn-close-garage');
+    const btnGarageDrive = document.getElementById('btn-garage-drive');
+
+    const optionsModal = document.getElementById('options-modal');
+    const btnCloseOptions = document.getElementById('btn-close-options');
+    const btnOptionsBack = document.getElementById('btn-options-back');
+    const btnOptAudio = document.getElementById('btn-opt-audio');
+    const btnOptCam = document.getElementById('btn-opt-cam');
+    const btnOptControls = document.getElementById('btn-opt-controls');
+
+    this.isFreeRoam = false;
+
+    const startDriving = (mode = 'career') => {
+      if (mainMenu) mainMenu.classList.add('hidden');
+      if (garageModal) garageModal.classList.remove('open');
+      if (optionsModal) optionsModal.classList.remove('open');
+      this.audio.resume();
+
+      if (mode === 'freeroam') {
+        this.isFreeRoam = true;
+        this.showToast('🏁 FREE ROAM: Explore city streets & stunt ramps!');
+        if (this.uiOrder) this.uiOrder.innerText = 'Free Roam Mode';
+        if (this.uiTargetDist) this.uiTargetDist.innerText = 'Explore Circuit';
+      } else if (mode === 'new') {
+        this.isFreeRoam = false;
+        this.vehiclePhysics.reset(0, -40, 0);
+        if (this.world && this.world.resetCones) this.world.resetCones();
+        this.deliverySystem.score = 0;
+        this.showToast('🚀 NEW GAME: Delivery Mission Started!');
+      } else {
+        this.isFreeRoam = false;
+        this.showToast('⚡ CAREER: Sixty60 Delivery Run in progress!');
+      }
+    };
+
+    if (btnMenuCareer) btnMenuCareer.addEventListener('click', () => startDriving('career'));
+    if (btnMenuNew) btnMenuNew.addEventListener('click', () => startDriving('new'));
+    if (btnMenuFreeroam) btnMenuFreeroam.addEventListener('click', () => startDriving('freeroam'));
+
+    if (btnMenuGarage) {
+      btnMenuGarage.addEventListener('click', () => {
+        if (garageModal) garageModal.classList.add('open');
+      });
+    }
+    if (btnCloseGarage) {
+      btnCloseGarage.addEventListener('click', () => {
+        if (garageModal) garageModal.classList.remove('open');
+      });
+    }
+    if (btnGarageDrive) {
+      btnGarageDrive.addEventListener('click', () => {
+        startDriving('career');
+      });
+    }
+
+    if (btnMenuOptions) {
+      btnMenuOptions.addEventListener('click', () => {
+        if (optionsModal) optionsModal.classList.add('open');
+      });
+    }
+    if (btnCloseOptions) {
+      btnCloseOptions.addEventListener('click', () => {
+        if (optionsModal) optionsModal.classList.remove('open');
+      });
+    }
+    if (btnOptionsBack) {
+      btnOptionsBack.addEventListener('click', () => {
+        if (optionsModal) optionsModal.classList.remove('open');
+      });
+    }
+
+    if (btnOptAudio) {
+      btnOptAudio.addEventListener('click', () => {
+        const unmuted = this.audio.toggleMute();
+        btnOptAudio.innerText = unmuted ? '🔊 AUDIO: ON' : '🔇 AUDIO: OFF';
+        const btnAudio = document.getElementById('btn-audio');
+        if (btnAudio) btnAudio.innerText = unmuted ? '🔊 AUDIO: ON' : '🔇 AUDIO: OFF';
+        this.showToast(unmuted ? 'Audio Unmuted' : 'Audio Muted');
+      });
+    }
+
+    if (btnOptCam) {
+      btnOptCam.addEventListener('click', () => {
+        const mode = this.cameraManager.toggleMode();
+        btnOptCam.innerText = mode === 'THIRD_PERSON' ? '📷 3RD CAM' : '📷 ISO CAM';
+        if (this.uiCamBtn) this.uiCamBtn.innerText = btnOptCam.innerText;
+        this.showToast(`Camera: ${mode === 'THIRD_PERSON' ? 'Third-Person Chase' : '3D Isometric'}`);
+      });
+    }
+
+    if (btnOptControls) {
+      btnOptControls.addEventListener('click', () => {
+        if (optionsModal) optionsModal.classList.remove('open');
+        openGuide('keyboard');
+      });
+    }
+
+    if (btnMenuQuit) {
+      btnMenuQuit.addEventListener('click', () => {
+        this.showToast('Thanks for playing Checkers Hyper Sixty60! Press Continue to resume.');
+      });
+    }
+
+    if (btnOpenMainMenu) {
+      btnOpenMainMenu.addEventListener('click', () => {
+        if (mainMenu) mainMenu.classList.remove('hidden');
+      });
+    }
+
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape' || e.key === 'Escape' || e.code === 'F1') {
+      if (e.code === 'Escape' || e.key === 'Escape') {
+        if (garageModal && garageModal.classList.contains('open')) {
+          garageModal.classList.remove('open');
+          return;
+        }
+        if (optionsModal && optionsModal.classList.contains('open')) {
+          optionsModal.classList.remove('open');
+          return;
+        }
         if (guideModal && guideModal.classList.contains('open')) {
           closeGuide();
+          return;
+        }
+        // If no modal open, toggle main menu
+        if (mainMenu) {
+          if (mainMenu.classList.contains('hidden')) {
+            mainMenu.classList.remove('hidden');
+          } else {
+            mainMenu.classList.add('hidden');
+          }
         }
       }
     });
-
-    // Auto-open on initial load for PC / iOS desktop/tablet users so instructions are immediately visible
-    try {
-      if (window.innerWidth > 900 && !sessionStorage.getItem('sixty60_guide_seen')) {
-        setTimeout(() => openGuide('keyboard'), 450);
-      }
-    } catch (e) {}
   }
 
   showToast(text) {
@@ -360,7 +490,12 @@ class GameApp {
     if (this.uiScore) this.uiScore.innerText = this.deliverySystem.score;
 
     const currentTarget = this.deliverySystem.getCurrentSpot();
-    if (currentTarget) {
+    if (this.isFreeRoam) {
+      if (this.uiOrder) this.uiOrder.innerText = 'Mode: Free Roam';
+      if (this.uiTargetDist) this.uiTargetDist.innerText = 'Full Circuit Open';
+      if (this.uiPrompt) this.uiPrompt.style.display = 'none';
+      if (this.uiMobileDeliverBtn) this.uiMobileDeliverBtn.style.display = 'none';
+    } else if (currentTarget) {
       const dist = Math.round(vanPos.distanceTo(currentTarget.position));
       if (this.uiOrder) this.uiOrder.innerText = `Order: ${currentTarget.name}`;
       if (this.uiTargetDist) this.uiTargetDist.innerText = `${dist}m away`;
