@@ -407,7 +407,7 @@ export class ArcadeVehicle {
           // If the car is on the road and this spot is a high vertical wall (> 0.35m), the car cannot climb it from the side!
           const isAtRampEntry = (h <= 0.35) || (Math.abs(localZ) >= hd - 0.85);
           const isElevatedOnRamp = (this.position.y >= h - 0.30);
-          const canAccessRamp = isAtRampEntry || isElevatedOnRamp;
+          const canAccessRamp = this.isOnRamp || isAtRampEntry || isElevatedOnRamp;
 
           if (canAccessRamp && h > maxHeight) {
             maxHeight = h;
@@ -561,13 +561,28 @@ export class ArcadeVehicle {
             this.velocity.multiplyScalar(0.70);
           }
         } else if (c.type === 'ramp') {
-          // SOLID RAMP SIDE BARRIER: Guarantees NO part of the car (front bumper, corners, sides, rear) can penetrate ramp side walls!
+          // SOLID RAMP SIDE BARRIER:
+          // ONLY blocks a car approaching the ramp's side walls from the outside (|carLocalX| > hw)
+          // NEVER diverts a car driving up or approaching the entrance slope (|carLocalX| <= hw)
+          if (this.isOnRamp || this.isAirborne) continue;
+
           const cosA = Math.cos(c.angleY);
           const sinA = Math.sin(c.angleY);
           const hw = c.width / 2;
           const hd = c.depth / 2;
 
-          const carLocalX = (this.position.x - c.x) * cosA - (this.position.z - c.z) * sinA;
+          const dxCenter = this.position.x - c.x;
+          const dzCenter = this.position.z - c.z;
+          const carLocalX = dxCenter * cosA - dzCenter * sinA;
+          const carLocalZ = dxCenter * sinA + dzCenter * cosA;
+
+          // If the car is within the ramp width (aiming to drive up the slope), NEVER divert!
+          if (Math.abs(carLocalX) <= hw || Math.abs(carLocalZ) > hd + 1.2) {
+            continue;
+          }
+
+          const isLeftSide = carLocalX < -hw;
+          const isRightSide = carLocalX > hw;
 
           // Van perimeter points: front bumper, corners, mid sides, rear bumper
           const checkPoints = [
@@ -578,12 +593,10 @@ export class ArcadeVehicle {
             { x: this.position.x + right.x * halfW, z: this.position.z + right.z * halfW },
             { x: this.position.x - forward.x * halfL - right.x * halfW, z: this.position.z - forward.z * halfL - right.z * halfW },
             { x: this.position.x - forward.x * halfL + right.x * halfW, z: this.position.z - forward.z * halfL + right.z * halfW },
-            { x: this.position.x - forward.x * halfL, z: this.position.z - forward.z * halfL },
-            { x: this.position.x, z: this.position.z }
+            { x: this.position.x - forward.x * halfL, z: this.position.z - forward.z * halfL }
           ];
 
-          let maxPenLeft = 0;
-          let maxPenRight = 0;
+          let maxPen = 0;
 
           for (const pt of checkPoints) {
             const dx = pt.x - c.x;
@@ -591,42 +604,26 @@ export class ArcadeVehicle {
             const plx = dx * cosA - dz * sinA;
             const plz = dx * sinA + dz * cosA;
 
-            if (Math.abs(plz) <= hd - 0.20) {
+            if (Math.abs(plz) <= hd - 0.4) {
               const rampH = Math.max(0, 1.0 - (Math.abs(plz) / hd)) * c.height;
 
               // Only block if car is below the ramp height (hitting side wall from road)
-              if (this.position.y < rampH - 0.20 && rampH > 0.25) {
-                // Left side wall (at -hw):
-                if (carLocalX < 0 && plx > -hw) {
+              if (this.position.y < rampH - 0.15 && rampH > 0.3) {
+                if (isLeftSide && plx > -hw) {
                   const pen = plx - (-hw);
-                  if (pen > maxPenLeft) maxPenLeft = pen;
-                }
-                // Right side wall (at hw):
-                else if (carLocalX > 0 && plx < hw) {
+                  if (pen > maxPen) maxPen = pen;
+                } else if (isRightSide && plx < hw) {
                   const pen = hw - plx;
-                  if (pen > maxPenRight) maxPenRight = pen;
+                  if (pen > maxPen) maxPen = pen;
                 }
               }
             }
           }
 
-          if (maxPenLeft > 0) {
-            const pushDist = maxPenLeft + 0.03;
-            const normX = -cosA;
-            const normZ = sinA;
-            this.position.x += normX * pushDist;
-            this.position.z += normZ * pushDist;
-
-            const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
-            if (vInward > 0) {
-              this.velocity.x -= (-normX) * vInward * 1.35;
-              this.velocity.z -= (-normZ) * vInward * 1.35;
-              this.velocity.multiplyScalar(0.75);
-            }
-          } else if (maxPenRight > 0) {
-            const pushDist = maxPenRight + 0.03;
-            const normX = cosA;
-            const normZ = -sinA;
+          if (maxPen > 0) {
+            const pushDist = maxPen + 0.02;
+            const normX = isLeftSide ? -cosA : cosA;
+            const normZ = isLeftSide ? sinA : -sinA;
             this.position.x += normX * pushDist;
             this.position.z += normZ * pushDist;
 
