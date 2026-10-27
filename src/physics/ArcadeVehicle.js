@@ -36,14 +36,14 @@ export class ArcadeVehicle {
     // AAA Progressive Driving Parameters
     this.maxSpeed = 38.0; // ~137 km/h
     this.reverseMaxSpeed = 12.0;
-    this.baseAccelRate = 22.0; // Progressive smooth acceleration
-    this.brakeRate = 50.0; // Responsive clean brakes
-    this.dragCoeff = 0.984;
+    this.baseAccelRate = 26.0; // Responsive punchy acceleration
+    this.brakeRate = 54.0; // Responsive clean brakes
+    this.dragCoeff = 0.985;
 
-    // Speed-Sensitive Steering (Stable at high speeds, agile at low speeds)
+    // Speed-Sensitive Steering (Stable at high speeds, agile and snappy at low/mid speeds)
     this.steerInput = 0;
     this.steerAngle = 0;
-    this.steerResponse = 15.0;
+    this.steerResponse = 24.0;
 
     // Grip & Drift
     this.isDrifting = false;
@@ -336,21 +336,21 @@ export class ArcadeVehicle {
 
       // 7. YAW STEERING & OVERSTEER ROTATION (NO ROTATION WHEN STOPPED)
       let turnFactor = 0;
-      if (absSpeed > 0.35) {
-        turnFactor = Math.min(1.0, (absSpeed - 0.35) / 3.0);
+      if (absSpeed > 0.2) {
+        turnFactor = Math.min(1.0, (absSpeed - 0.2) / 2.2);
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
       // High-speed drift yaw: responsive oversteer rotation to whip tail out
       let yawRateCoeff;
       if (this.isDrifting) {
-        yawRateCoeff = 3.8; // Fast, responsive tail-out rotation
+        yawRateCoeff = 4.0; // Fast, responsive tail-out rotation
       } else {
-        yawRateCoeff = THREE.MathUtils.lerp(3.2, 1.8, speedRatio);
+        yawRateCoeff = THREE.MathUtils.lerp(3.5, 1.9, speedRatio);
       }
 
       const targetYawRate = this.steerInput * turnFactor * dirSign * yawRateCoeff;
-      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 18.0 * dt);
+      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 22.0 * dt);
       this.heading += this.angularVelocity * dt;
 
     } else {

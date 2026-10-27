@@ -324,17 +324,20 @@
     /* Menu Buttons Cluster: Enriched larger size & responsive positioning */
     .menu-buttons-cluster {
       position: absolute;
-      right: clamp(28px, 6vw, 110px);
-      top: clamp(140px, 39vh, 360px);
+      right: clamp(24px, 5.5vw, 100px);
+      top: 50%;
+      transform: translateY(-50%);
       display: flex;
       flex-direction: column;
       gap: 12px;
       width: clamp(185px, 17vw, 245px);
+      max-height: 96vh;
       z-index: 10;
     }
 
     .menu-btn {
       width: 100%;
+      box-sizing: border-box;
       padding: 13px 20px;
       background: rgba(10, 20, 28, 0.78);
       backdrop-filter: blur(10px);
@@ -355,6 +358,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      white-space: nowrap;
+    }
+    .menu-btn span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      display: inline-block;
     }
     .menu-btn:hover {
       transform: translateX(-4px) scale(1.03);
@@ -436,28 +447,43 @@
       border-radius: 4px;
     }
 
-    /* Responsive scaling for mobile & tablet */
-    @media (max-width: 900px) {
+    /* Responsive scaling for mobile, tablets & all landscape aspect ratios */
+    @media (max-height: 520px) {
       .menu-buttons-cluster {
-        right: 24px;
-        top: 32%;
-        width: 165px;
-        gap: 8px;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        right: clamp(12px, 3.5vw, 36px) !important;
+        width: clamp(155px, 25vw, 190px) !important;
+        gap: clamp(4px, 1.1vh, 8px) !important;
+        max-height: 94vh !important;
+      }
+      .menu-btn {
+        padding: clamp(5px, 1.3vh, 8px) clamp(8px, 1.8vw, 12px) !important;
+        font-size: clamp(9.5px, 1.8vh + 3px, 11px) !important;
+        letter-spacing: 0.4px !important;
+      }
+    }
+    @media (max-width: 900px) and (min-height: 521px) {
+      .menu-buttons-cluster {
+        right: clamp(16px, 4vw, 36px);
+        width: clamp(170px, 28vw, 210px);
+        gap: 9px;
       }
       .menu-btn {
         padding: 10px 14px;
-        font-size: 11px;
+        font-size: 11.5px;
       }
     }
     @media (max-width: 600px) {
       .menu-buttons-cluster {
-        right: 16px;
-        width: 145px;
-        gap: 6px;
+        right: clamp(10px, 3vw, 20px) !important;
+        width: clamp(140px, 42vw, 175px) !important;
+        gap: clamp(4px, 1.2vh, 6px) !important;
       }
       .menu-btn {
-        padding: 8px 10px;
-        font-size: 10px;
+        padding: 6px 8px !important;
+        font-size: 10px !important;
+        letter-spacing: 0.3px !important;
       }
     }
 
@@ -800,12 +826,10 @@
       pointer-events: none;
     }
 
-    /* LEFT: STEERING & HANDBRAKE CLUSTER */
+    /* LEFT: STEERING CLUSTER */
     .mobile-left-cluster {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 12px;
+      align-items: center;
       pointer-events: auto;
     }
     .steer-cluster {
@@ -860,17 +884,26 @@
       filter: drop-shadow(0 0 12px #ef4444);
     }
 
-    /* Handbrake Turn Button (Positioned on Left Side) */
+    /* RIGHT: RACING PEDALS & HANDBRAKE CLUSTER */
+    .mobile-right-cluster {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12px;
+      pointer-events: auto;
+    }
+
+    /* Handbrake Turn Button (Positioned on Right Side) */
     .handbrake-btn {
-      width: 94px;
-      height: 40px;
+      width: 96px;
+      height: 38px;
       background: rgba(245, 158, 11, 0.32);
       border: 2px solid #f59e0b;
       border-radius: 12px;
       color: #fbbf24;
       font-family: 'Montserrat', sans-serif;
       font-weight: 900;
-      font-size: 12px;
+      font-size: 11.5px;
       letter-spacing: 0.8px;
       display: flex;
       align-items: center;
@@ -880,7 +913,7 @@
       cursor: pointer;
       outline: none;
       transition: transform 0.08s ease, background 0.08s ease;
-      margin-left: 2px;
+      margin-right: 4px;
     }
     .handbrake-btn:active, .handbrake-btn.active {
       transform: scale(0.92);
@@ -1607,13 +1640,8 @@
 
   <!-- MOBILE TOUCH CONTROLS (Authentic Racing Setup: Triangles & Pedals) -->
   <div id="touch-controls">
-    <!-- LEFT: STEERING & HANDBRAKE CLUSTER -->
+    <!-- LEFT: STEERING CLUSTER -->
     <div class="mobile-left-cluster">
-      <!-- Handbrake Turn Button (Moved to Left Side of Screen) -->
-      <button class="handbrake-btn" id="btn-drift" aria-label="Handbrake Turn" tabindex="-1">
-        <span>(P) DRIFT</span>
-      </button>
-
       <!-- Left / Right Triangular Steering Arrows -->
       <div class="steer-cluster">
         <!-- Left Triangle Button (Grey/White) -->
@@ -1639,25 +1667,33 @@
       </button>
     </div>
 
-    <!-- RIGHT: RACING PEDALS (Dual Pedal Setup) -->
-    <div class="pedal-cluster">
-      <!-- Red Brake Pedal (6 perforated holes) -->
-      <button class="racing-pedal pedal-brake" id="btn-brake" aria-label="Brake" tabindex="-1">
-        <div class="pedal-holes-brake">
-          <span></span><span></span><span></span>
-          <span></span><span></span><span></span>
-        </div>
+    <!-- RIGHT: RACING PEDALS & HANDBRAKE CLUSTER -->
+    <div class="mobile-right-cluster">
+      <!-- Handbrake Turn Button (Positioned on Right Side) -->
+      <button class="handbrake-btn" id="btn-drift" aria-label="Handbrake Turn" tabindex="-1">
+        <span>(P) DRIFT</span>
       </button>
 
-      <!-- Silver Accelerator Pedal (8 perforated holes) -->
-      <button class="racing-pedal pedal-gas" id="btn-gas" aria-label="Gas / Accelerate" tabindex="-1">
-        <div class="pedal-holes-gas">
-          <span></span><span></span>
-          <span></span><span></span>
-          <span></span><span></span>
-          <span></span><span></span>
-        </div>
-      </button>
+      <!-- Racing Pedals (Dual Pedal Setup) -->
+      <div class="pedal-cluster">
+        <!-- Red Brake Pedal (6 perforated holes) -->
+        <button class="racing-pedal pedal-brake" id="btn-brake" aria-label="Brake" tabindex="-1">
+          <div class="pedal-holes-brake">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+          </div>
+        </button>
+
+        <!-- Silver Accelerator Pedal (8 perforated holes) -->
+        <button class="racing-pedal pedal-gas" id="btn-gas" aria-label="Gas / Accelerate" tabindex="-1">
+          <div class="pedal-holes-gas">
+            <span></span><span></span>
+            <span></span><span></span>
+            <span></span><span></span>
+            <span></span><span></span>
+          </div>
+        </button>
+      </div>
     </div>
   </div>
 

@@ -18,7 +18,10 @@ class GameApp {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+      (window.innerWidth <= 960 && 'ontouchstart' in window);
+    this.renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // AAA Soft Shadows
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -449,6 +452,10 @@ class GameApp {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+      (window.innerWidth <= 960 && 'ontouchstart' in window);
+    this.renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
   }
 
   animate() {
@@ -476,8 +483,8 @@ class GameApp {
     // 2. Update Grounded Arcade Physics
     this.vehiclePhysics.update(dt, this.input);
 
-    // 3. Update Visual Van Model & Suspension
-    this.vanModel.update(dt, this.vehiclePhysics);
+    // 3. Update Visual Van Model & Suspension (Pass input for responsive brake lights)
+    this.vanModel.update(dt, this.vehiclePhysics, this.input);
 
     // 4. Update Dynamic Camera
     this.cameraManager.update(dt, this.vanModel.root, this.vehiclePhysics);

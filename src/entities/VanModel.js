@@ -140,14 +140,19 @@ export class VanModel {
     this.headlightR.target.position.set(0.5, 0.1, 15);
     this.chassisGroup.add(this.headlightR, this.headlightR.target);
 
-    // Taillight glow
+    // Taillight glow & Dynamic Brake Lights
     const tailGlowGeo = new THREE.BoxGeometry(0.08, 0.24, 0.04);
-    this.tailGlowMat = new THREE.MeshBasicMaterial({ color: 0xaa1111 });
+    this.tailGlowMat = new THREE.MeshBasicMaterial({ color: 0x3a0808 });
     const tailL = new THREE.Mesh(tailGlowGeo, this.tailGlowMat);
     tailL.position.set(-0.62, 0.55, -1.64);
     const tailR = new THREE.Mesh(tailGlowGeo, this.tailGlowMat);
     tailR.position.set(0.62, 0.55, -1.64);
     this.chassisGroup.add(tailL, tailR);
+
+    // Dynamic Red Brake Light Glow
+    this.brakeLight = new THREE.PointLight(0xff1122, 0, 4.0, 2);
+    this.brakeLight.position.set(0, 0.55, -1.8);
+    this.chassisGroup.add(this.brakeLight);
 
     // Dashboard & Steering Wheel
     const dash = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.32, 0.45), darkTrimMat);
@@ -261,7 +266,7 @@ export class VanModel {
     return this.rearDoorsOpen;
   }
 
-  update(dt, vehiclePhysics) {
+  update(dt, vehiclePhysics, input = null) {
     // 1. Root position sits directly at the ground contact elevation
     this.root.position.copy(vehiclePhysics.position);
     this.root.rotation.y = vehiclePhysics.heading;
@@ -290,11 +295,21 @@ export class VanModel {
       this.steeringWheelPivot.rotation.z = -vehiclePhysics.steerAngle * 2.5;
     }
 
-    // 5. Brake Lights
-    if (vehiclePhysics.speed > 0.5 && vehiclePhysics.velocity.dot(new THREE.Vector3(0, 0, -1)) < 0) {
-      this.tailGlowMat.color.setHex(0xff0000);
+    // 5. Dynamic Brake Lights
+    // Turned ON when the van brakes, uses handbrake, or reverses
+    const isBraking = Boolean(input && input.brake > 0.05);
+    const isHandbraking = Boolean((input && input.handbrake) || vehiclePhysics.isDrifting);
+    const isReversing = vehiclePhysics.speed < -0.15 || Boolean(input && input.brake > 0.05 && vehiclePhysics.speed <= 0.3);
+    const isDecelBraking = Boolean(vehiclePhysics.isBrakingHard);
+
+    const brakeActive = isBraking || isHandbraking || isReversing || isDecelBraking;
+
+    if (brakeActive) {
+      this.tailGlowMat.color.setHex(0xff0022); // Vivid crimson glow
+      if (this.brakeLight) this.brakeLight.intensity = 1.8;
     } else {
-      this.tailGlowMat.color.setHex(0x771111);
+      this.tailGlowMat.color.setHex(0x3a0808); // Inactive dim red glass
+      if (this.brakeLight) this.brakeLight.intensity = 0;
     }
 
     // 6. Animate Doors

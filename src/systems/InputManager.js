@@ -118,28 +118,55 @@ export class InputManager {
     const el = document.getElementById(id);
     if (!el) return;
 
-    const start = (e) => {
+    let activePointerId = null;
+
+    const onPointerDown = (e) => {
       e.preventDefault();
+      activePointerId = e.pointerId;
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch (err) {}
       callback(true);
       el.classList.add('active');
     };
-    const end = (e) => {
-      e.preventDefault();
+
+    const onPointerUp = (e) => {
+      if (activePointerId !== null && e.pointerId === activePointerId) {
+        activePointerId = null;
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch (err) {}
+      }
       callback(false);
       el.classList.remove('active');
     };
 
-    el.addEventListener('pointerdown', start);
-    el.addEventListener('pointerup', end);
-    el.addEventListener('pointercancel', end);
-    el.addEventListener('pointerleave', end);
+    el.addEventListener('pointerdown', onPointerDown);
+    el.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('pointercancel', onPointerUp);
+    el.addEventListener('pointerleave', (e) => {
+      if (!el.hasPointerCapture || !el.hasPointerCapture(e.pointerId)) {
+        onPointerUp(e);
+      }
+    });
 
-    el.addEventListener('mousedown', start);
-    window.addEventListener('mouseup', end);
+    // Touch events for ultra-low latency mobile response
+    el.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      callback(true);
+      el.classList.add('active');
+    }, { passive: false });
 
-    el.addEventListener('touchstart', start, { passive: false });
-    el.addEventListener('touchend', end);
-    el.addEventListener('touchcancel', end);
+    el.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      callback(false);
+      el.classList.remove('active');
+    });
+
+    el.addEventListener('touchcancel', (e) => {
+      callback(false);
+      el.classList.remove('active');
+    });
   }
 
   bindButtonClick(id, callback) {
