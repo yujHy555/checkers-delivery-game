@@ -256,12 +256,12 @@ export class VanModel {
   loadCustomGLTFBody() {
     const loader = new GLTFLoader();
     const candidatePaths = [
-      '/models/checkers_van_body_01.gltf',
       '/models/checkers_van_body_01.glb',
-      '/assets/checkers_van_body_01.gltf',
+      '/models/checkers_van_body_01.gltf',
       '/assets/checkers_van_body_01.glb',
-      'checkers_van_body_01.gltf',
-      'checkers_van_body_01.glb'
+      '/assets/checkers_van_body_01.gltf',
+      'checkers_van_body_01.glb',
+      'checkers_van_body_01.gltf'
     ];
 
     const tryLoad = (index) => {
@@ -277,16 +277,61 @@ export class VanModel {
           const model = gltf.scene;
           model.name = 'CustomVanBody';
 
-          // Enable shadows and verify materials
+          // Align model baseline with chassis (Blender ground y=0 -> offset by -0.35m relative to chassisGroup at y=0.35m)
+          model.position.set(0, -0.35, 0);
+
+          // Find the baked van body mesh (Cube.001 with diffuse & normal texture)
+          // Hide reference objects from Blender: standing character, ground plane, duplicate meshes, and static wheels
+          let bakedBodyFound = false;
+
           model.traverse((child) => {
+            const name = child.name || '';
+            const lowerName = name.toLowerCase();
+
+            // Always hide reference character, ground planes, or camera/light nodes
+            if (lowerName.includes('standing') || lowerName.includes('male') || lowerName.includes('plane') || lowerName.includes('camera') || lowerName.includes('light')) {
+              child.visible = false;
+              return;
+            }
+
+            // Always hide static Blender wheels (our dynamic animated physics wheels handle driving, steering and spinning)
+            if (lowerName.startsWith('wheel') || lowerName.includes('tire') || lowerName.includes('rim')) {
+              child.visible = false;
+              return;
+            }
+
+            // Check if this is the baked body mesh (Cube.001)
+            if (name === 'Cube.001' || (child.material && child.material.name === 'Material.002')) {
+              child.visible = true;
+              bakedBodyFound = true;
+            } else if (name === 'Cube' || name === 'node_0' || lowerName.includes('tripo')) {
+              // Hide duplicate/unbaked source geometry if the baked body is present
+              child.visible = false;
+            }
+
             if (child.isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
               if (child.material) {
                 child.material.side = THREE.DoubleSide;
+                // Ensure proper normal map scaling and depth
+                if (child.material.normalMap) {
+                  child.material.normalScale.set(1.0, 1.0);
+                  child.material.needsUpdate = true;
+                }
               }
             }
           });
+
+          // Fallback: If Cube.001 wasn't identified by name, ensure non-reference meshes are visible
+          if (!bakedBodyFound) {
+            model.traverse((child) => {
+              const lowerName = (child.name || '').toLowerCase();
+              if (!lowerName.includes('standing') && !lowerName.includes('male') && !lowerName.includes('plane') && !lowerName.startsWith('wheel')) {
+                child.visible = true;
+              }
+            });
+          }
 
           this.customBodyMesh = model;
           this.customBodyGroup.add(model);
