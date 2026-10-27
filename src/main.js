@@ -184,10 +184,33 @@ class GameApp {
     const guideModal = document.getElementById('controls-guide-modal');
     const btnControlsGuide = document.getElementById('btn-controls-guide');
     const btnOpenGuideBar = document.getElementById('btn-open-guide-bar');
+    const btnOpenGamepadBar = document.getElementById('btn-open-gamepad-bar');
     const btnCloseGuide = document.getElementById('btn-close-guide');
     const btnCloseModalX = document.getElementById('btn-close-modal-x');
+    const tabKeyboard = document.getElementById('tab-keyboard');
+    const tabGamepad = document.getElementById('tab-gamepad');
+    const stageKeyboard = document.getElementById('stage-keyboard');
+    const stageGamepad = document.getElementById('stage-gamepad');
 
-    const openGuide = () => {
+    const setGuideMode = (mode) => {
+      if (mode === 'gamepad') {
+        if (stageKeyboard) stageKeyboard.style.display = 'none';
+        if (stageGamepad) stageGamepad.style.display = 'block';
+        if (tabGamepad) tabGamepad.classList.add('active');
+        if (tabKeyboard) tabKeyboard.classList.remove('active');
+      } else {
+        if (stageKeyboard) stageKeyboard.style.display = 'block';
+        if (stageGamepad) stageGamepad.style.display = 'none';
+        if (tabKeyboard) tabKeyboard.classList.add('active');
+        if (tabGamepad) tabGamepad.classList.remove('active');
+      }
+    };
+
+    if (tabKeyboard) tabKeyboard.addEventListener('click', () => setGuideMode('keyboard'));
+    if (tabGamepad) tabGamepad.addEventListener('click', () => setGuideMode('gamepad'));
+
+    const openGuide = (mode = null) => {
+      if (mode) setGuideMode(mode);
       if (guideModal && window.innerWidth > 900) {
         guideModal.classList.add('open');
       }
@@ -200,8 +223,9 @@ class GameApp {
       }
     };
 
-    if (btnControlsGuide) btnControlsGuide.addEventListener('click', openGuide);
-    if (btnOpenGuideBar) btnOpenGuideBar.addEventListener('click', openGuide);
+    if (btnControlsGuide) btnControlsGuide.addEventListener('click', () => openGuide());
+    if (btnOpenGuideBar) btnOpenGuideBar.addEventListener('click', () => openGuide('keyboard'));
+    if (btnOpenGamepadBar) btnOpenGamepadBar.addEventListener('click', () => openGuide('gamepad'));
     if (btnCloseGuide) btnCloseGuide.addEventListener('click', closeGuide);
     if (btnCloseModalX) btnCloseModalX.addEventListener('click', closeGuide);
 
@@ -222,7 +246,7 @@ class GameApp {
     // Auto-open on initial load for PC / iOS desktop/tablet users so instructions are immediately visible
     try {
       if (window.innerWidth > 900 && !sessionStorage.getItem('sixty60_guide_seen')) {
-        setTimeout(openGuide, 450);
+        setTimeout(() => openGuide('keyboard'), 450);
       }
     } catch (e) {}
   }
