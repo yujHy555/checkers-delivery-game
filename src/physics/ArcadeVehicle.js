@@ -75,7 +75,7 @@ export class ArcadeVehicle {
   initSkidmarks() {
     this.maxSkidPoints = 800;
     this.skidGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(this.maxSkidPoints * 6);
+    const positions = new Float32Array(this.maxSkidPoints * 36);
     this.skidGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
     this.skidMaterial = new THREE.MeshBasicMaterial({
@@ -213,14 +213,10 @@ export class ArcadeVehicle {
     const dyRL = wb * sinP - tw * sinR;
     const dyRR = wb * sinP + tw * sinR;
 
-    // Strict Non-Penetrating Ground Elevation:
-    // Guarantees Y_wheel >= g_wheel.height + roadLevel for EVERY wheel touching the ramp!
+    // Smooth Non-Penetrating Ground Elevation:
+    // Guarantees tires follow terrain seamlessly with zero downhill bounce or step-off bumps
     const rawGroundH = Math.max(
       gCenter.height,
-      gFL.height - dyFL,
-      gFR.height - dyFR,
-      gRL.height - dyRL,
-      gRR.height - dyRR,
       (hFront + hRear) * 0.5
     );
     const targetGroundY = rawGroundH + this.roadLevel;
@@ -270,14 +266,14 @@ export class ArcadeVehicle {
         this.surfaceRoll = THREE.MathUtils.lerp(this.surfaceRoll, targetSurfaceRoll, 22.0 * dt);
         this.pitch = this.surfacePitch;
 
-        // Launch over crest at high speed (> 5.5 m/s)
-        if (isOnRamp && this.speed > 5.5) {
-          if ((isNearPeak || (hRear >= hFront && gCenter.height > 0.6)) && this.jumpLaunchCooldown <= 0) {
-            this.isAirborne = true;
-            this.airTime = 0.01;
-            this.jumpLaunchCooldown = 0.32;
-            this.velocity.y = Math.max(5.8, this.speed * 0.44);
-          }
+        // Launch over crest ONLY when climbing up towards summit at high speed (> 6.0 m/s)
+        // Downhill driving NEVER triggers a jump launch, completely preventing any bounce on the downhill slope
+        const isClimbingTowardsPeak = (this.speed >= 0 && hFront >= hRear - 0.25) || (this.speed < 0 && hRear >= hFront - 0.25);
+        if (isOnRamp && isClimbingTowardsPeak && isNearPeak && absSpeed > 6.0 && this.jumpLaunchCooldown <= 0) {
+          this.isAirborne = true;
+          this.airTime = 0.01;
+          this.jumpLaunchCooldown = 0.35;
+          this.velocity.y = Math.max(5.8, absSpeed * 0.45);
         }
 
         // Downforce
@@ -358,7 +354,7 @@ export class ArcadeVehicle {
     this.visualPitch = this.surfacePitch + this.dynamicPitch;
 
     // 11. ACCURATE SKID MARKS & SMOKE
-    this.updateSkidsAndSmoke(dt, forward, right);
+    this.updateSkidsAndSmoke(dt, forward, right, input);
   }
 
   samplePointGround(x, z) {
@@ -498,26 +494,28 @@ export class ArcadeVehicle {
     }
   }
 
-  updateSkidsAndSmoke(dt, forward, right) {
-    const isBrakingSkid = this.isBrakingHard && !this.isAirborne;
-    const isDriftSkid = !this.isAirborne && (this.isDrifting || this.slipSpeed > 3.0);
-    const isSkidding = isBrakingSkid || isDriftSkid;
+  updateSkidsAndSmoke(dt, forward, right, input) {
+    const absSpeed = Math.abs(this.speed);
+    // User requirement: skid marks appear ONLY when van does a handbrake turn OR hard brakes at high speed
+    const isHandbrakeSkid = !this.isAirborne && (this.isDrifting || input.handbrake) && absSpeed > 1.8;
+    const isHighSpeedBrakeSkid = !this.isAirborne && input.brake > 0.45 && absSpeed > 6.0;
+    const isSkidding = isHandbrakeSkid || isHighSpeedBrakeSkid;
 
     const rlPos = this.position.clone()
-      .addScaledVector(forward, -1.05)
-      .addScaledVector(right, -0.65);
+      .addScaledVector(forward, -this.wheelBaseHalf)
+      .addScaledVector(right, -this.trackHalfWidth);
     const rrPos = this.position.clone()
-      .addScaledVector(forward, -1.05)
-      .addScaledVector(right, 0.65);
+      .addScaledVector(forward, -this.wheelBaseHalf)
+      .addScaledVector(right, this.trackHalfWidth);
 
     // Accurate ground height under tires for skids
     const gRL = this.samplePointGround(rlPos.x, rlPos.z);
     const gRR = this.samplePointGround(rrPos.x, rrPos.z);
-    rlPos.y = gRL.height + this.roadLevel + 0.008;
-    rrPos.y = gRR.height + this.roadLevel + 0.008;
+    rlPos.y = gRL.height + this.roadLevel + 0.01;
+    rrPos.y = gRR.height + this.roadLevel + 0.01;
 
     if (isSkidding) {
-      if (isDriftSkid) {
+      if (this.isDrifting || this.slipSpeed > 2.5) {
         this.spawnSmoke(rlPos);
         this.spawnSmoke(rrPos);
       }
@@ -571,7 +569,7 @@ export class ArcadeVehicle {
 
     const positions = this.skidGeometry.attributes.position.array;
     let pIdx = 0;
-    const w = 0.14;
+    const halfWidth = 0.11; // 22cm realistic tire track width
 
     for (let i = 0; i < count - 1; i++) {
       const i3 = i * 3;
@@ -583,21 +581,56 @@ export class ArcadeVehicle {
       const rx1 = this.skidHistoryR[i3], ry1 = this.skidHistoryR[i3 + 1], rz1 = this.skidHistoryR[i3 + 2];
       const rx2 = this.skidHistoryR[ni3], ry2 = this.skidHistoryR[ni3 + 1], rz2 = this.skidHistoryR[ni3 + 2];
 
-      positions[pIdx++] = lx1 - w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
-      positions[pIdx++] = lx1 + w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
-      positions[pIdx++] = lx2 - w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
+      const ldx = lx2 - lx1;
+      const ldz = lz2 - lz1;
+      const ldist = Math.hypot(ldx, ldz);
 
-      positions[pIdx++] = lx1 + w; positions[pIdx++] = ly1; positions[pIdx++] = lz1;
-      positions[pIdx++] = lx2 + w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
-      positions[pIdx++] = lx2 - w; positions[pIdx++] = ly2; positions[pIdx++] = lz2;
+      const rdx = rx2 - rx1;
+      const rdz = rz2 - rz1;
+      const rdist = Math.hypot(rdx, rdz);
 
-      positions[pIdx++] = rx1 - w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
-      positions[pIdx++] = rx1 + w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
-      positions[pIdx++] = rx2 - w; positions[pIdx++] = ry2; positions[pIdx++] = rz2;
+      // Only connect consecutive points if within valid driving distance; skips gap jumps
+      if (ldist > 0.04 && ldist < 2.5 && rdist > 0.04 && rdist < 2.5) {
+        // True 2D perpendicular normal for left tire ribbon
+        const lnx = -ldz / ldist;
+        const lnz = ldx / ldist;
+        const lox = lnx * halfWidth;
+        const loz = lnz * halfWidth;
 
-      positions[pIdx++] = rx1 + w; positions[pIdx++] = ry1; positions[pIdx++] = rz1;
-      positions[pIdx++] = rx2 + w; positions[pIdx++] = ry2; positions[pIdx++] = rz2;
-      positions[pIdx++] = rx2 - w; positions[pIdx++] = ry2; positions[pIdx++] = rz2;
+        // Quad vertices for Left Tire
+        const pL1x = lx1 - lox, pL1y = ly1, pL1z = lz1 - loz;
+        const pL2x = lx1 + lox, pL2y = ly1, pL2z = lz1 + loz;
+        const pL3x = lx2 - lox, pL3y = ly2, pL3z = lz2 - loz;
+        const pL4x = lx2 + lox, pL4y = ly2, pL4z = lz2 + loz;
+
+        positions[pIdx++] = pL1x; positions[pIdx++] = pL1y; positions[pIdx++] = pL1z;
+        positions[pIdx++] = pL2x; positions[pIdx++] = pL2y; positions[pIdx++] = pL2z;
+        positions[pIdx++] = pL3x; positions[pIdx++] = pL3y; positions[pIdx++] = pL3z;
+
+        positions[pIdx++] = pL2x; positions[pIdx++] = pL2y; positions[pIdx++] = pL2z;
+        positions[pIdx++] = pL4x; positions[pIdx++] = pL4y; positions[pIdx++] = pL4z;
+        positions[pIdx++] = pL3x; positions[pIdx++] = pL3y; positions[pIdx++] = pL3z;
+
+        // True 2D perpendicular normal for right tire ribbon
+        const rnx = -rdz / rdist;
+        const rnz = rdx / rdist;
+        const rox = rnx * halfWidth;
+        const roz = rnz * halfWidth;
+
+        // Quad vertices for Right Tire
+        const pR1x = rx1 - rox, pR1y = ry1, pR1z = rz1 - roz;
+        const pR2x = rx1 + rox, pR2y = ry1, pR2z = rz1 + roz;
+        const pR3x = rx2 - rox, pR3y = ry2, pR3z = rz2 - roz;
+        const pR4x = rx2 + rox, pR4y = ry2, pR4z = rz2 + roz;
+
+        positions[pIdx++] = pR1x; positions[pIdx++] = pR1y; positions[pIdx++] = pR1z;
+        positions[pIdx++] = pR2x; positions[pIdx++] = pR2y; positions[pIdx++] = pR2z;
+        positions[pIdx++] = pR3x; positions[pIdx++] = pR3y; positions[pIdx++] = pR3z;
+
+        positions[pIdx++] = pR2x; positions[pIdx++] = pR2y; positions[pIdx++] = pR2z;
+        positions[pIdx++] = pR4x; positions[pIdx++] = pR4y; positions[pIdx++] = pR4z;
+        positions[pIdx++] = pR3x; positions[pIdx++] = pR3y; positions[pIdx++] = pR3z;
+      }
     }
 
     this.skidGeometry.attributes.position.needsUpdate = true;

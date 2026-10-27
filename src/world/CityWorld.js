@@ -11,37 +11,35 @@ export class CityWorld {
   }
 
   buildWorld() {
-    // 1. Lush Vibrant Green Grass Ground Plane (Receives shadow)
-    const grassTex = TextureGenerator.createGrassTexture();
+    // 1. Pristine Greybox Ground Plane (Receives shadow, clean GI studio aesthetic)
     const groundGeo = new THREE.PlaneGeometry(350, 350);
     const groundMat = new THREE.MeshStandardMaterial({
-      map: grassTex,
-      color: 0x388e3c, // Rich, healthy, pleasant lawn green
-      roughness: 0.82,
-      metalness: 0.02
+      color: 0xd9e2ec, // Luminous, elegant architectural light-grey floor
+      roughness: 0.88,
+      metalness: 0.04
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // 2. Road Network (clean open edges, no grey barriers)
+    // 2. Road Network (clean open edges, slate grey with crisp white dashes)
     this.buildRoads();
 
-    // 3. SOLID DOUBLE-SIDED 3D JUMP RAMPS (NO RAILINGS, clean open geometry)
+    // 3. SOLID DOUBLE-SIDED 3D JUMP RAMPS (NO RAILINGS, architectural off-white matte geometry)
     this.buildDoubleSidedRamps();
 
-    // 4. Slalom Cones Area
+    // 4. Slalom Cones Area (greybox styling)
     this.buildSlalomArea();
 
-    // 5. Buildings & Delivery Destinations
+    // 5. Buildings & Delivery Destinations (greybox architectural masses)
     this.buildBuildings();
   }
 
   buildRoads() {
     const roadMat = new THREE.MeshStandardMaterial({
-      map: TextureGenerator.createAsphaltTexture(),
-      roughness: 0.8
+      color: 0x52606d, // Neutral slate-grey asphalt
+      roughness: 0.75
     });
 
     const createRoad = (x, z, width, length, rot = 0) => {
@@ -52,8 +50,8 @@ export class CityWorld {
       road.receiveShadow = true;
       this.scene.add(road);
 
-      // Yellow Center Dash Lines
-      const lineMat = new THREE.MeshBasicMaterial({ color: 0xffd54f });
+      // Crisp Minimalist White Center Dash Lines
+      const lineMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
       const numDashes = Math.floor(length / 7);
       for (let i = 0; i < numDashes; i++) {
         const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 3.8), lineMat);
@@ -83,15 +81,16 @@ export class CityWorld {
   }
 
   buildDoubleSidedRamps() {
-    // Solid simple untextured matte material (clean vibrant amber, NO railings)
+    // Solid simple untextured matte material - clean architectural off-white greybox
     const rampMat = new THREE.MeshStandardMaterial({
-      color: 0xff8f00,
-      roughness: 0.5,
-      metalness: 0.1,
-      side: THREE.DoubleSide
+      color: 0xf1f5f9,
+      roughness: 0.65,
+      metalness: 0.05,
+      side: THREE.FrontSide
     });
 
     // Creates an airtight, solid double-sided A-Frame wedge WITHOUT any railings
+    // All faces have counter-clockwise outward winding to ensure perfect normals
     const createDoubleSidedRampMesh = (w, d, h) => {
       const hw = w / 2;
       const hd = d / 2;
@@ -100,25 +99,23 @@ export class CityWorld {
       // Base: (-hw, 0, -hd), (hw, 0, -hd), (hw, 0, hd), (-hw, 0, hd)
       // Apex Ridge: (-hw, h, 0), (hw, h, 0)
       const positions = new Float32Array([
-        // Face 1: South Incline Slope (from -hd up to 0) - 2 triangles
-        -hw, 0, -hd,   hw, 0, -hd,   hw, h, 0,
-        -hw, 0, -hd,   hw, h, 0,    -hw, h, 0,
+        // Face 1: South Incline Slope (slopes up from z = -hd to z = 0, facing South/Up)
+        -hw, 0, -hd,    hw, h, 0,     hw, 0, -hd,
+        -hw, 0, -hd,   -hw, h, 0,     hw, h, 0,
 
-        // Face 2: North Decline Slope (from 0 down to +hd) - 2 triangles
-        -hw, h, 0,     hw, h, 0,     hw, 0, hd,
-        -hw, h, 0,     hw, 0, hd,   -hw, 0, hd,
+        // Face 2: North Decline Slope (slopes down from z = 0 to z = +hd, facing North/Up)
+        -hw, h, 0,      hw, 0, hd,    hw, h, 0,
+        -hw, h, 0,     -hw, 0, hd,    hw, 0, hd,
 
-        // Face 3: Bottom Base - 2 triangles
-        -hw, 0, -hd,   hw, 0, hd,    hw, 0, -hd,
-        -hw, 0, -hd,  -hw, 0, hd,    hw, 0, hd,
+        // Face 3: Bottom Base (facing Down)
+        -hw, 0, -hd,   -hw, 0, hd,    hw, 0, hd,
+        -hw, 0, -hd,    hw, 0, hd,    hw, 0, -hd,
 
-        // Face 4: Left Side Triangular Gable (Solid side wall)
-        -hw, 0, -hd,  -hw, h, 0,    -hw, 0, 0,
-        -hw, 0, 0,    -hw, h, 0,    -hw, 0, hd,
+        // Face 4: Left Side Triangular Gable (facing West / -X)
+        -hw, 0, hd,    -hw, h, 0,    -hw, 0, -hd,
 
-        // Face 5: Right Side Triangular Gable (Solid side wall)
-        hw, 0, -hd,   hw, 0, 0,     hw, h, 0,
-        hw, 0, 0,     hw, 0, hd,    hw, h, 0
+        // Face 5: Right Side Triangular Gable (facing East / +X)
+        hw, 0, -hd,     hw, h, 0,     hw, 0, hd
       ]);
 
       const geo = new THREE.BufferGeometry();
@@ -126,8 +123,8 @@ export class CityWorld {
       geo.computeVertexNormals();
 
       const mesh = new THREE.Mesh(geo, rampMat);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = false; // Disables self-shadowing to eliminate all acne, scanlines & cube shadows
+      mesh.receiveShadow = true; // High-precision receiver for car & wheel shadows
       return mesh;
     };
 
@@ -164,8 +161,8 @@ export class CityWorld {
   }
 
   buildSlalomArea() {
-    const coneMat = new THREE.MeshStandardMaterial({ color: 0xff5722, roughness: 0.4 });
-    const whiteStripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const coneMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 });
+    const whiteStripeMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
 
     for (let i = -4; i <= 4; i++) {
       if (Math.abs(i) < 2) continue;
@@ -187,15 +184,15 @@ export class CityWorld {
 
   buildBuildings() {
     const buildingConfigs = [
-      { id: '1', name: 'Palm Villa', x: -35, z: 25, w: 16, d: 14, h: 8, col: 0x37474f },
-      { id: '2', name: 'Hillside Modern', x: -42, z: -35, w: 18, d: 14, h: 9, col: 0x455a64 },
-      { id: '3', name: 'Sunny Crest Residence', x: 44, z: 70, w: 16, d: 16, h: 8, col: 0x546e7a },
-      { id: '4', name: 'Orchid Court Complex', x: -40, z: 85, w: 22, d: 18, h: 14, col: 0x263238 },
-      { id: '5', name: 'Checkers Mega Hub', x: 46, z: -10, w: 32, d: 28, h: 10, col: 0x1b2831 }
+      { id: '1', name: 'Palm Villa', x: -35, z: 25, w: 16, d: 14, h: 8, col: 0xf8fafc },
+      { id: '2', name: 'Hillside Modern', x: -42, z: -35, w: 18, d: 14, h: 9, col: 0xe2e8f0 },
+      { id: '3', name: 'Sunny Crest Residence', x: 44, z: 70, w: 16, d: 16, h: 8, col: 0xcbd5e1 },
+      { id: '4', name: 'Orchid Court Complex', x: -40, z: 85, w: 22, d: 18, h: 14, col: 0xf1f5f9 },
+      { id: '5', name: 'Checkers Mega Hub', x: 46, z: -10, w: 32, d: 28, h: 10, col: 0x94a3b8 }
     ];
 
     for (const b of buildingConfigs) {
-      const bMat = new THREE.MeshStandardMaterial({ color: b.col, roughness: 0.7 });
+      const bMat = new THREE.MeshStandardMaterial({ color: b.col, roughness: 0.85, metalness: 0.05 });
       const bMesh = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), bMat);
       bMesh.position.set(b.x, b.h / 2, b.z);
       bMesh.castShadow = true;
@@ -204,7 +201,7 @@ export class CityWorld {
 
       const trimMesh = new THREE.Mesh(
         new THREE.BoxGeometry(b.w + 0.4, 0.4, b.d + 0.4),
-        new THREE.MeshStandardMaterial({ color: 0x00bcd4, roughness: 0.3 })
+        new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 })
       );
       trimMesh.position.set(b.x, b.h + 0.2, b.z);
       this.scene.add(trimMesh);

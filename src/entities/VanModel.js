@@ -66,10 +66,10 @@ export class VanModel {
     lowerBody.receiveShadow = false;
     this.chassisGroup.add(lowerBody);
 
-    // Upper cargo box
+    // Upper cargo box (does not cast shadow to avoid tall cube shadow on ramps)
     const upperBody = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.85, 3.1), bodyGreenMat);
     upperBody.position.set(0, 1.15, -0.05);
-    upperBody.castShadow = true;
+    upperBody.castShadow = false;
     this.chassisGroup.add(upperBody);
 
     // Textured Side Panels

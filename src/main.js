@@ -11,10 +11,10 @@ class GameApp {
   constructor() {
     this.container = document.getElementById('canvas-container');
 
-    // 1. Scene & WebGL Renderer
+    // 1. Scene & WebGL Renderer (AAA Greybox GI Look)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x90caf9);
-    this.scene.fog = new THREE.FogExp2(0x90caf9, 0.0035);
+    this.scene.background = new THREE.Color(0xe6edf3);
+    this.scene.fog = new THREE.FogExp2(0xe6edf3, 0.005);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -22,7 +22,7 @@ class GameApp {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // AAA Soft Shadows
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.05;
     this.container.appendChild(this.renderer.domElement);
 
     // 2. Camera & Camera Manager (Starts in Third-Person Chase Cam)
@@ -74,36 +74,36 @@ class GameApp {
   }
 
   setupAAAGroundedShadow() {
-    // Balanced Ambient Lighting
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3d4a52, 0.75);
+    // AAA Greybox Global Illumination (GI) Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.25);
     hemiLight.position.set(0, 50, 0);
     this.scene.add(hemiLight);
 
-    const ambient = new THREE.AmbientLight(0xdcf8ff, 0.3);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(ambient);
 
     // SINGLE QUALITY AAA DIRECTIONAL SUN LIGHT
-    // Positioned high overhead so shadow sits directly under wheels and chassis
-    this.sunLight = new THREE.DirectionalLight(0xfff8e7, 1.8);
+    // Positioned directly overhead for tight, accurate ground contact shadow
+    this.sunLight = new THREE.DirectionalLight(0xffffff, 1.35);
     this.sunLight.castShadow = true;
 
     // High resolution 2048 shadow map
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
 
-    // Generous 48x48m shadow camera: completely eliminates cube/box shadow frustum clipping artifacts on ramps
-    const boxSize = 24.0;
+    // Generous 50x50m shadow camera: completely eliminates cube/box shadow frustum clipping artifacts on ramps
+    const boxSize = 25.0;
     this.sunLight.shadow.camera.left = -boxSize;
     this.sunLight.shadow.camera.right = boxSize;
     this.sunLight.shadow.camera.top = boxSize;
     this.sunLight.shadow.camera.bottom = -boxSize;
     this.sunLight.shadow.camera.near = 5.0;
-    this.sunLight.shadow.camera.far = 80.0;
+    this.sunLight.shadow.camera.far = 85.0;
     this.sunLight.shadow.camera.updateProjectionMatrix();
 
-    // Precise bias settings: eliminates shadow acne & grounds the tires firmly to the road/ramps
+    // Precise bias settings: crisp, grounded tire contact shadow with zero shadow acne or edge artifacts
     this.sunLight.shadow.bias = -0.0001;
-    this.sunLight.shadow.normalBias = 0.004;
+    this.sunLight.shadow.normalBias = 0.02;
     this.sunLight.shadow.radius = 1.0;
 
     this.scene.add(this.sunLight);
@@ -253,7 +253,7 @@ class GameApp {
     // Overhead sun positioned directly above the van for accurate ground shadow contact without elongated box silhouettes
     const vanPos = this.vanModel.root.position;
     if (this.sunLight) {
-      this.sunLight.position.set(vanPos.x + 2.0, vanPos.y + 42.0, vanPos.z + 2.0);
+      this.sunLight.position.set(vanPos.x + 0.5, vanPos.y + 45.0, vanPos.z + 0.5);
       this.sunLight.target.position.set(vanPos.x, vanPos.y, vanPos.z);
       this.sunLight.target.updateMatrixWorld();
     }
