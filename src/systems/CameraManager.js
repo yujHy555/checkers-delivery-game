@@ -20,6 +20,10 @@ export class CameraManager {
     this.chaseDistance = 6.4;
     this.chaseHeight = 2.6;
     this.baseFov = 62;
+
+    // Isometric tracking state
+    this.isoHeading = 0;
+    this.hasInitIso = false;
   }
 
   checkIsMobile() {
@@ -30,12 +34,14 @@ export class CameraManager {
 
   toggleMode() {
     this.mode = this.mode === 'THIRD_PERSON' ? 'ISOMETRIC' : 'THIRD_PERSON';
+    this.hasInitIso = false;
     return this.mode;
   }
 
   setMode(mode) {
     if (mode === 'ISOMETRIC' || mode === 'THIRD_PERSON') {
       this.mode = mode;
+      this.hasInitIso = false;
     }
   }
 
@@ -51,21 +57,43 @@ export class CameraManager {
     let desiredTarget = new THREE.Vector3();
 
     if (this.mode === 'ISOMETRIC') {
-      // Clean Elevated 45-degree Isometric View (Moved a lot closer towards van on mobile!)
-      const isoDist = isMobile ? 12.0 : 18.0;
-      const isoHeight = isMobile ? 13.0 : 22.0;
+      // Silky Smooth Elevated 45-degree Isometric View (Optimized for Mobile!)
+      const isoDist = isMobile ? 8.8 : 16.0;
+      const isoHeight = isMobile ? 9.6 : 18.0;
 
+      if (!this.hasInitIso) {
+        this.isoHeading = heading;
+        this.hasInitIso = true;
+      }
+
+      // Smooth heading tracking: smooths out jittery steering so camera doesn't violently whip the screen
+      let diff = heading - this.isoHeading;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      const turnFollowSpeed = isMobile ? 12.0 : 8.0;
+      this.isoHeading += diff * Math.min(1.0, turnFollowSpeed * dt);
+
+      const isoForward = new THREE.Vector3(Math.sin(this.isoHeading), 0, Math.cos(this.isoHeading));
       desiredPos.copy(focusPos)
-        .addScaledVector(forward, -isoDist)
+        .addScaledVector(isoForward, -isoDist)
         .add(new THREE.Vector3(0, isoHeight, 0));
 
-      desiredTarget.copy(focusPos).add(new THREE.Vector3(0, isMobile ? 0.65 : 0.8, 0));
+      desiredTarget.copy(focusPos)
+        .addScaledVector(isoForward, isMobile ? 1.6 : 2.0)
+        .add(new THREE.Vector3(0, isMobile ? 0.6 : 0.8, 0));
 
-      const targetFov = isMobile ? 54 : 46;
+      const targetFov = isMobile ? 52 : 46;
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 6.0 * dt);
       this.camera.updateProjectionMatrix();
 
+      // Responsive, silky-smooth damping for isometric
+      const posSpeed = isMobile ? 16.0 : this.posLerpSpeed;
+      const targetSpeed = isMobile ? 20.0 : this.targetLerpSpeed;
+      this.currentPos.lerp(desiredPos, posSpeed * dt);
+      this.currentTarget.lerp(desiredTarget, targetSpeed * dt);
+
     } else {
+      this.hasInitIso = false;
       // Dynamic Third-Person Chase Cam (Moved a lot closer towards van on mobile!)
       const baseDist = isMobile ? 4.6 : 6.4;
       const baseHeight = isMobile ? 1.95 : 2.6;
@@ -88,11 +116,11 @@ export class CameraManager {
       const targetFov = baseFov + speedNorm * (isMobile ? 10.0 : 14.0);
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 6.0 * dt);
       this.camera.updateProjectionMatrix();
-    }
 
-    // Smooth camera damping
-    this.currentPos.lerp(desiredPos, this.posLerpSpeed * dt);
-    this.currentTarget.lerp(desiredTarget, this.targetLerpSpeed * dt);
+      // Smooth camera damping
+      this.currentPos.lerp(desiredPos, this.posLerpSpeed * dt);
+      this.currentTarget.lerp(desiredTarget, this.targetLerpSpeed * dt);
+    }
 
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentTarget);

@@ -405,7 +405,9 @@ export class ArcadeVehicle {
           // PHYSICAL ENTRY CHECK:
           // A car on the road can only drive onto the ramp where the ramp height is low (<= 0.35m at slope entries).
           // If the car is on the road and this spot is a high vertical wall (> 0.35m), the car cannot climb it from the side!
-          const canAccessRamp = this.isOnRamp || (h <= 0.35) || (this.position.y >= h - 0.35);
+          const isAtRampEntry = (h <= 0.35) || (Math.abs(localZ) >= hd - 0.85);
+          const isElevatedOnRamp = (this.position.y >= h - 0.30);
+          const canAccessRamp = isAtRampEntry || isElevatedOnRamp;
 
           if (canAccessRamp && h > maxHeight) {
             maxHeight = h;
@@ -558,67 +560,84 @@ export class ArcadeVehicle {
             this.velocity.z -= dot * normalZ * 1.35;
             this.velocity.multiplyScalar(0.70);
           }
-        } else if (c.type === 'ramp' && iter === 0) {
-        // SMOOTH RAMP SIDE BARRIER: Prevents driving through vertical side wall from road, NEVER traps or blocks driving off!
-        const dx = this.position.x - c.x;
-        const dz = this.position.z - c.z;
-        const cosA = Math.cos(c.angleY);
-        const sinA = Math.sin(c.angleY);
-        const localX = dx * cosA - dz * sinA;
-        const localZ = dx * sinA + dz * cosA;
+        } else if (c.type === 'ramp') {
+          // SOLID RAMP SIDE BARRIER: Guarantees NO part of the car (front bumper, corners, sides, rear) can penetrate ramp side walls!
+          const cosA = Math.cos(c.angleY);
+          const sinA = Math.sin(c.angleY);
+          const hw = c.width / 2;
+          const hd = c.depth / 2;
 
-        // Velocity in ramp local frame
-        const vLocalX = this.velocity.x * cosA - this.velocity.z * sinA;
+          const carLocalX = (this.position.x - c.x) * cosA - (this.position.z - c.z) * sinA;
 
-        const hw = c.width / 2;
-        const hd = c.depth / 2;
+          // Van perimeter points: front bumper, corners, mid sides, rear bumper
+          const checkPoints = [
+            { x: this.position.x + forward.x * halfL, z: this.position.z + forward.z * halfL },
+            { x: this.position.x + forward.x * halfL - right.x * halfW, z: this.position.z + forward.z * halfL - right.z * halfW },
+            { x: this.position.x + forward.x * halfL + right.x * halfW, z: this.position.z + forward.z * halfL + right.z * halfW },
+            { x: this.position.x - right.x * halfW, z: this.position.z - right.z * halfW },
+            { x: this.position.x + right.x * halfW, z: this.position.z + right.z * halfW },
+            { x: this.position.x - forward.x * halfL - right.x * halfW, z: this.position.z - forward.z * halfL - right.z * halfW },
+            { x: this.position.x - forward.x * halfL + right.x * halfW, z: this.position.z - forward.z * halfL + right.z * halfW },
+            { x: this.position.x - forward.x * halfL, z: this.position.z - forward.z * halfL },
+            { x: this.position.x, z: this.position.z }
+          ];
 
-        // Only test within ramp length, excluding flat entry/exit tips (< 0.4m from ends)
-        if (Math.abs(localZ) <= hd - 0.4) {
-          const distFromPeak = Math.abs(localZ);
-          const rampH = Math.max(0, 1.0 - (distFromPeak / hd)) * c.height;
+          let maxPenLeft = 0;
+          let maxPenRight = 0;
 
-          // Only collide if car is down on the road outside (not on top of ramp or airborne)
-          if (!this.isOnRamp && !this.isAirborne && this.position.y < rampH - 0.15) {
-            const carR = this.halfCarWidth;
+          for (const pt of checkPoints) {
+            const dx = pt.x - c.x;
+            const dz = pt.z - c.z;
+            const plx = dx * cosA - dz * sinA;
+            const plz = dx * sinA + dz * cosA;
 
-            // Left side barrier (localX < -hw): outside left edge trying to penetrate
-            if (localX < -hw && localX > -hw - carR) {
-              const penetration = (hw + carR) - Math.abs(localX);
-              const normX = -cosA;
-              const normZ = sinA;
+            if (Math.abs(plz) <= hd - 0.20) {
+              const rampH = Math.max(0, 1.0 - (Math.abs(plz) / hd)) * c.height;
 
-              this.position.x += normX * penetration;
-              this.position.z += normZ * penetration;
-
-              // Deflect inward velocity and allow free forward/backward slide
-              const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
-              if (vInward > 0) {
-                this.velocity.x -= (-normX) * vInward * 1.2;
-                this.velocity.z -= (-normZ) * vInward * 1.2;
-                this.velocity.multiplyScalar(0.92);
-              }
-            }
-            // Right side barrier (localX > hw): outside right edge trying to penetrate
-            else if (localX > hw && localX < hw + carR) {
-              const penetration = (hw + carR) - localX;
-              const normX = cosA;
-              const normZ = -sinA;
-
-              this.position.x += normX * penetration;
-              this.position.z += normZ * penetration;
-
-              // Deflect inward velocity and allow free forward/backward slide
-              const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
-              if (vInward > 0) {
-                this.velocity.x -= (-normX) * vInward * 1.2;
-                this.velocity.z -= (-normZ) * vInward * 1.2;
-                this.velocity.multiplyScalar(0.92);
+              // Only block if car is below the ramp height (hitting side wall from road)
+              if (this.position.y < rampH - 0.20 && rampH > 0.25) {
+                // Left side wall (at -hw):
+                if (carLocalX < 0 && plx > -hw) {
+                  const pen = plx - (-hw);
+                  if (pen > maxPenLeft) maxPenLeft = pen;
+                }
+                // Right side wall (at hw):
+                else if (carLocalX > 0 && plx < hw) {
+                  const pen = hw - plx;
+                  if (pen > maxPenRight) maxPenRight = pen;
+                }
               }
             }
           }
+
+          if (maxPenLeft > 0) {
+            const pushDist = maxPenLeft + 0.03;
+            const normX = -cosA;
+            const normZ = sinA;
+            this.position.x += normX * pushDist;
+            this.position.z += normZ * pushDist;
+
+            const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+            if (vInward > 0) {
+              this.velocity.x -= (-normX) * vInward * 1.35;
+              this.velocity.z -= (-normZ) * vInward * 1.35;
+              this.velocity.multiplyScalar(0.75);
+            }
+          } else if (maxPenRight > 0) {
+            const pushDist = maxPenRight + 0.03;
+            const normX = cosA;
+            const normZ = -sinA;
+            this.position.x += normX * pushDist;
+            this.position.z += normZ * pushDist;
+
+            const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+            if (vInward > 0) {
+              this.velocity.x -= (-normX) * vInward * 1.35;
+              this.velocity.z -= (-normZ) * vInward * 1.35;
+              this.velocity.multiplyScalar(0.75);
+            }
+          }
         }
-      }
     }
   }
   }

@@ -29,7 +29,7 @@ class GameApp {
     this.container.appendChild(this.renderer.domElement);
 
     // 2. Camera & Camera Manager (Starts in Third-Person Chase Cam)
-    this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
+    this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 350);
     this.cameraManager = new CameraManager(this.camera, this.renderer.domElement);
 
     // 3. World Environment with Double-Sided Ramps
