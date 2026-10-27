@@ -161,8 +161,9 @@ export class ArcadeVehicle {
 
     // 2. SPEED-SENSITIVE STEERING ANGLE
     const speedRatio = Math.min(1.0, absSpeed / 26.0);
-    const maxSteerDeg = THREE.MathUtils.lerp(32.0, 14.0, speedRatio);
-    const dynamicMaxSteer = THREE.MathUtils.degToRad(maxSteerDeg);
+    // When drifting, grant full 34 degree steering authority for counter-steering control
+    const baseSteerDeg = this.isDrifting ? 34.0 : THREE.MathUtils.lerp(32.0, 16.0, speedRatio);
+    const dynamicMaxSteer = THREE.MathUtils.degToRad(baseSteerDeg);
 
     this.steerInput = THREE.MathUtils.lerp(this.steerInput, input.steer, this.steerResponse * dt);
     this.steerAngle = this.steerInput * dynamicMaxSteer;
@@ -303,33 +304,43 @@ export class ArcadeVehicle {
         this.velocity.multiplyScalar(Math.pow(this.dragCoeff, dt * 60.0));
       }
 
-      // 6. DRIFT & TRACTION
-      if (input.handbrake) {
+      // 6. SATISFYING HIGH-SPEED DRIFT & POWER SLIDE PHYSICS
+      if (input.handbrake && absSpeed > 1.2) {
         this.isDrifting = true;
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 16.0 * dt);
-        this.velocity.multiplyScalar(Math.pow(0.965, dt * 30.0));
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 20.0 * dt);
+        // Conserve high-speed momentum throughout the drift (minimal gentle drag)
+        this.velocity.multiplyScalar(Math.pow(0.994, dt * 60.0));
+        // Power slide: throttle pushes car forward through the slide
+        if (input.throttle > 0 && this.speed < this.maxSpeed) {
+          this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.75 * dt);
+        }
       } else {
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 8.0 * dt);
-        if (this.driftFactor < 0.08) this.isDrifting = false;
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 5.0 * dt);
+        if (this.driftFactor < 0.04) this.isDrifting = false;
       }
 
-      const gripRate = THREE.MathUtils.lerp(45.0, 5.5, this.driftFactor);
+      // Lateral grip: drops down to 1.4 for long, smooth, dramatic sideways sliding around bends!
+      const gripRate = THREE.MathUtils.lerp(45.0, 1.4, this.driftFactor);
       const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
       this.velocity.addScaledVector(right, lateralDecel);
 
-      // 7. YAW STEERING (NO ROTATION WHEN STOPPED)
+      // 7. YAW STEERING & OVERSTEER ROTATION (NO ROTATION WHEN STOPPED)
       let turnFactor = 0;
       if (absSpeed > 0.35) {
-        turnFactor = Math.min(1.0, (absSpeed - 0.35) / 4.5);
+        turnFactor = Math.min(1.0, (absSpeed - 0.35) / 3.0);
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
-      const driftBonus = this.isDrifting ? 1.75 : 1.0;
+      // High-speed drift yaw: responsive oversteer rotation to whip tail out
+      let yawRateCoeff;
+      if (this.isDrifting) {
+        yawRateCoeff = 3.8; // Fast, responsive tail-out rotation
+      } else {
+        yawRateCoeff = THREE.MathUtils.lerp(3.2, 1.8, speedRatio);
+      }
 
-      const highSpeedDamp = THREE.MathUtils.lerp(3.2, 1.8, speedRatio);
-      const targetYawRate = this.steerInput * turnFactor * dirSign * highSpeedDamp * driftBonus;
-
-      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 16.0 * dt);
+      const targetYawRate = this.steerInput * turnFactor * dirSign * yawRateCoeff;
+      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 18.0 * dt);
       this.heading += this.angularVelocity * dt;
 
     } else {
@@ -343,7 +354,7 @@ export class ArcadeVehicle {
     this.resolveCollisions();
 
     // 10. DYNAMIC CHASSIS SUSPENSION LEAN (Subtle & critically damped)
-    const targetDynRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.012), -0.04, 0.04);
+    const targetDynRoll = THREE.MathUtils.clamp(-this.angularVelocity * (this.speed * 0.015), -0.06, 0.06);
     const targetDynPitch = THREE.MathUtils.clamp(-(input.throttle - input.brake) * 0.02, -0.04, 0.04);
 
     this.dynamicRoll = THREE.MathUtils.lerp(this.dynamicRoll, targetDynRoll, 14.0 * dt);

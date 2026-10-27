@@ -535,8 +535,8 @@ export class CityWorld {
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
     const right = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
 
-    const hl = 1.75; // Half-length of van chassis
-    const hw = 0.92; // Half-width of van chassis
+    const hl = 1.95; // Half-length of van chassis with bumper reach
+    const hw = 1.10; // Half-width of van chassis with fender reach
 
     for (const cone of this.cones) {
       if (cone.hitCooldown > 0) {
@@ -548,46 +548,52 @@ export class CityWorld {
       const dz = cone.pos.z - vanPos.z;
       const dy = cone.pos.y - vanPos.y;
 
+      // Fast broadphase distance check
+      if (dx * dx + dz * dz > 25.0) continue;
+
       const df = dx * forward.x + dz * forward.z; // Along van forward axis
       const dr = dx * right.x + dz * right.z;     // Along van right axis
 
       const overlapF = (hl + cone.radius) - Math.abs(df);
       const overlapR = (hw + cone.radius) - Math.abs(dr);
 
-      if (overlapF > 0 && overlapR > 0 && dy > -0.3 && dy < 1.4) {
+      if (overlapF > 0 && overlapR > 0 && dy > -1.0 && dy < 2.5) {
         // Impact confirmed!
         if (cone.hitCooldown <= 0) {
-          cone.hitCooldown = 0.12;
+          cone.hitCooldown = 0.10;
 
           // Normal direction pointing away from impact face
           let normX, normZ;
           if (overlapF < overlapR) {
-            normX = forward.x * Math.sign(df);
-            normZ = forward.z * Math.sign(df);
+            normX = forward.x * Math.sign(df || 1);
+            normZ = forward.z * Math.sign(df || 1);
           } else {
-            normX = right.x * Math.sign(dr);
-            normZ = right.z * Math.sign(dr);
+            normX = right.x * Math.sign(dr || 1);
+            normZ = right.z * Math.sign(dr || 1);
           }
 
           // Push cone outside van boundary to prevent penetration
-          cone.pos.x += normX * (overlapF < overlapR ? overlapF + 0.1 : overlapR + 0.1);
-          cone.pos.z += normZ * (overlapF < overlapR ? overlapF + 0.1 : overlapR + 0.1);
+          cone.pos.x += normX * 0.45;
+          cone.pos.z += normZ * 0.45;
 
           // Impact intensity
-          const impactSpeed = Math.max(3.0, absSpeed);
+          const impactSpeed = Math.max(4.0, absSpeed);
 
           // Linear velocity impulse (directional launch)
-          cone.vel.x = vanVel.x * 1.15 + normX * (impactSpeed * 0.45 + 2.2) + (Math.random() - 0.5) * 1.5;
-          cone.vel.z = vanVel.z * 1.15 + normZ * (impactSpeed * 0.45 + 2.2) + (Math.random() - 0.5) * 1.5;
+          cone.vel.x = vanVel.x * 1.35 + normX * (impactSpeed * 0.65 + 3.0) + (Math.random() - 0.5) * 2.0;
+          cone.vel.z = vanVel.z * 1.35 + normZ * (impactSpeed * 0.65 + 3.0) + (Math.random() - 0.5) * 2.0;
           // Upward pop (cone flies dynamically into the air)
-          cone.vel.y = Math.min(6.5, impactSpeed * 0.35 + 2.2);
+          cone.vel.y = Math.min(8.5, impactSpeed * 0.45 + 3.0);
 
           // 3D angular tumble impulse
-          cone.angVel.x = (Math.random() - 0.5) * impactSpeed * 2.2 + normZ * impactSpeed * 1.2;
-          cone.angVel.y = (Math.random() - 0.5) * impactSpeed * 3.5;
-          cone.angVel.z = (Math.random() - 0.5) * impactSpeed * 2.2 - normX * impactSpeed * 1.2;
+          cone.angVel.x = (Math.random() - 0.5) * impactSpeed * 3.0 + normZ * impactSpeed * 1.5;
+          cone.angVel.y = (Math.random() - 0.5) * impactSpeed * 4.5;
+          cone.angVel.z = (Math.random() - 0.5) * impactSpeed * 3.0 - normX * impactSpeed * 1.5;
 
           cone.isSleeping = false;
+
+          cone.mesh.position.copy(cone.pos);
+          cone.mesh.rotation.copy(cone.rot);
 
           // Dynamic clatter / thump audio
           if (audio && audio.playConeHit) {

@@ -31,6 +31,7 @@ class GameApp {
 
     // 3. World Environment with Double-Sided Ramps
     this.world = new CityWorld(this.scene);
+    this.cityWorld = this.world;
 
     // 4. Arcade Vehicle Physics (Grounded, zero bounce, high agility)
     this.vehiclePhysics = new ArcadeVehicle(this.scene, { x: 0, y: 0.35, z: -40, heading: 0 });
@@ -157,8 +158,8 @@ class GameApp {
 
     this.input.onResetVehicle = () => {
       this.vehiclePhysics.reset(0, -40, 0);
-      if (this.cityWorld && this.cityWorld.resetCones) {
-        this.cityWorld.resetCones();
+      if (this.world && this.world.resetCones) {
+        this.world.resetCones();
       }
       this.showToast('Van reset on center road!');
     };
@@ -265,8 +266,8 @@ class GameApp {
     this.deliverySystem.update(dt, vanPos);
 
     // 7. Update Dynamic World Elements (Accurate Traffic Cone Physics & Collisions)
-    if (this.cityWorld && this.cityWorld.update) {
-      this.cityWorld.update(dt, this.vehiclePhysics, this.audio);
+    if (this.world && this.world.update) {
+      this.world.update(dt, this.vehiclePhysics, this.audio);
     }
 
     // 8. Audio Engine, Handbrake Screech & Punchy Brake Sound
