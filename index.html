@@ -300,6 +300,236 @@
       background: rgba(0, 188, 212, 0.45);
     }
 
+    /* PC & IOS CONTROLS GUIDE MODAL (STRICTLY UNSCALED 1024x576) */
+    #controls-guide-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 9, 13, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow: auto;
+    }
+    #controls-guide-modal.open {
+      display: flex;
+    }
+    .guide-modal-content {
+      background: rgba(14, 25, 33, 0.98);
+      border: 1.5px solid rgba(0, 188, 212, 0.5);
+      border-radius: 18px;
+      padding: 16px 22px 20px;
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.75), 0 0 35px rgba(0, 188, 212, 0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 98vw;
+      max-height: 96vh;
+      overflow: auto;
+      position: relative;
+    }
+    .guide-modal-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(0, 188, 212, 0.25);
+      padding-bottom: 10px;
+      margin-bottom: 8px;
+    }
+    .guide-header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .guide-title-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 19px;
+      letter-spacing: 0.8px;
+      color: #ffffff;
+    }
+    .guide-title-text span {
+      color: #00e5ff;
+    }
+    .guide-btn-close {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      color: #ffffff;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .guide-btn-close:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
+
+    /* Controller Canvas Stage: STRICTLY UNSCALED 1024x576 */
+    .controller-stage {
+      position: relative;
+      width: 1024px;
+      height: 576px;
+      min-width: 1024px;
+      min-height: 576px;
+      max-width: 1024px;
+      max-height: 576px;
+      margin: 4px auto 8px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .controller-stage img.controller-bg {
+      width: 1024px !important;
+      height: 576px !important;
+      min-width: 1024px !important;
+      min-height: 576px !important;
+      max-width: none !important;
+      max-height: none !important;
+      object-fit: none !important;
+      display: block;
+      pointer-events: none;
+    }
+    .controller-svg-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1024px;
+      height: 576px;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .ctrl-callout {
+      position: absolute;
+      background: rgba(9, 20, 28, 0.92);
+      border: 1px solid rgba(0, 188, 212, 0.45);
+      border-radius: 8px;
+      padding: 6px 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65), 0 0 10px rgba(0, 188, 212, 0.15);
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-sizing: border-box;
+    }
+    .ctrl-callout.callout-left {
+      text-align: right;
+    }
+    .ctrl-callout.callout-right {
+      text-align: left;
+    }
+    .ctrl-callout.callout-center {
+      text-align: center;
+    }
+    .ctrl-badge {
+      display: inline-block;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+    }
+    .badge-trigger {
+      background: #f97316;
+      color: #0b1a20;
+    }
+    .badge-bumper {
+      background: #0284c7;
+      color: #ffffff;
+    }
+    .badge-stick {
+      background: #06b6d4;
+      color: #0b1a20;
+    }
+    .badge-dpad {
+      background: #475569;
+      color: #f1f5f9;
+    }
+    .badge-action-a {
+      background: #00e5ff;
+      color: #0b1a20;
+    }
+    .badge-action-b {
+      background: #f59e0b;
+      color: #0b1a20;
+    }
+    .badge-action-y {
+      background: #10b981;
+      color: #0b1a20;
+    }
+    .badge-doors {
+      background: #64748b;
+      color: #ffffff;
+    }
+    .badge-start {
+      background: #eab308;
+      color: #0b1a20;
+    }
+    .ctrl-action {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      color: #ffffff;
+      line-height: 1.15;
+    }
+    .ctrl-desc {
+      font-size: 11.5px;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .ctrl-desc kbd {
+      background: rgba(0, 188, 212, 0.25);
+      border: 1px solid rgba(0, 188, 212, 0.55);
+      color: #e0f2fe;
+      font-family: monospace;
+      font-weight: bold;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10.5px;
+    }
+    .guide-modal-footer {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-top: 8px;
+    }
+    .btn-drive-start {
+      background: linear-gradient(135deg, #00e5ff 0%, #00b0ff 100%);
+      color: #0b1a20;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      padding: 8px 28px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(0, 229, 255, 0.4);
+      transition: transform 0.1s ease, filter 0.1s ease;
+    }
+    .btn-drive-start:hover {
+      transform: scale(1.03);
+      filter: brightness(1.15);
+    }
+
+    /* Mobile Exclusion: Strictly hide controller image and guide on mobile phones */
+    @media (max-width: 900px) {
+      #controls-guide-modal,
+      #btn-controls-guide,
+      #btn-open-guide-bar {
+        display: none !important;
+      }
+    }
+
     /* WIDESCREEN ORIENTATION ENFORCEMENT OVERLAY */
     #rotate-device-modal {
       position: fixed;
@@ -664,6 +894,7 @@
       <div style="margin-top: 10px; display: flex; gap: 8px;">
         <button class="btn-top-action" id="btn-cam" tabindex="-1" onfocus="this.blur()">📷 3RD CAM</button>
         <button class="btn-top-action" id="btn-audio" tabindex="-1" onfocus="this.blur()">🔊 AUDIO: ON</button>
+        <button class="btn-top-action" id="btn-controls-guide" tabindex="-1" onfocus="this.blur()">🎮 CONTROLS</button>
       </div>
     </div>
 
@@ -710,7 +941,178 @@
     <span><b>ENTER / E</b> Deliver</span>
     <span><b>C</b> Camera</span>
     <span><b>R</b> Reset</span>
-    <span style="color: #00e5ff; margin-left: 6px;"><b>🎮 Gamepad Supported</b> (Triggers = RT/LT, Stick = Steer, B/X = Drift)</span>
+    <span style="color: #00e5ff; margin-left: 6px; cursor: pointer; text-decoration: underline; pointer-events: auto;" id="btn-open-guide-bar"><b>🎮 Gamepad Guide</b></span>
+  </div>
+
+  <!-- PC & IOS CONTROLS GUIDE OVERLAY (STRICTLY UNSCALED 1024x576) -->
+  <div id="controls-guide-modal">
+    <div class="guide-modal-content">
+      <div class="guide-modal-header">
+        <div class="guide-header-title">
+          <span class="brand-badge">⚡ SIXTY60</span>
+          <div class="guide-title-text">CONTROLLER & KEYBOARD <span>CONTROLS</span></div>
+        </div>
+        <button class="guide-btn-close" id="btn-close-modal-x" tabindex="-1">✕ CLOSE [ESC]</button>
+      </div>
+
+      <!-- EXACT UNSCALED 1024x576 CONTROLLER STAGE WITH DRAWN INSTRUCTIONS -->
+      <div class="controller-stage">
+        <img src="/assets/controller-guide.png" alt="Checkers Hyper Sixty60 Gamepad" class="controller-bg" width="1024" height="576" />
+
+        <!-- DRAWN OUT INSTRUCTIONS: SVG POINTER LEADER LINES -->
+        <svg class="controller-svg-overlay" viewBox="0 0 1024 576" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="glow-yellow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- 1. LT Brake / Reverse -->
+          <path d="M 310 42 L 230 32 L 180 32" stroke="#f97316" stroke-width="2.5" fill="none" filter="url(#glow-orange)" />
+          <circle cx="310" cy="42" r="6" fill="#f97316" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 2. LB Cargo Doors -->
+          <path d="M 348 72 L 230 100 L 180 100" stroke="#00e5ff" stroke-width="2.5" fill="none" filter="url(#glow-cyan)" />
+          <circle cx="348" cy="72" r="5" fill="#00e5ff" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 3. Left Stick Steer -->
+          <path d="M 338 182 L 230 182 L 180 182" stroke="#00e5ff" stroke-width="2.5" fill="none" filter="url(#glow-cyan)" />
+          <circle cx="338" cy="182" r="6" fill="#00e5ff" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 4. View Button (Rear Doors) -->
+          <path d="M 470 185 L 470 265 L 290 280 L 180 280" stroke="#94a3b8" stroke-width="2" fill="none" stroke-dasharray="4 3" />
+          <circle cx="470" cy="185" r="5" fill="#94a3b8" stroke="#ffffff" stroke-width="1.5" />
+
+          <!-- 5. D-Pad Digital Control -->
+          <path d="M 430 315 L 290 380 L 180 380" stroke="#38bdf8" stroke-width="2.5" fill="none" filter="url(#glow-cyan)" />
+          <circle cx="430" cy="315" r="6" fill="#38bdf8" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 6. RT Throttle / Accelerate -->
+          <path d="M 714 42 L 794 32 L 844 32" stroke="#f97316" stroke-width="2.5" fill="none" filter="url(#glow-orange)" />
+          <circle cx="714" cy="42" r="6" fill="#f97316" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 7. RB Handbrake Turn -->
+          <path d="M 674 72 L 794 100 L 844 100" stroke="#00e5ff" stroke-width="2.5" fill="none" filter="url(#glow-cyan)" />
+          <circle cx="674" cy="72" r="5" fill="#00e5ff" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 8. Y Button (Camera) -->
+          <path d="M 708 130 L 784 152 L 844 152" stroke="#10b981" stroke-width="2.5" fill="none" filter="url(#glow-green)" />
+          <circle cx="708" cy="130" r="5" fill="#10b981" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 9. X & B Buttons (Drift) -->
+          <path d="M 758 185 L 804 220 L 844 220" stroke="#00e5ff" stroke-width="2.5" fill="none" filter="url(#glow-cyan)" />
+          <circle cx="758" cy="185" r="5" fill="#00e5ff" stroke="#ffffff" stroke-width="2" />
+          <path d="M 660 185 L 690 205 L 758 205" stroke="#10b981" stroke-width="2" fill="none" stroke-dasharray="3 3" />
+          <circle cx="660" cy="185" r="5" fill="#10b981" stroke="#ffffff" stroke-width="1.5" />
+
+          <!-- 10. A Button (Deliver) -->
+          <path d="M 708 240 L 784 290 L 844 290" stroke="#00e5ff" stroke-width="2.5" fill="none" filter="url(#glow-cyan)" />
+          <circle cx="708" cy="240" r="6" fill="#00e5ff" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 11. Start / Menu (Reset) -->
+          <path d="M 575 185 L 575 440 L 512 440" stroke="#eab308" stroke-width="2.5" fill="none" filter="url(#glow-yellow)" />
+          <circle cx="575" cy="185" r="5" fill="#eab308" stroke="#ffffff" stroke-width="2" />
+        </svg>
+
+        <!-- DRAWN OUT CALLOUT CARDS (LEFT SIDE) -->
+        <div class="ctrl-callout callout-left" style="left: 10px; top: 12px; width: 170px;">
+          <div class="ctrl-badge badge-trigger">LT &bull; BRAKE</div>
+          <div class="ctrl-action">REVERSE & BRAKE</div>
+          <div class="ctrl-desc">Analog Brake &bull; <kbd>S</kbd> / <kbd>↓</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-left" style="left: 10px; top: 80px; width: 170px;">
+          <div class="ctrl-badge badge-bumper">LB &bull; CARGO</div>
+          <div class="ctrl-action">SIDE SLIDE DOOR</div>
+          <div class="ctrl-desc">Toggle Door &bull; <kbd>H</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-left" style="left: 10px; top: 160px; width: 170px;">
+          <div class="ctrl-badge badge-stick">LEFT STICK</div>
+          <div class="ctrl-action">ANALOG STEERING</div>
+          <div class="ctrl-desc">Steer Van &bull; <kbd>A</kbd> / <kbd>D</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-left" style="left: 10px; top: 258px; width: 170px;">
+          <div class="ctrl-badge badge-doors">VIEW &bull; DOORS</div>
+          <div class="ctrl-action">REAR CARGO DOORS</div>
+          <div class="ctrl-desc">Open / Close &bull; <kbd>G</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-left" style="left: 10px; top: 358px; width: 170px;">
+          <div class="ctrl-badge badge-dpad">D-PAD</div>
+          <div class="ctrl-action">DIGITAL DRIVE</div>
+          <div class="ctrl-desc">Up=Gas, Down=Brake, L/R=Steer</div>
+        </div>
+
+        <!-- DRAWN OUT CALLOUT CARDS (RIGHT SIDE) -->
+        <div class="ctrl-callout callout-right" style="right: 10px; top: 12px; width: 170px;">
+          <div class="ctrl-badge badge-trigger">RT &bull; THROTTLE</div>
+          <div class="ctrl-action">ACCELERATE (GAS)</div>
+          <div class="ctrl-desc">Analog Throttle &bull; <kbd>W</kbd> / <kbd>↑</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-right" style="right: 10px; top: 80px; width: 170px;">
+          <div class="ctrl-badge badge-bumper">RB &bull; DRIFT</div>
+          <div class="ctrl-action">HANDBRAKE TURN</div>
+          <div class="ctrl-desc">Rear Wheel Lock &bull; <kbd>SPACE</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-right" style="right: 10px; top: 135px; width: 170px;">
+          <div class="ctrl-badge badge-action-y">Y &bull; CAMERA</div>
+          <div class="ctrl-action">CHANGE CAMERA</div>
+          <div class="ctrl-desc">3rd-Person / Iso &bull; <kbd>C</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-right" style="right: 10px; top: 198px; width: 170px;">
+          <div class="ctrl-badge badge-action-b">B / X &bull; SLIDE</div>
+          <div class="ctrl-action">POWER DRIFT</div>
+          <div class="ctrl-desc">Slide Corners &bull; <kbd>SPACE</kbd></div>
+        </div>
+
+        <div class="ctrl-callout callout-right" style="right: 10px; top: 270px; width: 170px;">
+          <div class="ctrl-badge badge-action-a">A &bull; DELIVER</div>
+          <div class="ctrl-action">DROP OFF ORDER</div>
+          <div class="ctrl-desc">Deliver &bull; <kbd>ENTER</kbd> / <kbd>E</kbd></div>
+        </div>
+
+        <!-- DRAWN OUT CALLOUT CARDS (BOTTOM CENTER) -->
+        <div class="ctrl-callout callout-center" style="left: 512px; transform: translateX(-50%); bottom: 25px; width: 230px;">
+          <div class="ctrl-badge badge-start">START / MENU &bull; RESET</div>
+          <div class="ctrl-action">RESET & UNFLIP VAN</div>
+          <div class="ctrl-desc">Respawn Vehicle Safely &bull; <kbd>R</kbd></div>
+        </div>
+      </div>
+
+      <div class="guide-modal-footer">
+        <button class="btn-drive-start" id="btn-close-guide" tabindex="-1">READY TO RACE &bull; DRIVE NOW [ESC]</button>
+      </div>
+    </div>
   </div>
 
   <!-- MOBILE TOUCH CONTROLS (Authentic Racing Setup: Triangles & Pedals) -->

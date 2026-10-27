@@ -24,17 +24,40 @@ export class CityWorld {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // 2. Continuous Closed Loop Racetrack Circuit with Modern Rounded Corners & Edges
-    this.buildRoads();
-
-    // 3. SOLID DOUBLE-SIDED 3D JUMP RAMPS (NO RAILINGS, architectural off-white matte geometry - UNCHANGED)
+    // 2. SOLID DOUBLE-SIDED 3D JUMP RAMPS (NO RAILINGS - registered first so road lines know ramp bounds)
     this.buildDoubleSidedRamps();
+
+    // 3. Continuous Closed Loop Racetrack Circuit with Modern Rounded Corners & Edges
+    this.buildRoads();
 
     // 4. Interactive Traffic Cones with Modern Rounded Edges & Accurate Physics
     this.buildSlalomArea();
 
     // 5. Buildings with Modern Rounded Edges & Architectural GI Aesthetics
     this.buildBuildings();
+  }
+
+  // Checks if a point lies within or immediately adjacent to any jump ramp
+  isPointOnOrNearRamp(x, z, margin = 2.5) {
+    if (!this.colliders) return false;
+    for (const c of this.colliders) {
+      if (c.type === 'ramp') {
+        const dx = x - c.x;
+        const dz = z - c.z;
+        const cosA = Math.cos(c.angleY);
+        const sinA = Math.sin(c.angleY);
+        const localX = dx * cosA - dz * sinA;
+        const localZ = dx * sinA + dz * cosA;
+
+        const hw = c.width / 2 + margin;
+        const hd = c.depth / 2 + margin;
+
+        if (Math.abs(localX) <= hw && Math.abs(localZ) <= hd) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   buildRoads() {
@@ -106,18 +129,22 @@ export class CityWorld {
         });
       });
 
-      // Crisp White Dashes
+      // Crisp White Dashes (Strictly skipped if falling on or entering any ramp footprint)
       const numDashes = Math.floor(length / 7);
       for (let i = 0; i < numDashes; i++) {
+        const offset = (i - numDashes / 2 + 0.5) * 7;
+        const dashX = (rot === 0) ? x : x + offset;
+        const dashZ = (rot === 0) ? z + offset : z;
+
+        // Ensure road lines do NOT go on ramps (with 2.5m buffer covering the dash length)
+        if (this.isPointOnOrNearRamp(dashX, dashZ, 2.5)) {
+          continue;
+        }
+
         const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 3.8), lineMat);
         dash.rotation.x = -Math.PI / 2;
         dash.rotation.z = rot;
-        const offset = (i - numDashes / 2 + 0.5) * 7;
-        if (rot === 0) {
-          dash.position.set(x, 0.02, z + offset);
-        } else {
-          dash.position.set(x + offset, 0.02, z);
-        }
+        dash.position.set(dashX, 0.02, dashZ);
         this.scene.add(dash);
       }
     };

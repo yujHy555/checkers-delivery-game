@@ -179,6 +179,52 @@ class GameApp {
     if (this.uiCamBtn) {
       this.uiCamBtn.innerText = '📷 3RD CAM';
     }
+
+    // PC & iOS Controls Guide Modal
+    const guideModal = document.getElementById('controls-guide-modal');
+    const btnControlsGuide = document.getElementById('btn-controls-guide');
+    const btnOpenGuideBar = document.getElementById('btn-open-guide-bar');
+    const btnCloseGuide = document.getElementById('btn-close-guide');
+    const btnCloseModalX = document.getElementById('btn-close-modal-x');
+
+    const openGuide = () => {
+      if (guideModal && window.innerWidth > 900) {
+        guideModal.classList.add('open');
+      }
+    };
+
+    const closeGuide = () => {
+      if (guideModal) {
+        guideModal.classList.remove('open');
+        try { sessionStorage.setItem('sixty60_guide_seen', '1'); } catch (e) {}
+      }
+    };
+
+    if (btnControlsGuide) btnControlsGuide.addEventListener('click', openGuide);
+    if (btnOpenGuideBar) btnOpenGuideBar.addEventListener('click', openGuide);
+    if (btnCloseGuide) btnCloseGuide.addEventListener('click', closeGuide);
+    if (btnCloseModalX) btnCloseModalX.addEventListener('click', closeGuide);
+
+    if (guideModal) {
+      guideModal.addEventListener('click', (e) => {
+        if (e.target === guideModal) closeGuide();
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' || e.key === 'Escape' || e.code === 'F1') {
+        if (guideModal && guideModal.classList.contains('open')) {
+          closeGuide();
+        }
+      }
+    });
+
+    // Auto-open on initial load for PC / iOS desktop/tablet users so instructions are immediately visible
+    try {
+      if (window.innerWidth > 900 && !sessionStorage.getItem('sixty60_guide_seen')) {
+        setTimeout(openGuide, 450);
+      }
+    } catch (e) {}
   }
 
   showToast(text) {
