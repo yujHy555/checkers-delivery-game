@@ -2,6 +2,7 @@ export class AudioSynth {
   constructor() {
     this.ctx = null;
     this.isMuted = false;
+    this.volume = 0.8;
     this.initialized = false;
   }
 
@@ -14,7 +15,7 @@ export class AudioSynth {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioContext();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.55;
+      this.masterGain.gain.value = this.isMuted ? 0 : this.volume * 0.65;
       this.masterGain.connect(this.ctx.destination);
 
       if (this.ctx.state === 'suspended') {
@@ -87,10 +88,18 @@ export class AudioSynth {
     }
   }
 
+  setVolume(fraction) {
+    this.volume = Math.max(0, Math.min(1.0, fraction));
+    if (this.masterGain && this.ctx && !this.isMuted) {
+      this.masterGain.gain.setTargetAtTime(this.volume * 0.65, this.ctx.currentTime, 0.04);
+    }
+  }
+
   toggleMute() {
     this.isMuted = !this.isMuted;
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.55, this.ctx.currentTime, 0.05);
+      const targetGain = this.isMuted ? 0 : this.volume * 0.65;
+      this.masterGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.05);
     }
     if (!this.isMuted) {
       this.resume();

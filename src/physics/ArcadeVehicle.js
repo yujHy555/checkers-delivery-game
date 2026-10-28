@@ -318,23 +318,23 @@ export class ArcadeVehicle {
         this.velocity.multiplyScalar(Math.pow(this.dragCoeff, dt * 60.0));
       }
 
-      // 6. SATISFYING HIGH-SPEED DRIFT & POWER SLIDE PHYSICS
-      if (input.handbrake && absSpeed > 1.2) {
+      // 6. SATISFYING HIGH-SPEED DRIFT & POWER SLIDE PHYSICS (Ultra smooth, dramatic arcade power-slides)
+      if (input.handbrake && absSpeed > 0.8) {
         this.isDrifting = true;
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 20.0 * dt);
-        // Conserve high-speed momentum throughout the drift (minimal gentle drag)
-        this.velocity.multiplyScalar(Math.pow(0.995, dt * 60.0));
-        // Power slide: throttle pushes car forward through the slide
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 24.0 * dt);
+        // Conserve high-speed momentum throughout the drift
+        this.velocity.multiplyScalar(Math.pow(0.998, dt * 60.0));
+        // Power slide: throttle pushes car smoothly forward through the slide
         if (input.throttle > 0 && this.speed < this.maxSpeed) {
-          this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.75 * dt);
+          this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.85 * dt);
         }
       } else {
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 8.0 * dt);
-        if (this.driftFactor < 0.04) this.isDrifting = false;
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 5.5 * dt);
+        if (this.driftFactor < 0.03) this.isDrifting = false;
       }
 
-      // Lateral grip: drops down to 1.4 for long, smooth, dramatic sideways sliding around bends!
-      const gripRate = THREE.MathUtils.lerp(45.0, 1.4, this.driftFactor);
+      // Lateral grip: drops down to 0.55 for long, glorious, dramatic sideways sliding around bends!
+      const gripRate = THREE.MathUtils.lerp(45.0, 0.55, this.driftFactor);
       const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
       this.velocity.addScaledVector(right, lateralDecel);
 
@@ -348,10 +348,10 @@ export class ArcadeVehicle {
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
-      // High-speed drift yaw: responsive oversteer rotation to whip tail out
+      // High-speed drift yaw: responsive oversteer rotation to whip tail out with style
       let yawRateCoeff;
       if (this.isDrifting) {
-        yawRateCoeff = 4.2; // Fast, responsive tail-out rotation
+        yawRateCoeff = 4.8; // Fast, responsive tail-out rotation for epic arcade drifts!
       } else {
         yawRateCoeff = THREE.MathUtils.lerp(3.8, 2.0, speedRatio);
       }
@@ -421,6 +421,46 @@ export class ArcadeVehicle {
             isOnRamp = true;
             if (distFromPeak < 1.4) {
               isNearPeak = true;
+            }
+          }
+        }
+      } else if (c.type === 'bridge') {
+        const dx = x - c.x;
+        const dz = z - c.z;
+        const cosA = Math.cos(c.angleY || 0);
+        const sinA = Math.sin(c.angleY || 0);
+        const lx = dx * cosA - dz * sinA;
+        const lz = dx * sinA + dz * cosA;
+        const hw = c.width / 2;
+        const hl = c.length / 2;
+
+        if (Math.abs(lx) <= hw && Math.abs(lz) <= hl) {
+          // Can drive on elevated bridge deck when vehicle is near or above deck height
+          if (this.position.y >= c.height - 0.55) {
+            if (c.height > maxHeight) {
+              maxHeight = c.height;
+              isOnRamp = true;
+            }
+          }
+        }
+      } else if (c.type === 'elevated_ramp') {
+        const dx = x - c.x;
+        const dz = z - c.z;
+        const cosA = Math.cos(c.angleY || 0);
+        const sinA = Math.sin(c.angleY || 0);
+        const lx = dx * cosA - dz * sinA;
+        const lz = dx * sinA + dz * cosA;
+        const hw = c.width / 2;
+        const hl = c.length / 2;
+
+        if (Math.abs(lx) <= hw && Math.abs(lz) <= hl) {
+          const t = Math.max(0, Math.min(1.0, (lz + hl) / (2 * hl)));
+          const h = THREE.MathUtils.lerp(c.hStart, c.hEnd, t);
+          const minH = Math.min(c.hStart, c.hEnd);
+          if (this.position.y >= minH - 0.55) {
+            if (h > maxHeight) {
+              maxHeight = h;
+              isOnRamp = true;
             }
           }
         }

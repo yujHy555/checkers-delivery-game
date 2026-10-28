@@ -78,65 +78,66 @@ export class VanModel {
       });
     }
 
-    // 4. Front Headlights
-    this.headlightL = new THREE.SpotLight(0xffffff, 2.5, 45, Math.PI / 6, 0.45, 1.2);
+    // 4. Front Headlights (Managed dynamically by Day/Night cycle)
+    this.headlightL = new THREE.SpotLight(0xffffff, 0, 48, Math.PI / 5.5, 0.45, 1.2);
     this.headlightL.position.set(-0.65, 0.55, 2.25);
-    this.headlightL.target.position.set(-0.65, 0.1, 15);
+    this.headlightL.target.position.set(-0.65, 0.1, 16);
     this.chassisGroup.add(this.headlightL, this.headlightL.target);
 
-    this.headlightR = new THREE.SpotLight(0xffffff, 2.5, 45, Math.PI / 6, 0.45, 1.2);
+    this.headlightR = new THREE.SpotLight(0xffffff, 0, 48, Math.PI / 5.5, 0.45, 1.2);
     this.headlightR.position.set(0.65, 0.55, 2.25);
-    this.headlightR.target.position.set(0.65, 0.1, 15);
+    this.headlightR.target.position.set(0.65, 0.1, 16);
     this.chassisGroup.add(this.headlightR, this.headlightR.target);
 
-    // 5. Dual Rear Dynamic Brake Lights (PURE EMISSION, ZERO BLACK HOUSING)
+    // 5. Dual Rear Dynamic Brake Lights (PURE EMISSION, ZERO WHITE PLANE, ZERO BLACK HOUSING)
     // When brakes are OFF: completely invisible (NO dark/black box geometry over the taillights)
-    // When brakes are ON: brilliant additive neon red emission precisely mapped over the rear light clusters
+    // When brakes are ON: soft organic ruby-red glow positioned directly over the red lenses
     this.brakeLightsGroup = new THREE.Group();
     this.chassisGroup.add(this.brakeLightsGroup);
 
     this.brakeLightL = new THREE.PointLight(0xff0022, 0, 7.0, 2.0);
-    this.brakeLightL.position.set(-0.77, 0.395, -2.26);
+    this.brakeLightL.position.set(-0.765, 0.465, -2.28);
     this.brakeLightsGroup.add(this.brakeLightL);
 
     this.brakeLightR = new THREE.PointLight(0xff0022, 0, 7.0, 2.0);
-    this.brakeLightR.position.set(0.77, 0.395, -2.26);
+    this.brakeLightR.position.set(0.765, 0.465, -2.28);
     this.brakeLightsGroup.add(this.brakeLightR);
 
-    // Additive glowing materials (depthWrite: false ensures no sorting or black cutoff artifacts)
+    // Procedural soft glowing ruby-red lens texture (prevents white plane saturation / hard edges)
+    const brakeCanvas = document.createElement('canvas');
+    brakeCanvas.width = 128;
+    brakeCanvas.height = 256;
+    const bCtx = brakeCanvas.getContext('2d');
+    bCtx.clearRect(0, 0, 128, 256);
+    const grad = bCtx.createRadialGradient(64, 128, 8, 64, 128, 75);
+    grad.addColorStop(0, 'rgba(255, 30, 45, 0.95)');
+    grad.addColorStop(0.35, 'rgba(235, 10, 30, 0.75)');
+    grad.addColorStop(0.70, 'rgba(200, 0, 20, 0.35)');
+    grad.addColorStop(1, 'rgba(160, 0, 10, 0.0)');
+    bCtx.fillStyle = grad;
+    bCtx.fillRect(0, 0, 128, 256);
+    this.brakeGlowTex = new THREE.CanvasTexture(brakeCanvas);
+
+    // NormalBlending ensures rich ruby-red saturation without any white clipping plane
     this.brakeCoreMat = new THREE.MeshBasicMaterial({
-      color: 0xff1828,
+      map: this.brakeGlowTex,
+      color: 0xff1525,
       transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
+      opacity: 0.90,
+      blending: THREE.NormalBlending,
+      depthWrite: false,
+      toneMapped: false
     });
 
-    this.brakeHaloMat = new THREE.MeshBasicMaterial({
-      color: 0xff0022,
-      transparent: true,
-      opacity: 0.50,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    const lensGeo = new THREE.PlaneGeometry(0.13, 0.32);
+    const lensGeo = new THREE.PlaneGeometry(0.14, 0.34);
     lensGeo.rotateY(Math.PI); // Facing rearward (-Z)
-    const haloGeo = new THREE.PlaneGeometry(0.25, 0.46);
-    haloGeo.rotateY(Math.PI);
 
     this.tailLensL = new THREE.Mesh(lensGeo, this.brakeCoreMat);
-    this.tailLensL.position.set(-0.77, 0.395, -2.216);
-    const haloL = new THREE.Mesh(haloGeo, this.brakeHaloMat);
-    haloL.position.set(0, 0, -0.004);
-    this.tailLensL.add(haloL);
+    this.tailLensL.position.set(-0.765, 0.465, -2.215);
     this.brakeLightsGroup.add(this.tailLensL);
 
     this.tailLensR = new THREE.Mesh(lensGeo, this.brakeCoreMat);
-    this.tailLensR.position.set(0.77, 0.395, -2.216);
-    const haloR = new THREE.Mesh(haloGeo, this.brakeHaloMat);
-    haloR.position.set(0, 0, -0.004);
-    this.tailLensR.add(haloR);
+    this.tailLensR.position.set(0.765, 0.465, -2.215);
     this.brakeLightsGroup.add(this.tailLensR);
 
     // Initial state: INVISIBLE so the vehicle's printed rear lights are 100% visible and unblemished
@@ -261,6 +262,13 @@ export class VanModel {
   toggleRearDoors() {
     this.rearDoorsOpen = !this.rearDoorsOpen;
     return this.rearDoorsOpen;
+  }
+
+  setHeadlights(on) {
+    this.headlightsOn = on;
+    const intensity = on ? 2.8 : 0.0;
+    if (this.headlightL) this.headlightL.intensity = intensity;
+    if (this.headlightR) this.headlightR.intensity = intensity;
   }
 
   update(dt, vehiclePhysics, input = null) {

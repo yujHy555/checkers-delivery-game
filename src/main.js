@@ -73,6 +73,11 @@ class GameApp {
     // Menu State: Start in Main Menu with engine audio strictly silenced
     this.inMainMenu = true;
 
+    // Day-Night Cycle: 1 min Day, 1 min Night (120s total loop)
+    this.dayNightCycleDuration = 120.0;
+    this.cycleTime = 12.0; // Start during bright morning sunlight
+    this.isNight = false;
+
     // Clock
     this.clock = new THREE.Clock();
 
@@ -158,12 +163,12 @@ class GameApp {
 
   setupAAAGroundedShadow() {
     // AAA Greybox Global Illumination (GI) Lighting
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.25);
-    hemiLight.position.set(0, 50, 0);
-    this.scene.add(hemiLight);
+    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.25);
+    this.hemiLight.position.set(0, 50, 0);
+    this.scene.add(this.hemiLight);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    this.scene.add(ambient);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    this.scene.add(this.ambientLight);
 
     // SINGLE QUALITY AAA DIRECTIONAL SUN LIGHT
     // Positioned directly overhead for tight, accurate ground contact shadow
@@ -425,6 +430,22 @@ class GameApp {
       });
     }
 
+    // Volume Slider in Options Modal
+    this.optVolumeSlider = document.getElementById('opt-volume-slider');
+    this.volSliderLabel = document.getElementById('vol-slider-label');
+    if (this.optVolumeSlider) {
+      this.optVolumeSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (this.volSliderLabel) this.volSliderLabel.innerText = `${val}%`;
+        this.audio.setVolume(val / 100);
+      });
+    }
+
+    // Day / Night Pill Indicators
+    this.uiDayNightPill = document.getElementById('day-night-pill');
+    this.uiDnIcon = document.getElementById('dn-icon');
+    this.uiDnText = document.getElementById('dn-text');
+
     if (btnOptCam) {
       if (this.isMobile) {
         const camRow = btnOptCam.closest('.menu-setting-row');
@@ -549,6 +570,102 @@ class GameApp {
     }
   }
 
+  updateDayNightCycle(dt) {
+    this.cycleTime = (this.cycleTime + dt) % this.dayNightCycleDuration;
+    const t = this.cycleTime;
+
+    // Day is 0..60s (peak mid-day at 25-30s), Night is 60..120s (peak midnight at 85-90s)
+    let dayFactor = 0; // 1 = full day, 0 = full night
+    if (t < 50.0) {
+      dayFactor = 1.0;
+    } else if (t < 60.0) {
+      // Dusk transition over 10s (50s to 60s)
+      const p = (t - 50.0) / 10.0;
+      dayFactor = 0.5 * (1 + Math.cos(Math.PI * p));
+    } else if (t < 110.0) {
+      dayFactor = 0.0;
+    } else {
+      // Dawn transition over 10s (110s to 120s)
+      const p = (t - 110.0) / 10.0;
+      dayFactor = 0.5 * (1 - Math.cos(Math.PI * p));
+    }
+
+    // Atmospheric colors
+    const daySky = new THREE.Color(0x93c5fd);
+    const nightSky = new THREE.Color(0x090e1a);
+    const duskSky = new THREE.Color(0xd97706);
+
+    const currentSky = new THREE.Color();
+    if (t >= 50.0 && t < 60.0) {
+      const p = (t - 50.0) / 10.0;
+      currentSky.copy(daySky).lerp(duskSky, Math.sin(p * Math.PI));
+      currentSky.lerp(nightSky, p);
+    } else if (t >= 110.0) {
+      const p = (t - 110.0) / 10.0;
+      currentSky.copy(nightSky).lerp(duskSky, Math.sin(p * Math.PI));
+      currentSky.lerp(daySky, p);
+    } else if (dayFactor > 0.5) {
+      currentSky.copy(daySky);
+    } else {
+      currentSky.copy(nightSky);
+    }
+
+    // Update Scene Sky & Fog
+    if (this.scene.background && this.scene.background.isColor) {
+      this.scene.background.copy(currentSky);
+    } else {
+      this.scene.background = currentSky.clone();
+    }
+
+    if (this.scene.fog) {
+      this.scene.fog.color.copy(currentSky);
+    }
+
+    // Directional Sun / Moon
+    if (this.sunLight) {
+      const sunDay = new THREE.Color(0xfffaed);
+      const sunNight = new THREE.Color(0x60a5fa);
+      this.sunLight.color.copy(sunNight).lerp(sunDay, dayFactor);
+      this.sunLight.intensity = THREE.MathUtils.lerp(0.2, 1.35, dayFactor);
+    }
+
+    // Hemisphere & Ambient GI
+    if (this.hemiLight) {
+      this.hemiLight.intensity = THREE.MathUtils.lerp(0.25, 1.25, dayFactor);
+    }
+    if (this.ambientLight) {
+      this.ambientLight.intensity = THREE.MathUtils.lerp(0.12, 0.40, dayFactor);
+    }
+
+    // Headlights turn on automatically as it gets darker (dayFactor < 0.45)
+    const headlightsShouldBeOn = dayFactor < 0.45;
+    if (this.vanModel && this.vanModel.setHeadlights) {
+      this.vanModel.setHeadlights(headlightsShouldBeOn);
+    }
+
+    // HUD Day / Night Indicator
+    const isNightNow = dayFactor < 0.5;
+    if (this.uiDnIcon && this.uiDnText) {
+      if (isNightNow) {
+        const nightRemain = Math.max(1, Math.round(120.0 - t));
+        this.uiDnIcon.innerText = '🌙';
+        this.uiDnText.innerText = `NIGHT (${nightRemain}s)`;
+        if (this.uiDayNightPill) {
+          this.uiDayNightPill.style.background = 'rgba(99, 102, 241, 0.22)';
+          this.uiDayNightPill.style.borderColor = 'rgba(129, 140, 248, 0.65)';
+        }
+      } else {
+        const dayRemain = Math.max(1, Math.round(60.0 - t));
+        this.uiDnIcon.innerText = '☀️';
+        this.uiDnText.innerText = `DAY (${dayRemain}s)`;
+        if (this.uiDayNightPill) {
+          this.uiDayNightPill.style.background = 'rgba(0, 229, 255, 0.18)';
+          this.uiDayNightPill.style.borderColor = 'rgba(0, 229, 255, 0.45)';
+        }
+      }
+    }
+  }
+
   onWindowResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
@@ -570,6 +687,9 @@ class GameApp {
     }
 
     const dt = Math.min(this.clock.getDelta(), 0.08);
+
+    // 0. Update Dynamic Day-Night Cycle (1 min Day, 1 min Night, Auto Headlights)
+    this.updateDayNightCycle(dt);
 
     // 1. Process Input
     this.input.update();

@@ -169,12 +169,12 @@ export class CameraManager {
     } else {
       this.hasInitIso = false;
       // Dynamic Third-Person Chase Cam (Optimized for Mobile & Desktop!)
-      // Mobile: Tight framing (4.4m), virtually zero speed stretch (0.15m), and 24.0 lerp speed so the cam keeps up during rapid acceleration!
-      const baseDist = isMobile ? 4.4 : 6.4;
-      const baseHeight = isMobile ? 1.85 : 2.6;
+      // Mobile: Elevated view (baseDist = 5.6m, baseHeight = 2.45m) gives great tactical road visibility
+      const baseDist = isMobile ? 5.6 : 6.4;
+      const baseHeight = isMobile ? 2.45 : 2.6;
       const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
-      const dynamicDist = baseDist + speedNorm * (isMobile ? 0.15 : 1.8);
-      const dynamicHeight = baseHeight + speedNorm * (isMobile ? 0.05 : 0.45);
+      const dynamicDist = baseDist + speedNorm * (isMobile ? 0.20 : 1.8);
+      const dynamicHeight = baseHeight + speedNorm * (isMobile ? 0.08 : 0.45);
 
       // Position camera directly behind vehicle with smooth follow
       desiredPos.copy(focusPos)
@@ -183,8 +183,8 @@ export class CameraManager {
 
       // Look ahead along forward vector
       desiredTarget.copy(focusPos)
-        .addScaledVector(forward, isMobile ? 2.2 : 3.2)
-        .add(new THREE.Vector3(0, isMobile ? 0.80 : 0.9, 0));
+        .addScaledVector(forward, isMobile ? 2.5 : 3.2)
+        .add(new THREE.Vector3(0, isMobile ? 0.92 : 0.9, 0));
 
       // Speed FOV expansion (On mobile, minimal 3.0° expansion so van doesn't pull away visually)
       const baseFov = 62;
