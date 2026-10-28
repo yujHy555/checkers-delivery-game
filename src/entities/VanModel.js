@@ -78,16 +78,21 @@ export class VanModel {
       });
     }
 
-    // 4. Front Headlights (Managed dynamically by Day/Night cycle)
-    this.headlightL = new THREE.SpotLight(0xffffff, 0, 48, Math.PI / 5.5, 0.45, 1.2);
-    this.headlightL.position.set(-0.65, 0.55, 2.25);
-    this.headlightL.target.position.set(-0.65, 0.1, 16);
+    // 4. Front Headlights (High-intensity Night Beams + Forward Ground Flood)
+    this.headlightL = new THREE.SpotLight(0xfff8ee, 0, 75, Math.PI / 4.2, 0.50, 1.1);
+    this.headlightL.position.set(-0.65, 0.60, 2.25);
+    this.headlightL.target.position.set(-0.65, 0.05, 24);
     this.chassisGroup.add(this.headlightL, this.headlightL.target);
 
-    this.headlightR = new THREE.SpotLight(0xffffff, 0, 48, Math.PI / 5.5, 0.45, 1.2);
-    this.headlightR.position.set(0.65, 0.55, 2.25);
-    this.headlightR.target.position.set(0.65, 0.1, 16);
+    this.headlightR = new THREE.SpotLight(0xfff8ee, 0, 75, Math.PI / 4.2, 0.50, 1.1);
+    this.headlightR.position.set(0.65, 0.60, 2.25);
+    this.headlightR.target.position.set(0.65, 0.05, 24);
     this.chassisGroup.add(this.headlightR, this.headlightR.target);
+
+    // Forward ground illuminator (brightens tarmac, curbs and scenery directly ahead of the van)
+    this.headlightFlood = new THREE.PointLight(0xfffaed, 0, 32, 1.6);
+    this.headlightFlood.position.set(0, 0.70, 3.2);
+    this.chassisGroup.add(this.headlightFlood);
 
     // 5. Dual Rear Dynamic Brake Lights (PURE EMISSION, ZERO WHITE PLANE, ZERO BLACK HOUSING)
     // When brakes are OFF: completely invisible (NO dark/black box geometry over the taillights)
@@ -266,9 +271,11 @@ export class VanModel {
 
   setHeadlights(on) {
     this.headlightsOn = on;
-    const intensity = on ? 2.8 : 0.0;
-    if (this.headlightL) this.headlightL.intensity = intensity;
-    if (this.headlightR) this.headlightR.intensity = intensity;
+    const spotIntensity = on ? 8.5 : 0.0;
+    const floodIntensity = on ? 4.5 : 0.0;
+    if (this.headlightL) this.headlightL.intensity = spotIntensity;
+    if (this.headlightR) this.headlightR.intensity = spotIntensity;
+    if (this.headlightFlood) this.headlightFlood.intensity = floodIntensity;
   }
 
   update(dt, vehiclePhysics, input = null) {

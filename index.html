@@ -309,10 +309,7 @@
       inset: 0;
       width: 100vw;
       height: 100vh;
-      background: #03080c url('/assets/main-menu-bg-2k.jpg') center center / cover no-repeat;
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: high-quality;
-      filter: contrast(1.05) brightness(1.02);
+      background: #03080c;
       z-index: 50000;
       display: flex;
       align-items: center;
@@ -320,6 +317,28 @@
       transition: opacity 0.35s ease, visibility 0.35s ease;
       overflow: hidden;
       user-select: none;
+    }
+    .menu-bg-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      transition: opacity 1.8s ease-in-out;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+    #menu-bg-dusk {
+      background-image: url('/assets/main-menu-bg.jpg');
+    }
+    #menu-bg-morning {
+      background-image: url('/assets/main-menu-bg-morning.jpg');
+    }
+    .menu-bg-layer.active {
+      opacity: 1;
     }
     #main-menu-screen.hidden {
       opacity: 0;
@@ -1294,6 +1313,10 @@
 
   <!-- MAIN START MENU SCREEN (CHECKERS HYPER SIXTY60) -->
   <div id="main-menu-screen">
+    <!-- Smooth 10s Crossfading Backgrounds (Dusk/Sunset and Morning variations) -->
+    <div id="menu-bg-dusk" class="menu-bg-layer active"></div>
+    <div id="menu-bg-morning" class="menu-bg-layer"></div>
+
     <!-- MENU BUTTONS STACK (Adaptive, responsive & prominent) -->
     <div class="menu-buttons-cluster">
       <button class="menu-btn btn-career" id="btn-menu-career" tabindex="-1">

@@ -40,20 +40,21 @@ export class CityWorld {
     this.buildBuildings();
   }
 
-  // Checks if a point lies within or immediately adjacent to any jump ramp
+  // Checks if a point lies within or immediately adjacent to any jump ramp or bridge
   isPointOnOrNearRamp(x, z, margin = 2.5) {
     if (!this.colliders) return false;
     for (const c of this.colliders) {
       if (c.type === 'ramp' || c.type === 'bridge' || c.type === 'elevated_ramp') {
         const dx = x - c.x;
         const dz = z - c.z;
-        const cosA = Math.cos(c.angleY);
-        const sinA = Math.sin(c.angleY);
+        const ang = c.angleY || 0;
+        const cosA = Math.cos(ang);
+        const sinA = Math.sin(ang);
         const localX = dx * cosA - dz * sinA;
         const localZ = dx * sinA + dz * cosA;
 
         const hw = c.width / 2 + margin;
-        const hd = c.depth / 2 + margin;
+        const hd = (c.depth || c.length || 0) / 2 + margin;
 
         if (Math.abs(localX) <= hw && Math.abs(localZ) <= hd) {
           return true;
@@ -482,102 +483,106 @@ export class CityWorld {
     const bridgeGroup = new THREE.Group();
     bridgeGroup.name = 'ElevatedSkywayBridgeSection';
 
+    // Materials: AAA Greybox Architecture with zero z-fighting
     const deckMat = new THREE.MeshStandardMaterial({
-      color: 0x3f4a56, // Modern slate-grey racetrack asphalt
-      roughness: 0.70,
-      metalness: 0.06
+      color: 0x3a444e, // Slate-grey asphalt
+      roughness: 0.72,
+      metalness: 0.05
     });
 
     const structureMat = new THREE.MeshStandardMaterial({
-      color: 0xd0d7de, // Architectural light grey concrete piers
+      color: 0xd8e0e8, // Concrete pier columns
       roughness: 0.85,
-      metalness: 0.05
+      metalness: 0.04
     });
 
     const barrierMat = new THREE.MeshStandardMaterial({
       color: 0x06b6d4, // Vibrant turquoise safety crash barriers
       roughness: 0.35,
       metalness: 0.15,
-      emissive: 0x044e5c,
-      emissiveIntensity: 0.25
+      emissive: 0x0369a1,
+      emissiveIntensity: 0.35
     });
 
-    const reflectorMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
-    const whiteDashMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+    const jumpRampMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b, // Dark contrast deck for stunt jump
+      roughness: 0.65,
+      metalness: 0.10
+    });
+
+    const chevronMat = new THREE.MeshBasicMaterial({
+      color: 0xfacc15, // Bright energetic yellow jump chevrons
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    });
+
+    const cyanNeonMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff
+    });
 
     const bx = -22.0;
-    const bridgeW = 7.6;
+    const bridgeW = 10.8; // Super wide 10.8m roadway
     const hw = bridgeW / 2;
+    const hBridge = 3.6; // Uniform bridge deck height
 
-    // Helper: Creates a flat bridge deck segment
+    // 1. Helper: Flat Bridge Deck Segment (Airtight geometry, zero overlap)
     const createDeckSegment = (zCenter, length, height) => {
       const seg = new THREE.Group();
-      // Asphalt top road deck
-      const roadGeo = new THREE.BoxGeometry(bridgeW, 0.25, length);
+
+      // Top road deck (Box: height 0.30m, top flush with 'height')
+      const roadGeo = new THREE.BoxGeometry(bridgeW, 0.30, length);
       const roadMesh = new THREE.Mesh(roadGeo, deckMat);
-      roadMesh.position.set(0, height - 0.125, 0);
+      roadMesh.position.set(0, height - 0.15, 0);
       roadMesh.receiveShadow = true;
       roadMesh.castShadow = true;
       seg.add(roadMesh);
 
-      // Underside concrete girder
-      const girderGeo = new THREE.BoxGeometry(bridgeW - 0.6, 0.45, length);
+      // Underside structural concrete support girder
+      const girderGeo = new THREE.BoxGeometry(bridgeW - 0.8, 0.50, length);
       const girderMesh = new THREE.Mesh(girderGeo, structureMat);
-      girderMesh.position.set(0, height - 0.45, 0);
+      girderMesh.position.set(0, height - 0.55, 0);
       girderMesh.receiveShadow = true;
       girderMesh.castShadow = true;
       seg.add(girderMesh);
 
-      // Left & Right illuminated safety barriers
-      [-hw + 0.15, hw - 0.15].forEach((barrierX) => {
-        const barGeo = new THREE.BoxGeometry(0.30, 0.85, length);
+      // Left & Right turquoise safety crash barriers with glowing neon tops
+      [-hw + 0.22, hw - 0.22].forEach((barrierX) => {
+        const barGeo = new THREE.BoxGeometry(0.35, 0.95, length);
         const barMesh = new THREE.Mesh(barGeo, barrierMat);
-        barMesh.position.set(barrierX, height + 0.425, 0);
+        barMesh.position.set(barrierX, height + 0.475, 0);
         barMesh.castShadow = true;
         barMesh.receiveShadow = true;
         seg.add(barMesh);
 
-        // Warning reflectors along barrier
-        const numReflectors = Math.floor(length / 4.5);
-        for (let r = 0; r < numReflectors; r++) {
-          const rz = (r - numReflectors / 2 + 0.5) * 4.5;
-          const refMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.60), reflectorMat);
-          refMesh.position.set(barrierX + (barrierX > 0 ? -0.16 : 0.16), height + 0.55, rz);
-          seg.add(refMesh);
-        }
+        // Glowing neon rail on top of barrier
+        const railGeo = new THREE.BoxGeometry(0.12, 0.08, length);
+        const railMesh = new THREE.Mesh(railGeo, cyanNeonMat);
+        railMesh.position.set(barrierX, height + 0.97, 0);
+        seg.add(railMesh);
       });
-
-      // Center dashed road line
-      const numDashes = Math.floor(length / 5.5);
-      for (let d = 0; d < numDashes; d++) {
-        const dz = (d - numDashes / 2 + 0.5) * 5.5;
-        const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 2.6), whiteDashMat);
-        dash.rotation.x = -Math.PI / 2;
-        dash.position.set(0, height + 0.005, dz);
-        seg.add(dash);
-      }
 
       seg.position.set(bx, 0, zCenter);
       bridgeGroup.add(seg);
     };
 
-    // Helper: Creates an inclined connecting / approach ramp
-    const createRampSegment = (zCenter, length, hStart, hEnd) => {
+    // 2. Helper: Inclined Roadway Ramp Segment
+    const createRampSegment = (zCenter, length, hStart, hEnd, isStuntRamp = false) => {
       const seg = new THREE.Group();
       const hl = length / 2;
 
-      // Airtight wedge geometry for sloped roadway
+      // Solid wedge geometry for ramp surface
       const positions = new Float32Array([
-        // Top slope
+        // Top driving surface
         -hw, hStart, -hl,   hw, hEnd, hl,    hw, hStart, -hl,
         -hw, hStart, -hl,  -hw, hEnd, hl,    hw, hEnd, hl,
         // Bottom base
         -hw, 0, -hl,       -hw, 0, hl,       hw, 0, hl,
         -hw, 0, -hl,        hw, 0, hl,       hw, 0, -hl,
-        // Left side
+        // Left flank
         -hw, 0, -hl,       -hw, 0, hl,      -hw, hEnd, hl,
         -hw, 0, -hl,       -hw, hEnd, hl,   -hw, hStart, -hl,
-        // Right side
+        // Right flank
         hw, 0, -hl,        hw, hEnd, hl,     hw, 0, hl,
         hw, 0, -hl,        hw, hStart, -hl,  hw, hEnd, hl
       ]);
@@ -586,31 +591,56 @@ export class CityWorld {
       geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geo.computeVertexNormals();
 
-      const rampMesh = new THREE.Mesh(geo, deckMat);
+      const rampMesh = new THREE.Mesh(geo, isStuntRamp ? jumpRampMat : deckMat);
       rampMesh.receiveShadow = true;
       rampMesh.castShadow = true;
       seg.add(rampMesh);
 
-      // Sloped safety barriers along edges
+      // Angled safety barriers along sides
       const slopeAngle = Math.atan2(hEnd - hStart, length);
-      [-hw + 0.15, hw - 0.15].forEach((barrierX) => {
-        const barGeo = new THREE.BoxGeometry(0.30, 0.85, Math.hypot(length, hEnd - hStart));
+      const barrierLen = Math.hypot(length, hEnd - hStart);
+
+      [-hw + 0.22, hw - 0.22].forEach((barrierX) => {
+        const barGeo = new THREE.BoxGeometry(0.35, 0.95, barrierLen);
         const barMesh = new THREE.Mesh(barGeo, barrierMat);
-        barMesh.position.set(barrierX, (hStart + hEnd) / 2 + 0.425, 0);
+        barMesh.position.set(barrierX, (hStart + hEnd) / 2 + 0.475, 0);
         barMesh.rotation.x = slopeAngle;
         barMesh.castShadow = true;
         barMesh.receiveShadow = true;
         seg.add(barMesh);
+
+        // Glowing neon rail on ramp barrier
+        const railGeo = new THREE.BoxGeometry(0.12, 0.08, barrierLen);
+        const railMesh = new THREE.Mesh(railGeo, cyanNeonMat);
+        railMesh.position.set(barrierX, (hStart + hEnd) / 2 + 0.97, 0);
+        railMesh.rotation.x = slopeAngle;
+        seg.add(railMesh);
       });
+
+      // Stunt jump chevron markings on the ramp surface
+      if (isStuntRamp) {
+        const numChevrons = 3;
+        for (let c = 0; c < numChevrons; c++) {
+          const t = 0.25 + c * 0.28;
+          const cz = -hl + t * length;
+          const cy = THREE.MathUtils.lerp(hStart, hEnd, t) + 0.025;
+
+          const chevGeo = new THREE.PlaneGeometry(3.6, 1.2);
+          const chevMesh = new THREE.Mesh(chevGeo, chevronMat);
+          chevMesh.rotation.x = -Math.PI / 2 + slopeAngle;
+          chevMesh.position.set(0, cy, cz);
+          seg.add(chevMesh);
+        }
+      }
 
       seg.position.set(bx, 0, zCenter);
       bridgeGroup.add(seg);
     };
 
-    // Helper: Cylindrical bridge support pier columns
-    const addPierColumn = (zPos, h) => {
-      [-hw + 0.7, hw - 0.7].forEach((px) => {
-        const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, h - 0.2, 16), structureMat);
+    // 3. Helper: Structural Concrete Bridge Piers
+    const addBridgePier = (zPos, h) => {
+      [-hw + 1.2, hw - 1.2].forEach((px) => {
+        const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.78, h - 0.2, 16), structureMat);
         pier.position.set(bx + px, (h - 0.2) / 2, zPos);
         pier.castShadow = true;
         pier.receiveShadow = true;
@@ -618,87 +648,98 @@ export class CityWorld {
       });
     };
 
-    // 1. Approach Ramp 1 (Slopes up from Ground to Bridge 1)
-    // From z = -62 (0m) to z = -42 (3.2m), length = 20m
-    createRampSegment(-52, 20, 0, 3.2);
+    // ----------------------------------------------------
+    // BRIDGE STUNT SEQUENCE (Non-overlapping, Wide, Triple-AAA)
+    // ----------------------------------------------------
+
+    // A. Approach Ramp 1 (Slopes up smoothly from Ground to Bridge 1)
+    // z = -54 (y = 0m) to z = -32 (y = 3.6m), length = 22m
+    createRampSegment(-43, 22, 0, hBridge, false);
     this.colliders.push({
       type: 'elevated_ramp',
       x: bx,
-      z: -52,
+      z: -43,
       width: bridgeW,
-      length: 20,
+      length: 22,
       hStart: 0,
-      hEnd: 3.2
+      hEnd: hBridge
     });
 
-    // 2. Bridge 1 (Lower Elevated Bridge, height = 3.2m)
-    // Extends from z = -42 to z = -10, length = 32m
-    createDeckSegment(-26, 32, 3.2);
+    // B. Bridge 1 Deck (Run-up span at y = 3.6m)
+    // z = -32 to z = -14, length = 18m
+    createDeckSegment(-23, 18, hBridge);
     this.colliders.push({
       type: 'bridge',
       x: bx,
-      z: -26,
+      z: -23,
       width: bridgeW,
-      length: 32,
-      height: 3.2
+      length: 18,
+      height: hBridge
     });
-    addPierColumn(-38, 3.2);
-    addPierColumn(-26, 3.2);
-    addPierColumn(-14, 3.2);
+    addBridgePier(-30, hBridge);
+    addBridgePier(-16, hBridge);
 
-    // 3. Connecting Ramp (Joins Bridge 1 to Bridge 2)
-    // Extends from z = -10 (3.2m) to z = +10 (5.2m), length = 20m
-    createRampSegment(0, 20, 3.2, 5.2);
+    // C. Bridge Stunt Jump Ramp (Mounted on Bridge 1, launches over the chasm!)
+    // Starts at z = -14 (y = 3.6m) and slopes up to z = -2 (y = 5.2m), length = 12m
+    createRampSegment(-8, 12, hBridge, 5.2, true);
     this.colliders.push({
       type: 'elevated_ramp',
       x: bx,
-      z: 0,
+      z: -8,
       width: bridgeW,
-      length: 20,
-      hStart: 3.2,
-      hEnd: 5.2
+      length: 12,
+      hStart: hBridge,
+      hEnd: 5.2,
+      isJumpRamp: true
     });
-    addPierColumn(0, 4.2);
+    addBridgePier(-2.8, 5.0);
 
-    // 4. Bridge 2 (Upper Elevated Bridge, height = 5.2m)
-    // Extends from z = +10 to z = +42, length = 32m
-    createDeckSegment(26, 32, 5.2);
+    // D. The Stunt Gap (Chasm)
+    // From z = -2 to z = +7 (9.0-meter open jump gap over the air!)
+
+    // E. Bridge 2 Deck (Landing span at y = 3.6m)
+    // Starts at z = +7, extends to z = +28, length = 21m
+    createDeckSegment(17.5, 21, hBridge);
     this.colliders.push({
       type: 'bridge',
       x: bx,
-      z: 26,
+      z: 17.5,
       width: bridgeW,
-      length: 32,
-      height: 5.2
+      length: 21,
+      height: hBridge
     });
-    addPierColumn(14, 5.2);
-    addPierColumn(26, 5.2);
-    addPierColumn(38, 5.2);
+    addBridgePier(8.0, hBridge);
+    addBridgePier(20.0, hBridge);
 
-    // 5. Descent Ramp 2 (Slopes down from Bridge 2 to Ground)
-    // From z = +42 (5.2m) to z = +66 (0m), length = 24m
-    createRampSegment(54, 24, 5.2, 0);
+    // F. Descent Ramp 2 (Slopes down smoothly from Bridge 2 to Ground)
+    // z = +28 (y = 3.6m) to z = +50 (y = 0m), length = 22m
+    createRampSegment(39, 22, hBridge, 0, false);
     this.colliders.push({
       type: 'elevated_ramp',
       x: bx,
-      z: 54,
+      z: 39,
       width: bridgeW,
-      length: 24,
-      hStart: 5.2,
+      length: 22,
+      hStart: hBridge,
       hEnd: 0
     });
 
-    // 6. Side containment collision walls (boxes) so car stays on bridge
+    // G. Side Guardrail Colliders (Keep the van contained on elevated spans)
+    // Uses minY: 2.5 so cars driving on the ground beneath NEVER hit these barriers!
     this.colliders.push(
-      { type: 'box', x: bx - hw - 0.15, z: 2, width: 0.5, depth: 130, height: 8.0 },
-      { type: 'box', x: bx + hw + 0.15, z: 2, width: 0.5, depth: 130, height: 8.0 }
+      // Bridge 1 side barriers
+      { type: 'box', x: bx - hw - 0.25, z: -23, width: 0.5, depth: 36, minY: 2.2, maxY: 7.5 },
+      { type: 'box', x: bx + hw + 0.25, z: -23, width: 0.5, depth: 36, minY: 2.2, maxY: 7.5 },
+      // Bridge 2 side barriers
+      { type: 'box', x: bx - hw - 0.25, z: 17.5, width: 0.5, depth: 21, minY: 2.2, maxY: 7.5 },
+      { type: 'box', x: bx + hw + 0.25, z: 17.5, width: 0.5, depth: 21, minY: 2.2, maxY: 7.5 }
     );
 
-    // 7. VIP Skyway Elevated Delivery Dropoff Spot on Bridge 2
+    // H. VIP Skyway Stunt Bridge Delivery Dropoff Spot on Bridge 2
     this.deliverySpots.push({
       id: 'bridge_skyway',
-      name: 'Skyway Vista Bridge',
-      position: new THREE.Vector3(bx, 5.4, 26)
+      name: 'Skyway Stunt Bridge',
+      position: new THREE.Vector3(bx, hBridge + 0.35, 17.5)
     });
 
     this.scene.add(bridgeGroup);

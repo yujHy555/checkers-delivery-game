@@ -281,14 +281,14 @@ export class ArcadeVehicle {
         this.surfaceRoll = THREE.MathUtils.lerp(this.surfaceRoll, targetSurfaceRoll, 22.0 * dt);
         this.pitch = this.surfacePitch;
 
-        // Launch over crest ONLY when climbing up towards summit at high speed (> 6.0 m/s)
+        // Launch over crest ONLY when climbing up towards summit at high speed (> 4.5 m/s)
         // Downhill driving NEVER triggers a jump launch, completely preventing any bounce on the downhill slope
         const isClimbingTowardsPeak = (this.speed >= 0 && hFront >= hRear - 0.25) || (this.speed < 0 && hRear >= hFront - 0.25);
-        if (isOnRamp && isClimbingTowardsPeak && isNearPeak && absSpeed > 6.0 && this.jumpLaunchCooldown <= 0) {
+        if (isOnRamp && isClimbingTowardsPeak && isNearPeak && absSpeed > 4.5 && this.jumpLaunchCooldown <= 0) {
           this.isAirborne = true;
           this.airTime = 0.01;
-          this.jumpLaunchCooldown = 0.35;
-          this.velocity.y = Math.max(5.8, absSpeed * 0.45);
+          this.jumpLaunchCooldown = 0.40;
+          this.velocity.y = Math.max(6.8, absSpeed * 0.48);
         }
 
         // Downforce
@@ -435,12 +435,11 @@ export class ArcadeVehicle {
         const hl = c.length / 2;
 
         if (Math.abs(lx) <= hw && Math.abs(lz) <= hl) {
-          // Can drive on elevated bridge deck when vehicle is near or above deck height
-          if (this.position.y >= c.height - 0.55) {
-            if (c.height > maxHeight) {
-              maxHeight = c.height;
-              isOnRamp = true;
-            }
+          // Can drive or land on elevated bridge deck when vehicle is elevated or already on bridge/ramp
+          const canAccessBridge = this.isOnRamp || (this.position.y >= c.height - 1.8);
+          if (canAccessBridge && c.height > maxHeight) {
+            maxHeight = c.height;
+            isOnRamp = true;
           }
         }
       } else if (c.type === 'elevated_ramp') {
@@ -457,10 +456,15 @@ export class ArcadeVehicle {
           const t = Math.max(0, Math.min(1.0, (lz + hl) / (2 * hl)));
           const h = THREE.MathUtils.lerp(c.hStart, c.hEnd, t);
           const minH = Math.min(c.hStart, c.hEnd);
-          if (this.position.y >= minH - 0.55) {
-            if (h > maxHeight) {
-              maxHeight = h;
-              isOnRamp = true;
+
+          // Accessible if ramp starts near ground (minH <= 0.5) or vehicle is elevated / on ramp
+          const canAccessRamp = (minH <= 0.5) || this.isOnRamp || (this.position.y >= minH - 1.8);
+          if (canAccessRamp && h > maxHeight) {
+            maxHeight = h;
+            isOnRamp = true;
+            // Bridge stunt jump ramp peak trigger
+            if (c.isJumpRamp && t > 0.78) {
+              isNearPeak = true;
             }
           }
         }
@@ -524,6 +528,10 @@ export class ArcadeVehicle {
           if (Math.abs(cdx) > halfX + maxBoundRadius || Math.abs(cdz) > halfZ + maxBoundRadius) {
             continue;
           }
+
+          // Vertical height check for 3D boxes (bridges, elevated barriers)
+          if (c.minY !== undefined && this.position.y < c.minY) continue;
+          if (c.maxY !== undefined && this.position.y > c.maxY) continue;
 
           // 4 World Corners of the Oriented Van
           const cFLx = this.position.x + forward.x * halfL - right.x * halfW;

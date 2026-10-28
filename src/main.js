@@ -339,6 +339,22 @@ class GameApp {
 
     // Main Start Menu Screen & Sub-Modals
     const mainMenu = document.getElementById('main-menu-screen');
+    const bgDusk = document.getElementById('menu-bg-dusk');
+    const bgMorning = document.getElementById('menu-bg-morning');
+    if (bgDusk && bgMorning) {
+      let isDuskActive = true;
+      setInterval(() => {
+        isDuskActive = !isDuskActive;
+        if (isDuskActive) {
+          bgDusk.classList.add('active');
+          bgMorning.classList.remove('active');
+        } else {
+          bgMorning.classList.add('active');
+          bgDusk.classList.remove('active');
+        }
+      }, 10000);
+    }
+
     const btnMenuCareer = document.getElementById('btn-menu-career');
     const btnMenuNew = document.getElementById('btn-menu-new');
     const btnMenuFreeroam = document.getElementById('btn-menu-freeroam');
