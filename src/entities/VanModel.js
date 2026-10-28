@@ -149,6 +149,56 @@ export class VanModel {
     this.tailLensL.visible = false;
     this.tailLensR.visible = false;
 
+    // 5b. Rear Running Position Lights (Warm White / Slight Yellow, stay on with headlights at night)
+    this.rearRunningGroup = new THREE.Group();
+    this.chassisGroup.add(this.rearRunningGroup);
+
+    this.rearRunningLightL = new THREE.PointLight(0xfffae0, 0, 6.0, 2.0);
+    this.rearRunningLightL.position.set(-0.765, 0.465, -2.28);
+    this.rearRunningGroup.add(this.rearRunningLightL);
+
+    this.rearRunningLightR = new THREE.PointLight(0xfffae0, 0, 6.0, 2.0);
+    this.rearRunningLightR.position.set(0.765, 0.465, -2.28);
+    this.rearRunningGroup.add(this.rearRunningLightR);
+
+    const runningCanvas = document.createElement('canvas');
+    runningCanvas.width = 128;
+    runningCanvas.height = 256;
+    const rCtx = runningCanvas.getContext('2d');
+    rCtx.clearRect(0, 0, 128, 256);
+    const rGrad = rCtx.createRadialGradient(64, 128, 6, 64, 128, 65);
+    rGrad.addColorStop(0, 'rgba(255, 252, 220, 0.88)');
+    rGrad.addColorStop(0.35, 'rgba(255, 240, 180, 0.60)');
+    rGrad.addColorStop(0.70, 'rgba(255, 220, 140, 0.22)');
+    rGrad.addColorStop(1, 'rgba(255, 200, 100, 0.0)');
+    rCtx.fillStyle = rGrad;
+    rCtx.fillRect(0, 0, 128, 256);
+    this.rearRunningGlowTex = new THREE.CanvasTexture(runningCanvas);
+
+    this.rearRunningMat = new THREE.MeshBasicMaterial({
+      map: this.rearRunningGlowTex,
+      color: 0xfffae0,
+      transparent: true,
+      opacity: 0.80,
+      blending: THREE.NormalBlending,
+      depthWrite: false,
+      toneMapped: false
+    });
+
+    const runningLensGeo = new THREE.PlaneGeometry(0.12, 0.28);
+    runningLensGeo.rotateY(Math.PI);
+
+    this.rearRunningLensL = new THREE.Mesh(runningLensGeo, this.rearRunningMat);
+    this.rearRunningLensL.position.set(-0.765, 0.465, -2.214);
+    this.rearRunningGroup.add(this.rearRunningLensL);
+
+    this.rearRunningLensR = new THREE.Mesh(runningLensGeo, this.rearRunningMat);
+    this.rearRunningLensR.position.set(0.765, 0.465, -2.214);
+    this.rearRunningGroup.add(this.rearRunningLensR);
+
+    this.rearRunningLensL.visible = false;
+    this.rearRunningLensR.visible = false;
+
     // 6. Temporary lightweight fallback body (ensures instant startup with zero blank frames while 60MB GLB loads)
     this.createFallbackBody();
 
@@ -276,6 +326,13 @@ export class VanModel {
     if (this.headlightL) this.headlightL.intensity = spotIntensity;
     if (this.headlightR) this.headlightR.intensity = spotIntensity;
     if (this.headlightFlood) this.headlightFlood.intensity = floodIntensity;
+
+    // Rear running lights (warm white / slight yellow emission, modest reach)
+    const rearRunningIntensity = on ? 1.6 : 0.0;
+    if (this.rearRunningLightL) this.rearRunningLightL.intensity = rearRunningIntensity;
+    if (this.rearRunningLightR) this.rearRunningLightR.intensity = rearRunningIntensity;
+    if (this.rearRunningLensL) this.rearRunningLensL.visible = on;
+    if (this.rearRunningLensR) this.rearRunningLensR.visible = on;
   }
 
   update(dt, vehiclePhysics, input = null) {

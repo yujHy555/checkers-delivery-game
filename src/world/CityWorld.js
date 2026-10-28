@@ -634,9 +634,10 @@ export class CityWorld {
         seg.add(railMesh);
       });
 
-      // Stunt jump chevron markings on the ramp surface
+      // Stunt jump chevron markings on the ramp surface (oriented towards the jump gap)
       if (isStuntRamp) {
         const numChevrons = 3;
+        const pointsTowardsNegativeZ = (hStart > hEnd);
         for (let c = 0; c < numChevrons; c++) {
           const t = 0.25 + c * 0.28;
           const cz = -hl + t * length;
@@ -645,6 +646,9 @@ export class CityWorld {
           const chevGeo = new THREE.PlaneGeometry(3.6, 1.2);
           const chevMesh = new THREE.Mesh(chevGeo, chevronMat);
           chevMesh.rotation.x = -Math.PI / 2 + slopeAngle;
+          if (pointsTowardsNegativeZ) {
+            chevMesh.rotation.z = Math.PI;
+          }
           chevMesh.position.set(0, cy, cz);
           seg.add(chevMesh);
         }
@@ -663,20 +667,31 @@ export class CityWorld {
         pier.castShadow = true;
         pier.receiveShadow = true;
         bridgeGroup.add(pier);
+
+        // Solid physical collision for pillars at ground level
+        this.colliders.push({
+          type: 'box',
+          x: bx + px,
+          z: zPos,
+          width: 1.6,
+          depth: 1.6,
+          minY: 0.0,
+          maxY: h
+        });
       });
     };
 
     // ----------------------------------------------------
-    // BRIDGE STUNT SEQUENCE (Non-overlapping, Wide, Triple-AAA)
+    // BRIDGE STUNT SEQUENCE (Non-overlapping, Wide, Symmetrical Both-Way Jumps)
     // ----------------------------------------------------
 
-    // A. Approach Ramp 1 (Slopes up smoothly from Ground to Bridge 1)
-    // z = -54 (y = 0m) to z = -32 (y = 3.6m), length = 22m
-    createRampSegment(-43, 22, 0, hBridge, false);
+    // A. Approach Ramp 1 (South: Slopes up smoothly from Ground to Bridge 1)
+    // z = -55 (y = 0m) to z = -33 (y = 3.6m), length = 22m
+    createRampSegment(-44, 22, 0, hBridge, false);
     this.colliders.push({
       type: 'elevated_ramp',
       x: bx,
-      z: -43,
+      z: -44,
       width: bridgeW,
       length: 22,
       hStart: 0,
@@ -684,22 +699,22 @@ export class CityWorld {
     });
 
     // B. Bridge 1 Deck (Run-up span at y = 3.6m)
-    // z = -32 to z = -14, length = 18m
-    createDeckSegment(-23, 18, hBridge);
+    // z = -33 to z = -14, length = 19m
+    createDeckSegment(-23.5, 19, hBridge);
     this.colliders.push({
       type: 'bridge',
       x: bx,
-      z: -23,
+      z: -23.5,
       width: bridgeW,
-      length: 18,
+      length: 19,
       height: hBridge
     });
-    addBridgePier(-30, hBridge);
-    addBridgePier(-16, hBridge);
+    addBridgePier(-31, hBridge);
+    addBridgePier(-17, hBridge);
 
-    // C. Bridge Stunt Jump Ramp (Mounted on Bridge 1, launches over the chasm!)
-    // Starts at z = -14 (y = 3.6m) and slopes up to z = -2 (y = 5.2m), length = 12m
-    createRampSegment(-8, 12, hBridge, 5.2, true);
+    // C. Bridge 1 Stunt Jump Ramp (Launches North over the chasm!)
+    // Starts at z = -14 (y = 3.6m) and slopes up to z = -2 (y = 4.8m), length = 12m
+    createRampSegment(-8, 12, hBridge, 4.8, true);
     this.colliders.push({
       type: 'elevated_ramp',
       x: bx,
@@ -707,7 +722,7 @@ export class CityWorld {
       width: bridgeW,
       length: 12,
       hStart: hBridge,
-      hEnd: 5.2,
+      hEnd: 4.8,
       isJumpRamp: true
     });
     addBridgePier(-3.0, hBridge);
@@ -715,49 +730,76 @@ export class CityWorld {
     // D. The Stunt Gap (Chasm)
     // From z = -2 to z = +7 (9.0-meter open jump gap over the air!)
 
-    // E. Bridge 2 Deck (Landing span at y = 3.6m)
-    // Starts at z = +7, extends to z = +28, length = 21m
-    createDeckSegment(17.5, 21, hBridge);
-    this.colliders.push({
-      type: 'bridge',
-      x: bx,
-      z: 17.5,
-      width: bridgeW,
-      length: 21,
-      height: hBridge
-    });
-    addBridgePier(8.0, hBridge);
-    addBridgePier(20.0, hBridge);
-
-    // F. Descent Ramp 2 (Slopes down smoothly from Bridge 2 to Ground)
-    // z = +28 (y = 3.6m) to z = +50 (y = 0m), length = 22m
-    createRampSegment(39, 22, hBridge, 0, false);
+    // E. Bridge 2 Stunt Jump Ramp (Symmetrical: Launches South over the chasm!)
+    // Starts at z = +7 (y = 4.8m) and slopes down to z = +19 (y = 3.6m), length = 12m
+    createRampSegment(13, 12, 4.8, hBridge, true);
     this.colliders.push({
       type: 'elevated_ramp',
       x: bx,
-      z: 39,
+      z: 13,
+      width: bridgeW,
+      length: 12,
+      hStart: 4.8,
+      hEnd: hBridge,
+      isJumpRamp: true
+    });
+    addBridgePier(8.0, hBridge);
+
+    // F. Bridge 2 Deck (Run-up span at y = 3.6m)
+    // Starts at z = +19, extends to z = +38, length = 19m
+    createDeckSegment(28.5, 19, hBridge);
+    this.colliders.push({
+      type: 'bridge',
+      x: bx,
+      z: 28.5,
+      width: bridgeW,
+      length: 19,
+      height: hBridge
+    });
+    addBridgePier(22.0, hBridge);
+    addBridgePier(36.0, hBridge);
+
+    // G. Descent Ramp 2 (North: Slopes down smoothly from Bridge 2 to Ground)
+    // z = +38 (y = 3.6m) to z = +60 (y = 0m), length = 22m
+    createRampSegment(49, 22, hBridge, 0, false);
+    this.colliders.push({
+      type: 'elevated_ramp',
+      x: bx,
+      z: 49,
       width: bridgeW,
       length: 22,
       hStart: hBridge,
       hEnd: 0
     });
 
-    // G. Side Guardrail Colliders (Keep the van contained on elevated spans)
-    // Uses minY: 2.5 so cars driving on the ground beneath NEVER hit these barriers!
+    // H. Continuous Solid Side Guardrail Colliders (Exact barrier bounds)
+    // Uses minY so cars driving on the ground beneath NEVER hit overhead bridge barriers!
+    const barLeftX = bx - hw + 0.22;
+    const barRightX = bx + hw - 0.22;
+
     this.colliders.push(
-      // Bridge 1 side barriers
-      { type: 'box', x: bx - hw - 0.25, z: -23, width: 0.5, depth: 36, minY: 2.2, maxY: 7.5 },
-      { type: 'box', x: bx + hw + 0.25, z: -23, width: 0.5, depth: 36, minY: 2.2, maxY: 7.5 },
-      // Bridge 2 side barriers
-      { type: 'box', x: bx - hw - 0.25, z: 17.5, width: 0.5, depth: 21, minY: 2.2, maxY: 7.5 },
-      { type: 'box', x: bx + hw + 0.25, z: 17.5, width: 0.5, depth: 21, minY: 2.2, maxY: 7.5 }
+      // South Approach Ramp 1 barriers
+      { type: 'box', x: barLeftX, z: -44, width: 0.45, depth: 22, minY: 0.0, maxY: 4.8 },
+      { type: 'box', x: barRightX, z: -44, width: 0.45, depth: 22, minY: 0.0, maxY: 4.8 },
+
+      // Bridge 1 & Jump Ramp 1 elevated side barriers
+      { type: 'box', x: barLeftX, z: -17.5, width: 0.45, depth: 31, minY: 2.2, maxY: 7.5 },
+      { type: 'box', x: barRightX, z: -17.5, width: 0.45, depth: 31, minY: 2.2, maxY: 7.5 },
+
+      // Jump Ramp 2 & Bridge 2 elevated side barriers
+      { type: 'box', x: barLeftX, z: 22.5, width: 0.45, depth: 31, minY: 2.2, maxY: 7.5 },
+      { type: 'box', x: barRightX, z: 22.5, width: 0.45, depth: 31, minY: 2.2, maxY: 7.5 },
+
+      // North Descent Ramp 2 barriers
+      { type: 'box', x: barLeftX, z: 49, width: 0.45, depth: 22, minY: 0.0, maxY: 4.8 },
+      { type: 'box', x: barRightX, z: 49, width: 0.45, depth: 22, minY: 0.0, maxY: 4.8 }
     );
 
-    // H. VIP Skyway Stunt Bridge Delivery Dropoff Spot on Bridge 2
+    // I. VIP Skyway Stunt Bridge Delivery Dropoff Spot on Bridge 2
     this.deliverySpots.push({
       id: 'bridge_skyway',
       name: 'Skyway Stunt Bridge',
-      position: new THREE.Vector3(bx, hBridge + 0.35, 17.5)
+      position: new THREE.Vector3(bx, hBridge + 0.35, 28.5)
     });
 
     this.scene.add(bridgeGroup);

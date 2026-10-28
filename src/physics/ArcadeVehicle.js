@@ -272,6 +272,11 @@ export class ArcadeVehicle {
         this.airTime = 0.01;
         this.jumpLaunchCooldown = 0.12;
         this.velocity.y = Math.min(0, this.velocity.y);
+
+        // Clear skid history when dropping into air so tire tracks never float
+        this.skidHistoryL = [];
+        this.skidHistoryR = [];
+        this.updateSkidGeometry();
       } else {
         // Solid ground contact: instant exact alignment so tires NEVER sink into road or ramp, with ZERO bounce when driving slowly!
         this.position.y = targetGroundY;
@@ -281,14 +286,22 @@ export class ArcadeVehicle {
         this.surfaceRoll = THREE.MathUtils.lerp(this.surfaceRoll, targetSurfaceRoll, 22.0 * dt);
         this.pitch = this.surfacePitch;
 
-        // Launch over crest ONLY when climbing up towards summit at high speed (> 4.5 m/s)
+        // Launch over crest ONLY when climbing up towards summit at speed (> 3.0 m/s)
         // Downhill driving NEVER triggers a jump launch, completely preventing any bounce on the downhill slope
         const isClimbingTowardsPeak = (this.speed >= 0 && hFront >= hRear - 0.25) || (this.speed < 0 && hRear >= hFront - 0.25);
-        if (isOnRamp && isClimbingTowardsPeak && isNearPeak && absSpeed > 4.5 && this.jumpLaunchCooldown <= 0) {
+        if (isOnRamp && isClimbingTowardsPeak && isNearPeak && absSpeed > 3.0 && this.jumpLaunchCooldown <= 0) {
           this.isAirborne = true;
           this.airTime = 0.01;
-          this.jumpLaunchCooldown = 0.40;
-          this.velocity.y = Math.max(6.8, absSpeed * 0.48);
+          this.jumpLaunchCooldown = 0.35;
+          // Natural physical takeoff: forward velocity converted to vertical velocity by the ramp angle (ZERO artificial boost)
+          const naturalSlopeAngle = Math.abs(this.surfacePitch);
+          const naturalVy = absSpeed * Math.sin(naturalSlopeAngle);
+          this.velocity.y = Math.max(0.6, naturalVy);
+
+          // Clear skid history on launch so tire marks never bridge into the air
+          this.skidHistoryL = [];
+          this.skidHistoryR = [];
+          this.updateSkidGeometry();
         }
 
         // Downforce
@@ -338,13 +351,15 @@ export class ArcadeVehicle {
       const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
       this.velocity.addScaledVector(right, lateralDecel);
 
-      // 7. YAW STEERING & OVERSTEER ROTATION (Immediate steering authority even from standstill)
+      // 7. YAW STEERING (Physically realistic: yaw rotation requires vehicle motion, ZERO 360-spin when stopped)
       let turnFactor = 0;
-      if (absSpeed > 0.05 || (input && (input.throttle > 0 || input.brake > 0))) {
-        // Immediate steering authority from standstill / low speeds so van maneuvers effortlessly
-        turnFactor = Math.max(0.75, Math.min(1.0, absSpeed / 1.0));
-      } else if (absSpeed > 0.01) {
-        turnFactor = Math.min(1.0, absSpeed / 0.8);
+      if (absSpeed > 0.12) {
+        // Smoothly scale up steering authority from 0.12 m/s to 1.8 m/s
+        turnFactor = THREE.MathUtils.clamp((absSpeed - 0.12) / 1.5, 0.0, 1.0);
+      } else {
+        // When stationary or virtually stopped, wheels turn visually but heading does NOT spin!
+        turnFactor = 0;
+        this.angularVelocity = 0;
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
@@ -435,9 +450,10 @@ export class ArcadeVehicle {
         const hl = c.length / 2;
 
         if (Math.abs(lx) <= hw && Math.abs(lz) <= hl) {
-          // Can drive or land on elevated bridge deck when vehicle is elevated or already on bridge/ramp
-          const canAccessBridge = this.isOnRamp || (this.position.y >= c.height - 1.8);
-          if (canAccessBridge && c.height > maxHeight) {
+          // A car can ONLY drive on an elevated bridge if it is elevated near bridge height
+          // (i.e. drove up a ramp or landed from a jump). Cars on ground below (y <= 1.2m) NEVER sample overhead bridge!
+          const isElevatedNearDeck = (this.position.y >= c.height - 0.75);
+          if (isElevatedNearDeck && c.height > maxHeight) {
             maxHeight = c.height;
             isOnRamp = true;
           }
@@ -455,16 +471,23 @@ export class ArcadeVehicle {
         if (Math.abs(lx) <= hw && Math.abs(lz) <= hl) {
           const t = Math.max(0, Math.min(1.0, (lz + hl) / (2 * hl)));
           const h = THREE.MathUtils.lerp(c.hStart, c.hEnd, t);
-          const minH = Math.min(c.hStart, c.hEnd);
 
-          // Accessible if ramp starts near ground (minH <= 0.5) or vehicle is elevated / on ramp
-          const canAccessRamp = (minH <= 0.5) || this.isOnRamp || (this.position.y >= minH - 1.8);
-          if (canAccessRamp && h > maxHeight) {
+          // A car can only access this ramp section if:
+          // 1. The ramp is near ground level at this point (h <= 0.40m), allowing ground entrance, OR
+          // 2. The car is physically elevated near this ramp height (this.position.y >= h - 0.75m).
+          // If a car is driving on the ground under a 2m-high elevated ramp, it CANNOT climb it from below!
+          const isGroundEntry = (h <= 0.40);
+          const isElevatedOnRamp = (this.position.y >= h - 0.75);
+
+          if ((isGroundEntry || isElevatedOnRamp) && h > maxHeight) {
             maxHeight = h;
             isOnRamp = true;
-            // Bridge stunt jump ramp peak trigger
-            if (c.isJumpRamp && t > 0.78) {
-              isNearPeak = true;
+            if (c.isJumpRamp) {
+              // Trigger peak when approaching the higher end of the jump ramp (from either side)
+              const climbingToHigherEnd = (c.hEnd > c.hStart) ? (t > 0.80) : (t < 0.20);
+              if (climbingToHigherEnd) {
+                isNearPeak = true;
+              }
             }
           }
         }
@@ -697,8 +720,12 @@ export class ArcadeVehicle {
   updateSkidsAndSmoke(dt, forward, right, input) {
     const absSpeed = Math.abs(this.speed);
     // User requirement: skid marks appear ONLY when van does a handbrake turn OR hard brakes at high speed
-    const isHandbrakeSkid = !this.isAirborne && (this.isDrifting || input.handbrake) && absSpeed > 1.8;
-    const isHighSpeedBrakeSkid = !this.isAirborne && input.brake > 0.45 && absSpeed > 6.0;
+    const groundDistL = Math.abs(this.position.y - (gRL.height + this.roadLevel));
+    const groundDistR = Math.abs(this.position.y - (gRR.height + this.roadLevel));
+    const tiresFirmlyOnGround = !this.isAirborne && groundDistL < 0.16 && groundDistR < 0.16;
+
+    const isHandbrakeSkid = tiresFirmlyOnGround && (this.isDrifting || input.handbrake) && absSpeed > 1.8;
+    const isHighSpeedBrakeSkid = tiresFirmlyOnGround && input.brake > 0.45 && absSpeed > 6.0;
     const isSkidding = isHandbrakeSkid || isHighSpeedBrakeSkid;
 
     const rlPos = this.position.clone()
