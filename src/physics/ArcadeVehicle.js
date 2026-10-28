@@ -4,14 +4,14 @@ export class ArcadeVehicle {
   constructor(scene, options = {}) {
     this.scene = scene;
 
-    // Dimensions
-    this.length = 3.4;
-    this.width = 1.5;
-    this.height = 1.9;
-    this.wheelRadius = 0.35;
-    this.wheelBaseHalf = 1.05; // front & rear axle distance (2.1m wheelbase)
-    this.trackHalfWidth = 0.68; // left & right wheel track distance (1.36m track)
-    this.halfCarWidth = 0.75;
+    // Dimensions (Real-world scale matching custom 3D Kei Van body)
+    this.length = 4.51;
+    this.width = 1.84;
+    this.height = 1.96;
+    this.wheelRadius = 0.355;
+    this.wheelBaseHalf = 1.42; // front & rear axle distance (2.84m wheelbase matching body wells)
+    this.trackHalfWidth = 0.78; // left & right wheel track distance (1.56m track matching body wells)
+    this.halfCarWidth = 0.92;
 
     // Road surface level is 0.015-0.02 above base plane. Bottom of tires sits on road at y = 0.025!
     this.roadLevel = 0.025;
@@ -43,7 +43,7 @@ export class ArcadeVehicle {
     // Speed-Sensitive Steering (Ultra-responsive & snappy, agile at all speeds)
     this.steerInput = 0;
     this.steerAngle = 0;
-    this.steerResponse = 42.0;
+    this.steerResponse = 58.0;
 
     // Grip & Drift
     this.isDrifting = false;
@@ -165,6 +165,10 @@ export class ArcadeVehicle {
     const baseSteerDeg = this.isDrifting ? 34.0 : THREE.MathUtils.lerp(32.0, 16.0, speedRatio);
     const dynamicMaxSteer = THREE.MathUtils.degToRad(baseSteerDeg);
 
+    // Instant direction switch: if reversing steer direction, zero out opposite momentum immediately
+    if ((input.steer > 0 && this.steerInput < 0) || (input.steer < 0 && this.steerInput > 0)) {
+      this.steerInput = 0;
+    }
     this.steerInput = THREE.MathUtils.lerp(this.steerInput, input.steer, this.steerResponse * dt);
     this.steerAngle = this.steerInput * dynamicMaxSteer;
 
@@ -353,7 +357,7 @@ export class ArcadeVehicle {
       }
 
       const targetYawRate = this.steerInput * turnFactor * dirSign * yawRateCoeff;
-      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 32.0 * dt);
+      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 36.0 * dt);
       this.heading += this.angularVelocity * dt;
 
     } else {
@@ -461,10 +465,10 @@ export class ArcadeVehicle {
   }
 
   resolveCollisions() {
-    // Exact Van Oriented Bounding Box (OBB) extents (including front bumper, fenders & mirrors)
-    const halfL = 1.90; // Front bumper reaches to z = 1.83m (+0.07m buffer)
-    const halfW = 0.82; // Outer wheel arches & mirrors reach to x = 0.79m (+0.03m buffer)
-    const maxBoundRadius = 2.20; // Circumscribed radius for fast broadphase
+    // Exact Van Oriented Bounding Box (OBB) extents (matching real-world scale 3D body)
+    const halfL = 2.30; // Front bumper reaches to z = 2.30m
+    const halfW = 0.95; // Outer wheel arches & mirrors reach to x = 0.92m
+    const maxBoundRadius = 2.65; // Circumscribed radius for fast broadphase
 
     const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     const right = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));

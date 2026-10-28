@@ -136,22 +136,24 @@ export class InputManager {
     // 1. Unified Pointer Events with multi-touch capture
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       try { el.setPointerCapture(e.pointerId); } catch (_) {}
       activePointers.add(e.pointerId);
       triggerState(true);
-    }, { passive: false });
+    }, { capture: true, passive: false });
 
     el.addEventListener('pointerup', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       activePointers.delete(e.pointerId);
       try { el.releasePointerCapture(e.pointerId); } catch (_) {}
       if (activePointers.size === 0) triggerState(false);
-    }, { passive: false });
+    }, { capture: true, passive: false });
 
     el.addEventListener('pointercancel', (e) => {
       activePointers.delete(e.pointerId);
       if (activePointers.size === 0) triggerState(false);
-    }, { passive: false });
+    }, { capture: true, passive: false });
 
     // Window level safety so drag-off never gets stuck
     window.addEventListener('pointerup', (e) => {
@@ -159,26 +161,28 @@ export class InputManager {
         activePointers.delete(e.pointerId);
         if (activePointers.size === 0) triggerState(false);
       }
-    });
+    }, { capture: true });
 
-    // 2. Direct Touch Events for instantaneous mobile response
+    // 2. Direct Touch Events with capture phase for zero edge-swipe latency on mobile
     el.addEventListener('touchstart', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       triggerState(true);
-    }, { passive: false });
+    }, { capture: true, passive: false });
 
     el.addEventListener('touchend', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (e.targetTouches.length === 0) {
         triggerState(false);
       }
-    }, { passive: false });
+    }, { capture: true, passive: false });
 
     el.addEventListener('touchcancel', (e) => {
       if (e.targetTouches.length === 0) {
         triggerState(false);
       }
-    }, { passive: false });
+    }, { capture: true, passive: false });
   }
 
   bindButtonClick(id, callback) {
