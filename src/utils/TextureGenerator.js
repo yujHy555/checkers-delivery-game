@@ -1,324 +1,921 @@
 import * as THREE from 'three';
 
 export class TextureGenerator {
-  static createVanSideTexture(isFlipped = false) {
+  /**
+   * Generates high-definition side livery textures (2048 x 1024) matching the
+   * Checkers Sixty60 Delivery Van Vehicle Model Sheet turnaround.
+   *
+   * @param {boolean} isRightSide - If true, generates the right side (front is left, rear is right).
+   *                                If false, generates the left side (rear is left, front is right).
+   */
+  static createVanSideTexture(isRightSide = false) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2048;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // 1. SIGNATURE SIXTY60 SMOOTH VERTICAL GRADIENT
+    // Top: Vibrant Apple/Lime Green (#4ebc25), Bottom: Electric Cyan/Turquoise (#00b4d8)
+    const baseGrad = ctx.createLinearGradient(0, 0, 0, H);
+    baseGrad.addColorStop(0.0, '#52c628');
+    baseGrad.addColorStop(0.28, '#4cb824');
+    baseGrad.addColorStop(0.48, '#1fa574');
+    baseGrad.addColorStop(0.58, '#00b4d8');
+    baseGrad.addColorStop(1.0, '#009bb8');
+    ctx.fillStyle = baseGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Coordinate mapping:
+    // Left side view: Rear is at X=0..W*0.62, Front cab is at X=W*0.62..W
+    // Right side view: Front cab is at X=0..W*0.38, Rear is at X=W*0.38..W
+    const frontStart = isRightSide ? 0 : W * 0.62;
+    const frontEnd = isRightSide ? W * 0.38 : W;
+    const cargoStart = isRightSide ? W * 0.38 : 0;
+    const cargoEnd = isRightSide ? W : W * 0.62;
+
+    // 2. FRONT CAB SIDE WINDOW WITH CHARACTERISTIC KEI SLANT
+    ctx.save();
+    ctx.fillStyle = '#151d24'; // tinted dark glass
+    ctx.strokeStyle = '#0d1318';
+    ctx.lineWidth = 14;
+
+    ctx.beginPath();
+    if (!isRightSide) {
+      // Left side: Front window is at the right side (front of van)
+      // Top A-pillar slant down to front, bottom sill has downward slant at front
+      const winL = W * 0.67;
+      const winR = W * 0.94;
+      const winT = H * 0.08;
+      const winB = H * 0.44;
+      ctx.moveTo(winL, winT);
+      ctx.lineTo(winR - 90, winT);
+      ctx.lineTo(winR, winT + 80);
+      ctx.lineTo(winR, winB - 25);
+      ctx.lineTo(winR - 80, winB);
+      ctx.lineTo(winL, winB);
+      ctx.closePath();
+    } else {
+      // Right side: Front window is at the left side (front of van)
+      const winL = W * 0.06;
+      const winR = W * 0.33;
+      const winT = H * 0.08;
+      const winB = H * 0.44;
+      ctx.moveTo(winL + 90, winT);
+      ctx.lineTo(winR, winT);
+      ctx.lineTo(winR, winB);
+      ctx.lineTo(winL + 80, winB);
+      ctx.lineTo(winL, winB - 25);
+      ctx.lineTo(winL, winT + 80);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // Window reflection gloss highlight
+    const winRefl = ctx.createLinearGradient(0, 0, W, H);
+    winRefl.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+    winRefl.addColorStop(0.35, 'rgba(255, 255, 255, 0.04)');
+    winRefl.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
+    ctx.fillStyle = winRefl;
+    ctx.fill();
+    ctx.restore();
+
+    // 3. BLACK B-PILLAR & WINDOW DIVIDERS
+    ctx.fillStyle = '#1a1f24';
+    if (!isRightSide) {
+      ctx.fillRect(W * 0.645, H * 0.06, W * 0.035, H * 0.42);
+    } else {
+      ctx.fillRect(W * 0.32, H * 0.06, W * 0.035, H * 0.42);
+    }
+
+    // 4. SIGNATURE WHITE LIGHTNING BOLT / FLASH GRAPHIC
+    // Prominent bold white lightning bolt sweeping along waistline with sharp forward-pointing spear
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+
+    ctx.beginPath();
+    if (!isRightSide) {
+      // Left side: Spear points to the RIGHT (towards front)
+      // Main bolt
+      ctx.moveTo(W * 0.08, H * 0.49);
+      ctx.lineTo(W * 0.36, H * 0.49);
+      ctx.lineTo(W * 0.45, H * 0.45);
+      ctx.lineTo(W * 0.41, H * 0.54);
+      ctx.lineTo(W * 0.58, H * 0.51);
+      ctx.lineTo(W * 0.53, H * 0.59);
+      ctx.lineTo(W * 0.78, H * 0.54); // spearhead pointing forward
+      ctx.lineTo(W * 0.62, H * 0.65);
+      ctx.lineTo(W * 0.66, H * 0.62);
+      ctx.lineTo(W * 0.50, H * 0.69);
+      ctx.lineTo(W * 0.53, H * 0.65);
+      ctx.lineTo(W * 0.38, H * 0.71);
+      ctx.lineTo(W * 0.42, H * 0.64);
+      ctx.lineTo(W * 0.20, H * 0.67);
+      ctx.lineTo(W * 0.25, H * 0.60);
+      ctx.lineTo(W * 0.08, H * 0.57);
+      ctx.closePath();
+      ctx.fill();
+
+      // Secondary sharp lightning accent underneath
+      ctx.beginPath();
+      ctx.moveTo(W * 0.28, H * 0.73);
+      ctx.lineTo(W * 0.48, H * 0.73);
+      ctx.lineTo(W * 0.56, H * 0.69);
+      ctx.lineTo(W * 0.44, H * 0.77);
+      ctx.closePath();
+      ctx.fill();
+
+    } else {
+      // Right side: Spear points to the LEFT (towards front)
+      // Main bolt
+      ctx.moveTo(W * 0.92, H * 0.49);
+      ctx.lineTo(W * 0.64, H * 0.49);
+      ctx.lineTo(W * 0.55, H * 0.45);
+      ctx.lineTo(W * 0.59, H * 0.54);
+      ctx.lineTo(W * 0.42, H * 0.51);
+      ctx.lineTo(W * 0.47, H * 0.59);
+      ctx.lineTo(W * 0.22, H * 0.54); // spearhead pointing forward
+      ctx.lineTo(W * 0.38, H * 0.65);
+      ctx.lineTo(W * 0.34, H * 0.62);
+      ctx.lineTo(W * 0.50, H * 0.69);
+      ctx.lineTo(W * 0.47, H * 0.65);
+      ctx.lineTo(W * 0.62, H * 0.71);
+      ctx.lineTo(W * 0.58, H * 0.64);
+      ctx.lineTo(W * 0.80, H * 0.67);
+      ctx.lineTo(W * 0.75, H * 0.60);
+      ctx.lineTo(W * 0.92, H * 0.57);
+      ctx.closePath();
+      ctx.fill();
+
+      // Secondary sharp lightning accent underneath
+      ctx.beginPath();
+      ctx.moveTo(W * 0.72, H * 0.73);
+      ctx.lineTo(W * 0.52, H * 0.73);
+      ctx.lineTo(W * 0.44, H * 0.69);
+      ctx.lineTo(W * 0.56, H * 0.77);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 5. "Checkers Hyper" TYPOGRAPHY ON UPPER CARGO GREEN
+    // Bold white typography matching official Sixty60 livery
+    ctx.save();
+    const cargoCenterX = !isRightSide ? W * 0.34 : W * 0.66;
+    const textBaseY = H * 0.34;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetX = 3;
+    ctx.shadowOffsetY = 5;
+
+    // "Checkers"
+    ctx.font = 'bold 78px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '2px';
+    ctx.fillText('Checkers', cargoCenterX, textBaseY - 88);
+
+    // "Hyper" - Giant aggressive racing italic sans-serif
+    ctx.font = 'italic 900 190px "Arial Black", "Montserrat", Impact, sans-serif';
+    ctx.fillText('Hyper', cargoCenterX, textBaseY + 68);
+    ctx.restore();
+
+    // 6. "NOW ON sixty60" LOGO ON LOWER FRONT DOOR (CYAN SECTION)
+    ctx.save();
+    const frontDoorX = !isRightSide ? W * 0.77 : W * 0.23;
+    const logoY = H * 0.68;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 3;
+
+    // "NOW ON"
+    ctx.font = 'bold 32px "Montserrat", Arial, sans-serif';
+    ctx.letterSpacing = '3px';
+    ctx.fillText('NOW ON', frontDoorX, logoY - 32);
+
+    // "sixty" + 60 clock icon
+    ctx.font = 'bold 78px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.letterSpacing = '-1px';
+    ctx.fillText('sixty', frontDoorX + 10, logoY + 48);
+
+    // Clock Circle Icon representing "60"
+    const clockX = frontDoorX + 72;
+    const clockY = logoY + 22;
+    const clockR = 40;
+
+    // Clock ring
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(clockX, clockY, clockR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Clock tick markers
+    ctx.lineWidth = 4;
+    for (let a = 0; a < 12; a++) {
+      const angle = (a * Math.PI) / 6;
+      const x1 = clockX + Math.cos(angle) * (clockR - 6);
+      const y1 = clockY + Math.sin(angle) * (clockR - 6);
+      const x2 = clockX + Math.cos(angle) * (clockR - 1);
+      const y2 = clockY + Math.sin(angle) * (clockR - 1);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    // Clock hands (pointing at 10 past 10)
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(clockX, clockY);
+    ctx.lineTo(clockX - 16, clockY - 20); // hour hand
+    ctx.moveTo(clockX, clockY);
+    ctx.lineTo(clockX + 22, clockY - 10); // minute hand
+    ctx.stroke();
+
+    // "60" centered in the clock
+    ctx.font = '900 36px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('60', clockX, clockY + 36);
+    ctx.restore();
+
+    // 7. REALISTIC VEHICLE ARCHITECTURAL PANEL GAPS & HARDWARE
+    ctx.save();
+    ctx.strokeStyle = 'rgba(15, 23, 30, 0.45)';
+    ctx.lineWidth = 4;
+
+    if (!isRightSide) {
+      // Left side:
+      // Front cab door seam
+      ctx.beginPath();
+      ctx.moveTo(W * 0.62, H * 0.06);
+      ctx.lineTo(W * 0.62, H * 0.88);
+      // Front fender seam
+      ctx.moveTo(W * 0.94, H * 0.38);
+      ctx.lineTo(W * 0.94, H * 0.88);
+      // Sliding door rear seam
+      ctx.moveTo(W * 0.12, H * 0.06);
+      ctx.lineTo(W * 0.12, H * 0.88);
+      ctx.stroke();
+
+      // Black horizontal sliding door guide rail
+      ctx.fillStyle = '#1c2226';
+      ctx.fillRect(W * 0.12, H * 0.525, W * 0.50, 9);
+
+      // Front door handle (recessed black vertical oval)
+      ctx.fillStyle = '#181e22';
+      ctx.beginPath();
+      ctx.roundRect(W * 0.66, H * 0.48, 20, 52, 8);
+      ctx.fill();
+
+      // Sliding cargo door handle (horizontal)
+      ctx.beginPath();
+      ctx.roundRect(W * 0.55, H * 0.50, 48, 18, 6);
+      ctx.fill();
+
+      // Amber side turn indicator light on front fender
+      const indX = W * 0.90, indY = H * 0.52;
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath();
+      ctx.ellipse(indX, indY, 18, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#e65100';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Fuel filler door on left rear flank
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(W * 0.16, H * 0.62, 58, 58);
+
+    } else {
+      // Right side:
+      // Front fender seam
+      ctx.beginPath();
+      ctx.moveTo(W * 0.06, H * 0.38);
+      ctx.lineTo(W * 0.06, H * 0.88);
+      // Front cab door seam
+      ctx.moveTo(W * 0.38, H * 0.06);
+      ctx.lineTo(W * 0.38, H * 0.88);
+      // Sliding door rear seam
+      ctx.moveTo(W * 0.88, H * 0.06);
+      ctx.lineTo(W * 0.88, H * 0.88);
+      ctx.stroke();
+
+      // Black horizontal sliding door guide rail
+      ctx.fillStyle = '#1c2226';
+      ctx.fillRect(W * 0.38, H * 0.525, W * 0.50, 9);
+
+      // Front door handle (recessed black vertical oval)
+      ctx.fillStyle = '#181e22';
+      ctx.beginPath();
+      ctx.roundRect(W * 0.32, H * 0.48, 20, 52, 8);
+      ctx.fill();
+
+      // Sliding cargo door handle (horizontal)
+      ctx.beginPath();
+      ctx.roundRect(W * 0.41, H * 0.50, 48, 18, 6);
+      ctx.fill();
+
+      // Amber side turn indicator light on front fender
+      const indX = W * 0.10, indY = H * 0.52;
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath();
+      ctx.ellipse(indX, indY, 18, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#e65100';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // Lower matte black rocker panel sill along bottom edge
+    ctx.fillStyle = '#161a1d';
+    ctx.fillRect(0, H * 0.91, W, H * 0.09);
+
+    // Subtle waistline protective rub strip
+    ctx.fillStyle = 'rgba(15, 23, 30, 0.35)';
+    ctx.fillRect(0, H * 0.53, W, 7);
+
+    ctx.restore();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  /**
+   * Generates high-definition roof livery texture (1024 x 1024) matching the
+   * TOP VIEW of the Vehicle Model Sheet turnaround.
+   */
+  static createVanRoofTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    const W = 1024, H = 1024;
+
+    // 1. Signature smooth gradient: Green at front and sides, Cyan at center and rear
+    const roofGrad = ctx.createRadialGradient(W * 0.5, H * 0.55, 120, W * 0.5, H * 0.5, W * 0.65);
+    roofGrad.addColorStop(0.0, '#00b4d8');
+    roofGrad.addColorStop(0.55, '#1eb080');
+    roofGrad.addColorStop(1.0, '#50c228');
+    ctx.fillStyle = roofGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Longitudinal roof strengthening ribs
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    for (let x = 140; x <= 880; x += 120) {
+      ctx.fillRect(x, 60, 24, H - 120);
+    }
+
+    // 2. MASSIVE WHITE LIGHTNING BOLT ACROSS THE ROOF (As shown in TOP VIEW)
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+
+    ctx.beginPath();
+    // Diagonal lightning bolt stretching across the center
+    ctx.moveTo(W * 0.28, H * 0.22);
+    ctx.lineTo(W * 0.62, H * 0.22);
+    ctx.lineTo(W * 0.44, H * 0.46);
+    ctx.lineTo(W * 0.72, H * 0.42);
+    ctx.lineTo(W * 0.26, H * 0.86); // bottom spear
+    ctx.lineTo(W * 0.42, H * 0.58);
+    ctx.lineTo(W * 0.22, H * 0.60);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // 3. Checkers Sixty60 CLOCK LOGO IN THE CENTER
+    ctx.save();
+    const lcx = W * 0.72, lcy = H * 0.35;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(lcx, lcy, 52, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Clock hands
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(lcx, lcy);
+    ctx.lineTo(lcx - 20, lcy - 24);
+    ctx.moveTo(lcx, lcy);
+    ctx.lineTo(lcx + 28, lcy - 12);
+    ctx.stroke();
+
+    // "sixty" text next to clock
+    ctx.font = 'bold 54px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('sixty', lcx - 64, lcy + 18);
+    ctx.restore();
+
+    // 4. "Checkers Hyper" WHITE LOGO PRINTED ALONG BOTH SIDES OF THE ROOF
+    // Left roof edge (rotated -90 deg)
+    ctx.save();
+    ctx.translate(70, H * 0.5);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 36px "Montserrat", sans-serif';
+    ctx.fillText('Checkers', 0, -32);
+    ctx.font = 'italic 900 68px "Arial Black", sans-serif';
+    ctx.fillText('Hyper', 0, 32);
+    ctx.restore();
+
+    // Right roof edge (rotated 90 deg)
+    ctx.save();
+    ctx.translate(W - 70, H * 0.5);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 36px "Montserrat", sans-serif';
+    ctx.fillText('Checkers', 0, -32);
+    ctx.font = 'italic 900 68px "Arial Black", sans-serif';
+    ctx.fillText('Hyper', 0, 32);
+    ctx.restore();
+
+    // Front cab roof Sixty60 logo (above windshield)
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px "Montserrat", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚡ SIXTY60 ⚡', W * 0.5, H * 0.94);
+    ctx.restore();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  /**
+   * Generates high-definition front fascia texture (1024 x 512) matching the
+   * FRONT VIEW of the Vehicle Model Sheet turnaround.
+   */
+  static createVanFrontTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    // Background two-tone split: Top lime green, Bottom vibrant cyan
-    const greenColor = '#13b843';
-    const cyanColor = '#00a3b8';
-    const lightningColor = '#ffffff';
+    const W = 1024, H = 512;
 
-    ctx.fillStyle = greenColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 1. Signature smooth vertical gradient: Green at top, Cyan in center/bottom
+    const frontGrad = ctx.createLinearGradient(0, 0, 0, H);
+    frontGrad.addColorStop(0.0, '#50c228');
+    frontGrad.addColorStop(0.35, '#22ae68');
+    frontGrad.addColorStop(0.65, '#00b4d8');
+    frontGrad.addColorStop(1.0, '#009ab8');
+    ctx.fillStyle = frontGrad;
+    ctx.fillRect(0, 0, W, H);
 
-    // Diagonal lightning bolt cut
-    ctx.fillStyle = cyanColor;
+    // 2. White "NOW ON sixty60" BRANDING CENTERED ON NOSE ABOVE GRILLE
+    ctx.save();
+    const cx = W * 0.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 2;
+
+    ctx.font = 'bold 24px "Montserrat", Arial, sans-serif';
+    ctx.letterSpacing = '2px';
+    ctx.fillText('NOW ON', cx, 85);
+
+    // "sixty" + clock icon
+    ctx.font = 'bold 54px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('sixty', cx - 15, 145);
+
+    // Clock circle
+    const clockX = cx + 38, clockY = 125, clockR = 28;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 7;
     ctx.beginPath();
-    ctx.moveTo(0, 240);
-    // Draw stepped lightning bolt pattern matching the Sixty60 Hyper van
-    ctx.lineTo(260, 240);
-    ctx.lineTo(320, 275);
-    ctx.lineTo(460, 275);
-    ctx.lineTo(540, 230);
-    ctx.lineTo(1024, 255);
-    ctx.lineTo(1024, 512);
-    ctx.lineTo(0, 512);
-    ctx.closePath();
+    ctx.arc(clockX, clockY, clockR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(clockX, clockY);
+    ctx.lineTo(clockX - 12, clockY - 14);
+    ctx.moveTo(clockX, clockY);
+    ctx.lineTo(clockX + 16, clockY - 6);
+    ctx.stroke();
+
+    ctx.font = '900 24px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('60', clockX, clockY + 24);
+    ctx.restore();
+
+    // 3. HORIZONTAL BLACK FRONT GRILLE WITH SUZUKI CHROME EMBLEM
+    const grilleL = 220, grilleR = W - 220, grilleT = 180, grilleH = 120;
+    ctx.fillStyle = '#181b1e';
+    ctx.beginPath();
+    ctx.roundRect(grilleL, grilleT, grilleR - grilleL, grilleH, 12);
     ctx.fill();
 
-    // White lightning bolt accent stripe
-    ctx.strokeStyle = lightningColor;
-    ctx.lineWidth = 14;
+    // Grille mesh pattern & horizontal slats
+    ctx.strokeStyle = '#2b3137';
+    ctx.lineWidth = 4;
+    for (let y = grilleT + 18; y < grilleT + grilleH; y += 22) {
+      ctx.beginPath();
+      ctx.moveTo(grilleL + 12, y);
+      ctx.lineTo(grilleR - 12, y);
+      ctx.stroke();
+    }
+
+    // Chrome center Suzuki "S" emblem
+    ctx.save();
+    const gcx = W * 0.5, gcy = grilleT + grilleH * 0.5;
+    // Chrome badge backing
+    ctx.fillStyle = '#101315';
+    ctx.beginPath();
+    ctx.roundRect(gcx - 36, gcy - 36, 72, 72, 10);
+    ctx.fill();
+
+    // Chrome stylized "S"
+    const sGrad = ctx.createLinearGradient(gcx - 24, gcy - 24, gcx + 24, gcy + 24);
+    sGrad.addColorStop(0.0, '#ffffff');
+    sGrad.addColorStop(0.4, '#d8dee4');
+    sGrad.addColorStop(0.7, '#88939e');
+    sGrad.addColorStop(1.0, '#ffffff');
+    ctx.strokeStyle = sGrad;
+    ctx.lineWidth = 9;
     ctx.lineJoin = 'miter';
     ctx.beginPath();
-    ctx.moveTo(0, 240);
-    ctx.lineTo(260, 240);
-    ctx.lineTo(320, 275);
-    ctx.lineTo(460, 275);
-    ctx.lineTo(540, 230);
-    ctx.lineTo(1024, 255);
+    ctx.moveTo(gcx + 20, gcy - 20);
+    ctx.lineTo(gcx - 12, gcy - 20);
+    ctx.lineTo(gcx - 18, gcy - 4);
+    ctx.lineTo(gcx + 14, gcy + 4);
+    ctx.lineTo(gcx + 18, gcy + 20);
+    ctx.lineTo(gcx - 20, gcy + 20);
     ctx.stroke();
-
-    // Secondary subtle lightning streak
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(0, 270);
-    ctx.lineTo(240, 270);
-    ctx.lineTo(300, 305);
-    ctx.lineTo(480, 305);
-    ctx.lineTo(560, 260);
-    ctx.lineTo(1024, 285);
-    ctx.stroke();
-
-    // "Checkers Hyper" Text on Upper Cargo side
-    ctx.save();
-    if (isFlipped) {
-      // Invert horizontally if needed for opposite side mapping
-      // but canvas text looks best aligned left-to-right on car sides
-    }
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'italic 900 68px "Arial Black", Impact, sans-serif';
-    ctx.textAlign = 'center';
-    
-    // Slight italic slant
-    const textX = 640;
-    const textY = 145;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = 4;
-    
-    // Sub-title "Checkers"
-    ctx.font = 'bold 36px "Arial Black", sans-serif';
-    ctx.fillText('Checkers', textX - 70, textY - 45);
-
-    // Main title "Hyper"
-    ctx.font = 'italic 900 96px "Arial Black", Impact, sans-serif';
-    ctx.fillText('Hyper', textX + 40, textY + 30);
     ctx.restore();
 
-    // "NOW ON Sixty60" on lower cyan section
-    ctx.save();
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'left';
-    ctx.font = 'bold 24px Arial, sans-serif';
-    ctx.fillText('NOW ON', 120, 420);
+    // 4. KEI HEADLIGHT UNITS (Left & Right)
+    const drawHeadlightUnit = (hx, hy, isLeft) => {
+      // Outer black/chrome housing
+      ctx.fillStyle = '#121619';
+      ctx.beginPath();
+      ctx.roundRect(hx, hy, 165, 115, 14);
+      ctx.fill();
 
-    ctx.font = 'italic 900 52px "Arial Black", sans-serif';
-    ctx.fillText('SIXTY', 230, 422);
-    
-    // Draw Sixty60 Clock Icon
-    const clockX = 410;
-    const clockY = 405;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 6;
+      // Chrome reflector bowl
+      const refGrad = ctx.createLinearGradient(hx, hy, hx + 165, hy + 115);
+      refGrad.addColorStop(0, '#78848f');
+      refGrad.addColorStop(0.3, '#d4dce4');
+      refGrad.addColorStop(0.7, '#ffffff');
+      refGrad.addColorStop(1, '#505a62');
+      ctx.fillStyle = refGrad;
+      ctx.beginPath();
+      ctx.roundRect(hx + 8, hy + 8, 110, 99, 10);
+      ctx.fill();
+
+      // Projector bulb lens
+      const lensGrad = ctx.createRadialGradient(hx + 62, hy + 58, 4, hx + 62, hy + 58, 38);
+      lensGrad.addColorStop(0, '#ffffff');
+      lensGrad.addColorStop(0.4, '#cceeff');
+      lensGrad.addColorStop(0.75, '#5599bb');
+      lensGrad.addColorStop(1, '#1b2d38');
+      ctx.fillStyle = lensGrad;
+      ctx.beginPath();
+      ctx.arc(hx + 62, hy + 58, 34, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Amber corner turn signal
+      const ambX = isLeft ? hx + 124 : hx + 124;
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath();
+      ctx.roundRect(ambX, hy + 12, 32, 91, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#e65100';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    };
+
+    drawHeadlightUnit(35, 185, true);
+    drawHeadlightUnit(W - 200, 185, false);
+
+    // 5. LOWER BUMPER & AIR INTAKE
+    ctx.fillStyle = '#16191c';
     ctx.beginPath();
-    ctx.arc(clockX, clockY, 26, 0, Math.PI * 2);
-    ctx.stroke();
-    // Clock hands
-    ctx.beginPath();
-    ctx.moveTo(clockX, clockY);
-    ctx.lineTo(clockX, clockY - 14);
-    ctx.moveTo(clockX, clockY);
-    ctx.lineTo(clockX + 11, clockY + 6);
-    ctx.stroke();
-
-    // Number "60"
-    ctx.font = '900 36px "Arial Black", sans-serif';
-    ctx.fillText('60', clockX + 34, clockY + 12);
-    ctx.restore();
-
-    // Side sliding door track groove
-    ctx.fillStyle = '#222222';
-    ctx.fillRect(480, 260, 480, 5);
-
-    // Door seams & handle
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = 3;
-    // Front door seam
-    ctx.beginPath();
-    ctx.moveTo(420, 50);
-    ctx.lineTo(420, 480);
-    // Sliding door seam
-    ctx.moveTo(940, 50);
-    ctx.lineTo(940, 480);
-    ctx.stroke();
-
-    // Door handles
-    ctx.fillStyle = '#1a1a1a';
-    ctx.beginPath();
-    ctx.roundRect(380, 245, 34, 12, 4);
-    ctx.roundRect(500, 245, 34, 12, 4);
+    ctx.roundRect(80, 340, W - 160, 140, 16);
     ctx.fill();
+
+    // Center license plate holder
+    ctx.fillStyle = '#f8f9fa';
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(cx - 120, 375, 240, 75, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 36px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SIXTY 60', cx, 424);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
   }
 
-  static createVanRoofTexture() {
+  /**
+   * Generates high-definition rear tailgate texture (1024 x 768) matching the
+   * BACK VIEW of the Vehicle Model Sheet turnaround.
+   */
+  static createVanRearTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 768;
+    const ctx = canvas.getContext('2d');
+
+    const W = 1024, H = 768;
+
+    // 1. Vertical Signature Gradient: Green on top, Cyan in center/bottom
+    const rearGrad = ctx.createLinearGradient(0, 0, 0, H);
+    rearGrad.addColorStop(0.0, '#50c228');
+    rearGrad.addColorStop(0.4, '#1cb276');
+    rearGrad.addColorStop(0.7, '#00b4d8');
+    rearGrad.addColorStop(1.0, '#0096b4');
+    ctx.fillStyle = rearGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 2. LARGE REAR TAILGATE WINDOW / RECESSED UPPER PANEL
+    const winW = 760, winH = 260;
+    const winL = (W - winW) * 0.5, winT = 60;
+    ctx.fillStyle = '#12171c'; // dark tinted glass
+    ctx.strokeStyle = '#0d1114';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.roundRect(winL, winT, winW, winH, 24);
+    ctx.fill();
+    ctx.stroke();
+
+    // Rear window wiper
+    ctx.strokeStyle = '#282e34';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.5, winT + winH - 12);
+    ctx.lineTo(W * 0.58, winT + 40);
+    ctx.stroke();
+
+    // 3. PROMINENT WHITE SIXTY60 LOGO CENTERED ON TAILGATE (As shown in BACK VIEW)
+    ctx.save();
+    const cx = W * 0.5, logoY = 385;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 3;
+
+    // "sixty" + 60 clock icon
+    ctx.font = 'bold 78px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('sixty', cx - 20, logoY + 28);
+
+    // Clock icon
+    const clockX = cx + 54, clockY = logoY, clockR = 40;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(clockX, clockY, clockR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(clockX, clockY);
+    ctx.lineTo(clockX - 16, clockY - 20);
+    ctx.moveTo(clockX, clockY);
+    ctx.lineTo(clockX + 22, clockY - 10);
+    ctx.stroke();
+
+    ctx.font = '900 36px "Montserrat", "Arial Black", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('60', clockX, clockY + 36);
+    ctx.restore();
+
+    // 4. VERTICAL CORNER TAILLIGHTS (Left & Right)
+    // Top 40%: Red brake/tail, Middle 30%: Amber turn, Bottom 30%: White reverse
+    const drawTailLightCluster = (tx) => {
+      // Black housing
+      ctx.fillStyle = '#101416';
+      ctx.beginPath();
+      ctx.roundRect(tx, 220, 68, 280, 10);
+      ctx.fill();
+
+      // Red brake lens (prism reflector texture)
+      const redGrad = ctx.createLinearGradient(tx, 225, tx + 68, 345);
+      redGrad.addColorStop(0, '#e53935');
+      redGrad.addColorStop(0.5, '#ff1744');
+      redGrad.addColorStop(1, '#b71c1c');
+      ctx.fillStyle = redGrad;
+      ctx.fillRect(tx + 6, 226, 56, 115);
+
+      // Amber turn signal
+      const ambGrad = ctx.createLinearGradient(tx, 346, tx + 68, 425);
+      ambGrad.addColorStop(0, '#ffb300');
+      ambGrad.addColorStop(1, '#ff8f00');
+      ctx.fillStyle = ambGrad;
+      ctx.fillRect(tx + 6, 347, 56, 76);
+
+      // White reverse lens
+      const revGrad = ctx.createLinearGradient(tx, 428, tx + 68, 495);
+      revGrad.addColorStop(0, '#f5f7fa');
+      revGrad.addColorStop(1, '#cfd8dc');
+      ctx.fillStyle = revGrad;
+      ctx.fillRect(tx + 6, 429, 56, 66);
+
+      // Inner lens fluting lines
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 2;
+      for (let y = 232; y < 490; y += 12) {
+        ctx.beginPath();
+        ctx.moveTo(tx + 8, y);
+        ctx.lineTo(tx + 60, y);
+        ctx.stroke();
+      }
+    };
+
+    drawTailLightCluster(28);
+    drawTailLightCluster(W - 96);
+
+    // 5. RECESSED LICENSE PLATE HOUSING & REAR HANDLE
+    ctx.fillStyle = '#14181a';
+    ctx.beginPath();
+    ctx.roundRect(cx - 150, 470, 300, 130, 10);
+    ctx.fill();
+
+    // Black horizontal grab handle
+    ctx.fillStyle = '#22282c';
+    ctx.beginPath();
+    ctx.roundRect(cx - 100, 455, 200, 24, 6);
+    ctx.fill();
+
+    // License plate
+    ctx.fillStyle = '#fffae8';
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(cx - 110, 495, 220, 80, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 36px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SIXTY 60', cx, 548);
+
+    // 6. MATTE BLACK REAR BUMPER
+    ctx.fillStyle = '#16191c';
+    ctx.fillRect(0, H - 120, W, 120);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  /**
+   * Generates high-definition multi-spoke silver alloy wheel rim texture (512 x 512)
+   * matching the 8-spoke alloy wheels shown in all views of the Vehicle Model Sheet.
+   */
+  static createWheelRimTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#13b843';
-    ctx.fillRect(0, 0, 512, 512);
+    const cx = 256, cy = 256;
 
-    // Center roof logo
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 32px "Arial Black", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Checkers', 256, 210);
-
-    ctx.font = 'italic 900 84px "Arial Black", Impact, sans-serif';
-    ctx.fillText('Hyper', 256, 285);
-
-    ctx.font = 'bold 24px Arial, sans-serif';
-    ctx.fillText('NOW ON SIXTY60', 256, 335);
-
-    // Roof ribs / grooves
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-    for (let i = 80; i <= 440; i += 60) {
-      ctx.fillRect(i, 40, 14, 432);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
-  }
-
-  static createVanFrontTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-
-    // Split background: top green, bottom cyan
-    ctx.fillStyle = '#13b843';
-    ctx.fillRect(0, 0, 512, 110);
-    ctx.fillStyle = '#00a3b8';
-    ctx.fillRect(0, 110, 512, 146);
-
-    // Black bumper & grille area
-    ctx.fillStyle = '#1c1f21';
+    // Outer dark rim lip
+    ctx.fillStyle = '#1a1d20';
     ctx.beginPath();
-    ctx.roundRect(110, 130, 292, 90, 8);
+    ctx.arc(cx, cy, 250, 0, Math.PI * 2);
     ctx.fill();
 
-    // Grille mesh pattern
-    ctx.strokeStyle = '#33373b';
-    ctx.lineWidth = 2;
-    for (let x = 120; x <= 390; x += 14) {
-      ctx.beginPath();
-      ctx.moveTo(x, 140);
-      ctx.lineTo(x, 210);
-      ctx.stroke();
+    // Dark ventilated brake disc background
+    ctx.fillStyle = '#282c30';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 230, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Disc brake ventilation holes
+    ctx.fillStyle = '#151719';
+    for (let r = 160; r <= 210; r += 24) {
+      for (let a = 0; a < 24; a++) {
+        const ang = (a * Math.PI) / 12 + (r % 2) * 0.1;
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    // Sixty60 front badge emblem
-    const cx = 256, cy = 175;
+    // Machined silver rim outer ring
+    const rimGrad = ctx.createRadialGradient(cx, cy, 140, cx, cy, 240);
+    rimGrad.addColorStop(0.0, '#5a626a');
+    rimGrad.addColorStop(0.4, '#d8e0e8');
+    rimGrad.addColorStop(0.8, '#a0abb6');
+    rimGrad.addColorStop(1.0, '#424850');
+    ctx.strokeStyle = rimGrad;
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 222, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 8 Dual/Split Machined Silver Spokes (As seen on model sheet turnaround)
+    const numSpokes = 8;
+    for (let i = 0; i < numSpokes; i++) {
+      const angle = (i * Math.PI * 2) / numSpokes;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      // Machined silver spoke
+      const spGrad = ctx.createLinearGradient(0, 0, 0, 220);
+      spGrad.addColorStop(0, '#cbd5e1');
+      spGrad.addColorStop(0.5, '#ffffff');
+      spGrad.addColorStop(1, '#94a3b8');
+      ctx.fillStyle = spGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(-16, 50);
+      ctx.lineTo(-24, 218);
+      ctx.lineTo(24, 218);
+      ctx.lineTo(16, 50);
+      ctx.closePath();
+      ctx.fill();
+
+      // Center recessed spoke groove
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.moveTo(-4, 75);
+      ctx.lineTo(-6, 205);
+      ctx.lineTo(6, 205);
+      ctx.lineTo(4, 75);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Deep recessed center hub
+    const hubGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 65);
+    hubGrad.addColorStop(0, '#e2e8f0');
+    hubGrad.addColorStop(0.6, '#64748b');
+    hubGrad.addColorStop(1, '#1e293b');
+    ctx.fillStyle = hubGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 65, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center Suzuki hub cap (bright teal Sixty60 ring with chrome badge)
     ctx.fillStyle = '#00bcd4';
     ctx.beginPath();
-    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 32, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px Arial Black, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('60', cx, cy + 6);
-
-    // Modern Kei Headlights (Left & Right)
-    const drawHeadlight = (hx, hy) => {
-      // Chrome casing
-      ctx.fillStyle = '#222629';
-      ctx.beginPath();
-      ctx.roundRect(hx, hy, 84, 52, 10);
-      ctx.fill();
-
-      // Projector beam lens
-      const grad = ctx.createRadialGradient(hx + 42, hy + 26, 4, hx + 42, hy + 26, 30);
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.3, '#d8f8ff');
-      grad.addColorStop(0.7, '#7ad0e2');
-      grad.addColorStop(1, '#2c4046');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(hx + 42, hy + 26, 22, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Amber turn signal strip
-      ctx.fillStyle = '#ff9800';
-      ctx.fillRect(hx + 8, hy + 38, 68, 8);
-    };
-
-    drawHeadlight(20, 85);
-    drawHeadlight(408, 85);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
-  }
-
-  static createVanRearTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 384;
-    const ctx = canvas.getContext('2d');
-
-    // Split background
-    ctx.fillStyle = '#13b843';
-    ctx.fillRect(0, 0, 512, 180);
-    ctx.fillStyle = '#00a3b8';
-    ctx.fillRect(0, 180, 512, 204);
-
-    // Center vertical seam between the two barn doors
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(256, 0);
-    ctx.lineTo(256, 384);
-    ctx.stroke();
-
-    // Slogan & branding
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.font = 'italic 900 32px "Arial Black", sans-serif';
-    ctx.fillText('DELIVERED IN A FLASH', 256, 80);
-
-    ctx.font = 'bold 28px "Arial Black", sans-serif';
-    ctx.fillText('Checkers Hyper', 256, 125);
-
-    ctx.font = 'bold 22px Arial, sans-serif';
-    ctx.fillText('NOW ON SIXTY60', 256, 225);
-
-    // License plate
-    ctx.fillStyle = '#fffae8';
-    ctx.strokeStyle = '#222';
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(196, 270, 120, 48, 4);
-    ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#111';
-    ctx.font = 'bold 20px "Courier New", monospace';
-    ctx.fillText('SIXTY 60', 256, 302);
-
-    // Vertical Taillights on outer edges
-    const drawTailLight = (tx) => {
-      ctx.fillStyle = '#222';
-      ctx.fillRect(tx, 140, 28, 120);
-
-      // Red brake
-      ctx.fillStyle = '#e53935';
-      ctx.fillRect(tx + 4, 144, 20, 40);
-
-      // Amber indicator
-      ctx.fillStyle = '#ffb300';
-      ctx.fillRect(tx + 4, 188, 20, 32);
-
-      // White reverse light
-      ctx.fillStyle = '#eceff1';
-      ctx.fillRect(tx + 4, 224, 20, 32);
-    };
-
-    drawTailLight(16);
-    drawTailLight(468);
-
-    // Rear door handles
-    ctx.fillStyle = '#222';
-    ctx.beginPath();
-    ctx.roundRect(235, 200, 16, 24, 3);
-    ctx.roundRect(261, 200, 16, 24, 3);
-    ctx.fill();
+    // Chrome lug nuts (5 nuts in circle)
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * Math.PI * 2) / 5;
+      const lx = cx + Math.cos(angle) * 46;
+      const ly = cy + Math.sin(angle) * 46;
+      // Nut socket
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(lx, ly, 10, 0, Math.PI * 2);
+      ctx.fill();
+      // Chrome nut
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.arc(lx, ly, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
   }
 
@@ -447,57 +1044,6 @@ export class TextureGenerator {
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    return texture;
-  }
-
-  static createWheelRimTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-
-    // Metallic alloy wheel face
-    const cx = 128, cy = 128;
-    const grad = ctx.createRadialGradient(cx, cy, 20, cx, cy, 128);
-    grad.addColorStop(0, '#555b62');
-    grad.addColorStop(0.5, '#bdc3c7');
-    grad.addColorStop(0.8, '#7f8c8d');
-    grad.addColorStop(1, '#2c3e50');
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 120, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 5-Spoke Star Design
-    ctx.strokeStyle = '#e0e6ed';
-    ctx.lineWidth = 18;
-    for (let i = 0; i < 5; i++) {
-      const angle = (i * Math.PI * 2) / 5 - Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(angle) * 105, cy + Math.sin(angle) * 105);
-      ctx.stroke();
-    }
-
-    // Center hub cap with Sixty60 Cyan dot
-    ctx.fillStyle = '#00bcd4';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 24, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Lug nuts
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 5; i++) {
-      const angle = (i * Math.PI * 2) / 5;
-      const lx = cx + Math.cos(angle) * 44;
-      const ly = cy + Math.sin(angle) * 44;
-      ctx.beginPath();
-      ctx.arc(lx, ly, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
     return texture;
   }
 
