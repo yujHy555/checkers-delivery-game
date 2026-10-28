@@ -346,15 +346,22 @@ export class ArcadeVehicle {
         if (this.driftFactor < 0.03) this.isDrifting = false;
       }
 
-      // Lateral grip: 100% locked traction at normal/slow speeds so van strictly follows wheels without sliding
-      if (!this.isDrifting && absSpeed < 6.0) {
-        this.velocity.copy(forward).multiplyScalar(this.speed);
+      // Lateral grip: cancel side-slip at normal driving speeds; allow sliding during power-slides
+      const currentLateral = this.velocity.dot(right);
+      if (!this.isDrifting) {
+        // High grip: eliminate unwanted sideways sliding so van tracks smoothly forward
+        this.velocity.addScaledVector(right, -currentLateral);
         this.lateralVelocity = 0;
       } else {
         const gripRate = THREE.MathUtils.lerp(45.0, 0.65, this.driftFactor);
-        const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
+        const lateralDecel = -currentLateral * Math.min(1.0, gripRate * dt);
         this.velocity.addScaledVector(right, lateralDecel);
+        this.lateralVelocity = this.velocity.dot(right);
       }
+
+      // Update current forward speed after throttle, brake, and grip integration
+      this.speed = this.velocity.dot(forward);
+      const currentAbsSpeed = Math.abs(this.speed);
 
       // 7. PHYSICALLY ACCURATE ACKERMANN / BICYCLE KINEMATICS (Zero center-pivot 360 spins when slow or stopped)
       // Real vehicles turn because forward motion rolls the wheels along an arc (omega = (v / L) * tan(delta))
@@ -362,7 +369,7 @@ export class ArcadeVehicle {
       const wheelbase = this.wheelBaseHalf * 2;
       const dirSign = this.speed >= -0.05 ? 1 : -1;
 
-      if (absSpeed <= 0.20) {
+      if (currentAbsSpeed <= 0.12) {
         // Completely stationary or slowing to a stop: front wheels turn visually, but vehicle CANNOT rotate in place
         this.angularVelocity = 0;
         if (!input.throttle && !input.brake) {
@@ -375,11 +382,11 @@ export class ArcadeVehicle {
         const kinematicYawRate = (this.speed / wheelbase) * tanSteer;
 
         // Agile scaling at medium/high road speeds for responsive arcade feel, but strictly 1.0 at low speeds
-        const agilityBonus = THREE.MathUtils.lerp(1.0, 1.45, THREE.MathUtils.clamp((absSpeed - 3.0) / 12.0, 0.0, 1.0));
+        const agilityBonus = THREE.MathUtils.lerp(1.0, 1.45, THREE.MathUtils.clamp((currentAbsSpeed - 3.0) / 12.0, 0.0, 1.0));
         let targetYawRate = kinematicYawRate * agilityBonus;
 
         // Drift oversteer only triggers when actively power-sliding at speed (never when slow or stopping)
-        if (this.isDrifting && absSpeed > 2.0) {
+        if (this.isDrifting && currentAbsSpeed > 2.0) {
           const driftOversteer = this.steerInput * dirSign * 3.2 * this.driftFactor;
           targetYawRate += driftOversteer;
         }
