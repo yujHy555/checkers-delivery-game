@@ -240,34 +240,54 @@ export class VanModel {
     exhaust.position.set(0.44, 0.06, -1.74);
     this.chassisGroup.add(exhaust);
 
-    // 11. 3D VERTICAL REAR CORNER TAILLIGHT CLUSTERS
-    this.tailGlowMat = new THREE.MeshBasicMaterial({ color: 0x3a0808 });
+    // 11. 3D VERTICAL REAR CORNER TAILLIGHT CLUSTERS & DUAL BRAKE LIGHTS
+    // Accurately positioned on outer corner pillars (x = ±0.64, y = 0.56, z = -1.69)
+    this.tailGlowMat = new THREE.MeshStandardMaterial({
+      color: 0x3a0808,
+      emissive: 0x120202,
+      emissiveIntensity: 0.2,
+      roughness: 0.2,
+      metalness: 0.1
+    });
 
-    const createTailCluster = (x) => {
+    const createTailCluster = (x, isLeft) => {
       const cluster = new THREE.Group();
-      cluster.position.set(x, 0.60, -1.68);
+      cluster.position.set(x, 0.56, -1.69);
 
-      const housing = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.36, 0.04), trimMat);
+      // Dark housing bezel
+      const housing = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.46, 0.04), trimMat);
+      housing.position.set(0, 0, 0);
 
-      const redLens = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.03), this.tailGlowMat);
-      redLens.position.set(0, 0.10, 0.015);
+      // Red brake lens (top segment, centered at y = 0.70 in world space)
+      const redLens = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.03), this.tailGlowMat);
+      redLens.position.set(0, 0.14, 0.018);
 
-      const amberLens = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.09, 0.03), amberLensMat);
-      amberLens.position.set(0, -0.02, 0.015);
+      // Amber turn signal lens (middle segment, centered at y = 0.565 in world space)
+      const amberLens = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.03), amberLensMat);
+      amberLens.position.set(0, 0.005, 0.018);
 
-      const revLens = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.03), whiteLensMat);
-      revLens.position.set(0, -0.11, 0.015);
+      // White reverse lens (bottom segment, centered at y = 0.445 in world space)
+      const revLens = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.10, 0.03), whiteLensMat);
+      revLens.position.set(0, -0.11, 0.018);
 
-      cluster.add(housing, redLens, amberLens, revLens);
+      // Wrap-around side corner red reflector (as seen in model sheet SIDE VIEWS)
+      const sideReflector = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.08), this.tailGlowMat);
+      sideReflector.position.set(isLeft ? -0.055 : 0.055, 0.14, 0.035);
+
+      cluster.add(housing, redLens, amberLens, revLens, sideReflector);
       return cluster;
     };
-    this.chassisGroup.add(createTailCluster(-0.66));
-    this.chassisGroup.add(createTailCluster(0.66));
+    this.chassisGroup.add(createTailCluster(-0.64, true));
+    this.chassisGroup.add(createTailCluster(0.64, false));
 
-    // Dynamic Red Brake Light Glow
-    this.brakeLight = new THREE.PointLight(0xff1122, 0, 4.0, 2);
-    this.brakeLight.position.set(0, 0.60, -1.82);
-    this.chassisGroup.add(this.brakeLight);
+    // Dynamic Red Brake Lights - Dual point lights positioned directly at each red brake lens
+    this.brakeLightL = new THREE.PointLight(0xff0022, 0, 3.5, 2);
+    this.brakeLightL.position.set(-0.64, 0.70, -1.74);
+    this.chassisGroup.add(this.brakeLightL);
+
+    this.brakeLightR = new THREE.PointLight(0xff0022, 0, 3.5, 2);
+    this.brakeLightR.position.set(0.64, 0.70, -1.74);
+    this.chassisGroup.add(this.brakeLightR);
 
     // Headlight Spotlights
     this.headlightL = new THREE.SpotLight(0xffffff, 2.5, 30, Math.PI / 6, 0.4);
@@ -303,18 +323,38 @@ export class VanModel {
     this.sideSlideDoor.add(slideDoorMesh);
     this.chassisGroup.add(this.sideSlideDoor);
 
-    // Rear Barn Doors
+    // Rear Barn Doors (Width 0.57 each, positioned between corner pillars without overlapping taillights)
     this.rearDoorLeftPivot = new THREE.Group();
-    this.rearDoorLeftPivot.position.set(-0.68, 0.73, -1.65);
-    const rearDoorLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.30, 0.05), rearMat);
-    rearDoorLMesh.position.set(0.33, 0, 0);
+    this.rearDoorLeftPivot.position.set(-0.57, 0.72, -1.684);
+
+    const doorGeoL = new THREE.PlaneGeometry(0.57, 1.30);
+    doorGeoL.rotateY(Math.PI);
+    const uvL = doorGeoL.attributes.uv;
+    uvL.setXY(0, 0.50, 1.0);
+    uvL.setXY(1, 0.08, 1.0);
+    uvL.setXY(2, 0.50, 0.0);
+    uvL.setXY(3, 0.08, 0.0);
+    doorGeoL.uvsNeedUpdate = true;
+
+    const rearDoorLMesh = new THREE.Mesh(doorGeoL, rearMat);
+    rearDoorLMesh.position.set(0.285, 0, 0);
     this.rearDoorLeftPivot.add(rearDoorLMesh);
     this.chassisGroup.add(this.rearDoorLeftPivot);
 
     this.rearDoorRightPivot = new THREE.Group();
-    this.rearDoorRightPivot.position.set(0.68, 0.73, -1.65);
-    const rearDoorRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.30, 0.05), rearMat);
-    rearDoorRMesh.position.set(-0.33, 0, 0);
+    this.rearDoorRightPivot.position.set(0.57, 0.72, -1.684);
+
+    const doorGeoR = new THREE.PlaneGeometry(0.57, 1.30);
+    doorGeoR.rotateY(Math.PI);
+    const uvR = doorGeoR.attributes.uv;
+    uvR.setXY(0, 0.92, 1.0);
+    uvR.setXY(1, 0.50, 1.0);
+    uvR.setXY(2, 0.92, 0.0);
+    uvR.setXY(3, 0.50, 0.0);
+    doorGeoR.uvsNeedUpdate = true;
+
+    const rearDoorRMesh = new THREE.Mesh(doorGeoR, rearMat);
+    rearDoorRMesh.position.set(-0.285, 0, 0);
     this.rearDoorRightPivot.add(rearDoorRMesh);
     this.chassisGroup.add(this.rearDoorRightPivot);
 
@@ -431,11 +471,17 @@ export class VanModel {
     const brakeActive = isBraking || isHandbraking || isReversing || isDecelBraking;
 
     if (brakeActive) {
-      this.tailGlowMat.color.setHex(0xff0022); // Vivid crimson glow
-      if (this.brakeLight) this.brakeLight.intensity = 1.8;
+      this.tailGlowMat.color.setHex(0xff1122);
+      this.tailGlowMat.emissive.setHex(0xff0022);
+      this.tailGlowMat.emissiveIntensity = 2.8;
+      if (this.brakeLightL) this.brakeLightL.intensity = 2.4;
+      if (this.brakeLightR) this.brakeLightR.intensity = 2.4;
     } else {
-      this.tailGlowMat.color.setHex(0x3a0808); // Inactive dim red glass
-      if (this.brakeLight) this.brakeLight.intensity = 0;
+      this.tailGlowMat.color.setHex(0x3a0808);
+      this.tailGlowMat.emissive.setHex(0x100202);
+      this.tailGlowMat.emissiveIntensity = 0.15;
+      if (this.brakeLightL) this.brakeLightL.intensity = 0;
+      if (this.brakeLightR) this.brakeLightR.intensity = 0;
     }
 
     // 6. Animate Doors

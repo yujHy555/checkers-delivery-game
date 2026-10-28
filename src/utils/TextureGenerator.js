@@ -716,50 +716,50 @@ export class TextureGenerator {
     ctx.fillText('60', clockX, clockY + 36);
     ctx.restore();
 
-    // 4. VERTICAL CORNER TAILLIGHTS (Left & Right)
-    // Top 40%: Red brake/tail, Middle 30%: Amber turn, Bottom 30%: White reverse
+    // 4. VERTICAL CORNER TAILLIGHTS (Left & Right outer pillars)
+    // Aligned to match 3D lens coordinates: Red brake (top: 330-430), Amber turn (middle: 432-530), White reverse (bottom: 532-625)
     const drawTailLightCluster = (tx) => {
       // Black housing
       ctx.fillStyle = '#101416';
       ctx.beginPath();
-      ctx.roundRect(tx, 220, 68, 280, 10);
+      ctx.roundRect(tx, 330, 72, 298, 10);
       ctx.fill();
 
       // Red brake lens (prism reflector texture)
-      const redGrad = ctx.createLinearGradient(tx, 225, tx + 68, 345);
+      const redGrad = ctx.createLinearGradient(tx, 335, tx + 72, 430);
       redGrad.addColorStop(0, '#e53935');
       redGrad.addColorStop(0.5, '#ff1744');
       redGrad.addColorStop(1, '#b71c1c');
       ctx.fillStyle = redGrad;
-      ctx.fillRect(tx + 6, 226, 56, 115);
+      ctx.fillRect(tx + 6, 336, 60, 94);
 
       // Amber turn signal
-      const ambGrad = ctx.createLinearGradient(tx, 346, tx + 68, 425);
+      const ambGrad = ctx.createLinearGradient(tx, 432, tx + 72, 530);
       ambGrad.addColorStop(0, '#ffb300');
       ambGrad.addColorStop(1, '#ff8f00');
       ctx.fillStyle = ambGrad;
-      ctx.fillRect(tx + 6, 347, 56, 76);
+      ctx.fillRect(tx + 6, 433, 60, 96);
 
       // White reverse lens
-      const revGrad = ctx.createLinearGradient(tx, 428, tx + 68, 495);
+      const revGrad = ctx.createLinearGradient(tx, 532, tx + 72, 625);
       revGrad.addColorStop(0, '#f5f7fa');
       revGrad.addColorStop(1, '#cfd8dc');
       ctx.fillStyle = revGrad;
-      ctx.fillRect(tx + 6, 429, 56, 66);
+      ctx.fillRect(tx + 6, 533, 60, 92);
 
       // Inner lens fluting lines
       ctx.strokeStyle = 'rgba(0,0,0,0.2)';
       ctx.lineWidth = 2;
-      for (let y = 232; y < 490; y += 12) {
+      for (let y = 340; y < 625; y += 14) {
         ctx.beginPath();
         ctx.moveTo(tx + 8, y);
-        ctx.lineTo(tx + 60, y);
+        ctx.lineTo(tx + 64, y);
         ctx.stroke();
       }
     };
 
-    drawTailLightCluster(28);
-    drawTailLightCluster(W - 96);
+    drawTailLightCluster(20);
+    drawTailLightCluster(W - 92);
 
     // 5. RECESSED LICENSE PLATE HOUSING & REAR HANDLE
     ctx.fillStyle = '#14181a';
