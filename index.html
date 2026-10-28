@@ -813,7 +813,7 @@
       line-height: 1.35;
     }
 
-    /* MOBILE RACING TOUCH CONTROLS (Triangular Steer Arrows & Perforated Pedals) */
+    /* MOBILE RACING TOUCH CONTROLS (Ergonomic Circular Controls in White & Turquoise) */
     #touch-controls {
       position: absolute;
       bottom: 22px;
@@ -824,6 +824,9 @@
       align-items: flex-end;
       z-index: 25;
       pointer-events: none;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
 
     /* LEFT: STEERING CLUSTER */
@@ -838,53 +841,52 @@
       gap: 16px;
       pointer-events: auto;
     }
-    .touch-steer-btn {
-      width: 86px;
-      height: 74px;
-      background: transparent;
-      border: none;
+
+    /* Modern Circular White & Turquoise Touch Button */
+    .touch-circle-btn {
+      border-radius: 50%;
+      background: rgba(8, 145, 178, 0.24);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 3.5px solid #ffffff;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(6, 182, 212, 0.40), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      user-select: none;
+      cursor: pointer;
       outline: none;
       padding: 0;
-      cursor: pointer;
-      touch-action: none;
-      transition: transform 0.08s ease;
-      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
+      transition: transform 0.06s ease, background 0.08s ease, border-color 0.08s ease, box-shadow 0.08s ease;
     }
-    .touch-steer-btn:active, .touch-steer-btn.active {
+    .touch-circle-btn:active, .touch-circle-btn.active {
       transform: scale(0.92);
+      background: linear-gradient(135deg, #00e5ff 0%, #06b6d4 100%);
+      border-color: #ffffff;
+      box-shadow: 0 0 32px #00e5ff, 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 2px 6px rgba(255, 255, 255, 0.85);
+      color: #062b35;
     }
-    .steer-svg {
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-    }
-    .arrow-shape {
-      transition: fill 0.1s ease, filter 0.1s ease;
-    }
-    /* Left arrow: grey/white triangular chevron */
-    .arrow-left {
-      fill: rgba(226, 232, 240, 0.65);
-      stroke: rgba(255, 255, 255, 0.9);
-      stroke-width: 3.5;
-      stroke-linejoin: round;
-    }
-    .touch-steer-btn.btn-left:active .arrow-left, .touch-steer-btn.btn-left.active .arrow-left {
-      fill: #ffffff;
-      filter: drop-shadow(0 0 10px #ffffff);
-    }
-    /* Right arrow: vibrant red triangular chevron */
-    .arrow-right {
-      fill: #dc2626;
-      stroke: #b91c1c;
-      stroke-width: 3.5;
-      stroke-linejoin: round;
-    }
-    .touch-steer-btn.btn-right:active .arrow-right, .touch-steer-btn.btn-right.active .arrow-right {
-      fill: #ef4444;
-      filter: drop-shadow(0 0 12px #ef4444);
+    .touch-circle-btn:active .btn-icon-svg, .touch-circle-btn.active .btn-icon-svg {
+      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.9));
     }
 
-    /* RIGHT: RACING PEDALS & HANDBRAKE CLUSTER */
+    /* Steer Circle Buttons: Generous 84px diameter for easy finger touch */
+    .steer-circle-btn {
+      width: 84px;
+      height: 84px;
+    }
+    .btn-icon-svg {
+      width: 58%;
+      height: 58%;
+      overflow: visible;
+      transition: transform 0.06s ease;
+    }
+
+    /* RIGHT: DRIVING & DRIFT CLUSTER */
     .mobile-right-cluster {
       display: flex;
       flex-direction: column;
@@ -893,107 +895,51 @@
       pointer-events: auto;
     }
 
-    /* Handbrake Turn Button (Positioned on Right Side) */
-    .handbrake-btn {
-      width: 96px;
-      height: 38px;
-      background: rgba(245, 158, 11, 0.32);
-      border: 2px solid #f59e0b;
-      border-radius: 12px;
-      color: #fbbf24;
-      font-family: 'Montserrat', sans-serif;
-      font-weight: 900;
-      font-size: 11.5px;
-      letter-spacing: 0.8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
-      touch-action: none;
-      cursor: pointer;
-      outline: none;
-      transition: transform 0.08s ease, background 0.08s ease;
-      margin-right: 4px;
+    /* Circular Handbrake Drift Button */
+    .drift-circle-btn {
+      width: 68px;
+      height: 68px;
+      border: 3px solid #00e5ff;
+      background: rgba(6, 182, 212, 0.32);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 229, 255, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+      margin-right: 6px;
     }
-    .handbrake-btn:active, .handbrake-btn.active {
-      transform: scale(0.92);
-      background: #f59e0b;
-      color: #0b1a20;
-      box-shadow: 0 0 20px #f59e0b;
+    .drift-circle-btn .btn-icon-svg {
+      width: 72%;
+      height: 72%;
     }
 
-    /* RIGHT: RACING PEDALS (Dual Pedal Setup) */
+    /* Pedals Cluster */
     .pedal-cluster {
       display: flex;
       align-items: flex-end;
-      gap: 18px;
+      gap: 16px;
       pointer-events: auto;
     }
 
-    /* Red Brake Pedal with 6 perforated circular holes */
-    .pedal-brake {
+    /* Brake / Reverse Circle Button (82px) */
+    .brake-circle-btn {
       width: 82px;
       height: 82px;
-      background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
-      border: 3.5px solid #7f1d1d;
-      border-radius: 22px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      touch-action: none;
-      cursor: pointer;
-      outline: none;
-      transition: transform 0.08s ease;
+      border: 3.5px solid #ffffff;
+      background: rgba(8, 145, 178, 0.28);
     }
-    .pedal-brake:active, .pedal-brake.active {
-      transform: scale(0.92);
-      filter: brightness(1.15);
-    }
-    .pedal-holes-brake {
-      display: grid;
-      grid-template-columns: repeat(3, 14px);
-      gap: 9px;
-    }
-    .pedal-holes-brake span {
-      width: 14px;
-      height: 14px;
-      background: #450a0a;
-      border-radius: 50%;
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.85);
+    .brake-circle-btn .btn-icon-svg {
+      width: 62%;
+      height: 62%;
     }
 
-    /* Silver Accelerator Pedal with 8 perforated circular holes */
-    .pedal-gas {
-      width: 66px;
-      height: 124px;
-      background: linear-gradient(180deg, #f1f5f9 0%, #94a3b8 100%);
-      border: 3.5px solid #475569;
-      border-radius: 20px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.65);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      touch-action: none;
-      cursor: pointer;
-      outline: none;
-      transition: transform 0.08s ease;
+    /* Gas / Forward Accelerate Circle Button (Larger 92px for primary thumb resting) */
+    .gas-circle-btn {
+      width: 92px;
+      height: 92px;
+      border: 3.5px solid #00e5ff;
+      background: rgba(6, 182, 212, 0.35);
+      box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45), 0 0 22px rgba(0, 229, 255, 0.55), inset 0 2px 4px rgba(255, 255, 255, 0.65);
     }
-    .pedal-gas:active, .pedal-gas.active {
-      transform: scale(0.92);
-      filter: brightness(1.2);
-    }
-    .pedal-holes-gas {
-      display: grid;
-      grid-template-columns: repeat(2, 14px);
-      gap: 10px 10px;
-    }
-    .pedal-holes-gas span {
-      width: 14px;
-      height: 14px;
-      background: #1e293b;
-      border-radius: 50%;
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.85);
+    .gas-circle-btn .btn-icon-svg {
+      width: 66%;
+      height: 66%;
     }
 
     /* Mobile Contextual Deliver Button */
@@ -1103,26 +1049,28 @@
         height: 7px;
       }
       #touch-controls {
-        bottom: 8px;
-        left: 8px;
-        right: 8px;
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
       }
-      .touch-steer-btn {
-        width: 70px;
+      .steer-circle-btn {
+        width: 74px;
+        height: 74px;
+      }
+      .brake-circle-btn {
+        width: 74px;
+        height: 74px;
+      }
+      .gas-circle-btn {
+        width: 82px;
+        height: 82px;
+      }
+      .drift-circle-btn {
+        width: 60px;
         height: 60px;
       }
-      .pedal-brake {
-        width: 64px;
-        height: 64px;
-      }
-      .pedal-gas {
-        width: 52px;
-        height: 98px;
-      }
-      .handbrake-btn {
-        width: 64px;
-        height: 30px;
-        font-size: 9.5px;
+      #btn-cam {
+        display: none !important;
       }
       #desktop-keys-bar {
         display: none !important;
@@ -1698,23 +1646,22 @@
     </div>
   </div>
 
-  <!-- MOBILE TOUCH CONTROLS (Authentic Racing Setup: Triangles & Pedals) -->
+  <!-- MOBILE TOUCH CONTROLS (Ergonomic Circular Controls in White & Turquoise) -->
   <div id="touch-controls">
     <!-- LEFT: STEERING CLUSTER -->
     <div class="mobile-left-cluster">
-      <!-- Left / Right Triangular Steering Arrows -->
       <div class="steer-cluster">
-        <!-- Left Triangle Button (Grey/White) -->
-        <button class="touch-steer-btn btn-left" id="btn-steer-left" aria-label="Steer Left" tabindex="-1">
-          <svg viewBox="0 0 100 85" class="steer-svg">
-            <polygon points="85,8 85,77 15,42.5" class="arrow-shape arrow-left" />
+        <!-- Steer Left Circle Button -->
+        <button class="touch-circle-btn steer-circle-btn" id="btn-steer-left" aria-label="Steer Left" tabindex="-1">
+          <svg viewBox="0 0 64 64" class="btn-icon-svg">
+            <path d="M38 16L22 32L38 48" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
 
-        <!-- Right Triangle Button (Red) -->
-        <button class="touch-steer-btn btn-right" id="btn-steer-right" aria-label="Steer Right" tabindex="-1">
-          <svg viewBox="0 0 100 85" class="steer-svg">
-            <polygon points="15,8 15,77 85,42.5" class="arrow-shape arrow-right" />
+        <!-- Steer Right Circle Button -->
+        <button class="touch-circle-btn steer-circle-btn" id="btn-steer-right" aria-label="Steer Right" tabindex="-1">
+          <svg viewBox="0 0 64 64" class="btn-icon-svg">
+            <path d="M26 16L42 32L26 48" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
       </div>
@@ -1727,31 +1674,34 @@
       </button>
     </div>
 
-    <!-- RIGHT: RACING PEDALS & HANDBRAKE CLUSTER -->
+    <!-- RIGHT: DRIVING & DRIFT CLUSTER -->
     <div class="mobile-right-cluster">
-      <!-- Handbrake Turn Button (Positioned on Right Side) -->
-      <button class="handbrake-btn" id="btn-drift" aria-label="Handbrake Turn" tabindex="-1">
-        <span>(P) DRIFT</span>
+      <!-- Handbrake Drift Circle Button -->
+      <button class="touch-circle-btn drift-circle-btn" id="btn-drift" aria-label="Handbrake Drift" tabindex="-1">
+        <svg viewBox="0 0 64 64" class="btn-icon-svg drift-svg">
+          <circle cx="32" cy="32" r="18" fill="none" stroke="currentColor" stroke-width="3.5" stroke-dasharray="8 4"/>
+          <text x="32" y="37" font-family="'Montserrat', sans-serif" font-weight="900" font-size="11.5" fill="currentColor" text-anchor="middle" letter-spacing="0.5">DRIFT</text>
+        </svg>
       </button>
 
-      <!-- Racing Pedals (Dual Pedal Setup) -->
+      <!-- Gas & Brake Pedals (Circular Duo) -->
       <div class="pedal-cluster">
-        <!-- Red Brake Pedal (6 perforated holes) -->
-        <button class="racing-pedal pedal-brake" id="btn-brake" aria-label="Brake" tabindex="-1">
-          <div class="pedal-holes-brake">
-            <span></span><span></span><span></span>
-            <span></span><span></span><span></span>
-          </div>
+        <!-- Brake / Reverse Circle Button -->
+        <button class="touch-circle-btn brake-circle-btn" id="btn-brake" aria-label="Brake / Reverse" tabindex="-1">
+          <svg viewBox="0 0 64 64" class="btn-icon-svg">
+            <line x1="18" y1="17" x2="46" y2="17" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+            <path d="M20 27L32 41L44 27" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="32" y="55" font-family="'Montserrat', sans-serif" font-weight="900" font-size="8.5" fill="currentColor" text-anchor="middle" letter-spacing="0.8">REVERSE</text>
+          </svg>
         </button>
 
-        <!-- Silver Accelerator Pedal (8 perforated holes) -->
-        <button class="racing-pedal pedal-gas" id="btn-gas" aria-label="Gas / Accelerate" tabindex="-1">
-          <div class="pedal-holes-gas">
-            <span></span><span></span>
-            <span></span><span></span>
-            <span></span><span></span>
-            <span></span><span></span>
-          </div>
+        <!-- Gas / Accelerate Circle Button -->
+        <button class="touch-circle-btn gas-circle-btn" id="btn-gas" aria-label="Gas / Accelerate" tabindex="-1">
+          <svg viewBox="0 0 64 64" class="btn-icon-svg">
+            <path d="M18 36L32 20L46 36" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M22 46L32 34L42 46" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="32" y="57" font-family="'Montserrat', sans-serif" font-weight="900" font-size="9" fill="currentColor" text-anchor="middle" letter-spacing="1">GAS</text>
+          </svg>
         </button>
       </div>
     </div>

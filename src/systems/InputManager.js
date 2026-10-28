@@ -118,55 +118,67 @@ export class InputManager {
     const el = document.getElementById(id);
     if (!el) return;
 
-    let activePointerId = null;
+    let isDown = false;
+    const activePointers = new Set();
 
-    const onPointerDown = (e) => {
-      e.preventDefault();
-      activePointerId = e.pointerId;
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch (err) {}
-      callback(true);
-      el.classList.add('active');
-    };
-
-    const onPointerUp = (e) => {
-      if (activePointerId !== null && e.pointerId === activePointerId) {
-        activePointerId = null;
-        try {
-          el.releasePointerCapture(e.pointerId);
-        } catch (err) {}
+    const triggerState = (down) => {
+      if (isDown !== down) {
+        isDown = down;
+        callback(down);
+        if (down) {
+          el.classList.add('active');
+        } else {
+          el.classList.remove('active');
+        }
       }
-      callback(false);
-      el.classList.remove('active');
     };
 
-    el.addEventListener('pointerdown', onPointerDown);
-    el.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('pointercancel', onPointerUp);
-    el.addEventListener('pointerleave', (e) => {
-      if (!el.hasPointerCapture || !el.hasPointerCapture(e.pointerId)) {
-        onPointerUp(e);
+    // 1. Unified Pointer Events with multi-touch capture
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      activePointers.add(e.pointerId);
+      triggerState(true);
+    }, { passive: false });
+
+    el.addEventListener('pointerup', (e) => {
+      e.preventDefault();
+      activePointers.delete(e.pointerId);
+      try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (activePointers.size === 0) triggerState(false);
+    }, { passive: false });
+
+    el.addEventListener('pointercancel', (e) => {
+      activePointers.delete(e.pointerId);
+      if (activePointers.size === 0) triggerState(false);
+    }, { passive: false });
+
+    // Window level safety so drag-off never gets stuck
+    window.addEventListener('pointerup', (e) => {
+      if (activePointers.has(e.pointerId)) {
+        activePointers.delete(e.pointerId);
+        if (activePointers.size === 0) triggerState(false);
       }
     });
 
-    // Touch events for ultra-low latency mobile response
+    // 2. Direct Touch Events for instantaneous mobile response
     el.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      callback(true);
-      el.classList.add('active');
+      triggerState(true);
     }, { passive: false });
 
     el.addEventListener('touchend', (e) => {
       e.preventDefault();
-      callback(false);
-      el.classList.remove('active');
-    });
+      if (e.targetTouches.length === 0) {
+        triggerState(false);
+      }
+    }, { passive: false });
 
     el.addEventListener('touchcancel', (e) => {
-      callback(false);
-      el.classList.remove('active');
-    });
+      if (e.targetTouches.length === 0) {
+        triggerState(false);
+      }
+    }, { passive: false });
   }
 
   bindButtonClick(id, callback) {

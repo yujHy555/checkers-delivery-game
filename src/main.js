@@ -152,10 +152,20 @@ class GameApp {
     };
 
     this.input.onToggleCamera = () => {
+      if (this.isMobile) return;
       const mode = this.cameraManager.toggleMode();
-      this.showToast(`Camera: ${mode === 'THIRD_PERSON' ? 'Third-Person Chase' : '3D Isometric'}`);
+      let label = 'Third-Person Chase';
+      let btnText = '📷 3RD CAM';
+      if (mode === 'ISOMETRIC_CLOSE') {
+        label = '3D Isometric (Close)';
+        btnText = '📐 ISO CLOSE';
+      } else if (mode === 'ISOMETRIC_FAR') {
+        label = '3D Isometric (Wide Overview)';
+        btnText = '🌐 ISO WIDE';
+      }
+      this.showToast(`Camera: ${label}`);
       if (this.uiCamBtn) {
-        this.uiCamBtn.innerText = mode === 'THIRD_PERSON' ? '📷 3RD CAM' : '📷 ISO CAM';
+        this.uiCamBtn.innerText = btnText;
       }
     };
 
@@ -190,7 +200,11 @@ class GameApp {
     this.uiMinimapVan = document.getElementById('minimap-player');
 
     if (this.uiCamBtn) {
-      this.uiCamBtn.innerText = '📷 3RD CAM';
+      if (this.isMobile) {
+        this.uiCamBtn.style.display = 'none';
+      } else {
+        this.uiCamBtn.innerText = '📷 3RD CAM';
+      }
     }
 
     // PC & iOS Controls Guide Modal
@@ -342,12 +356,26 @@ class GameApp {
     }
 
     if (btnOptCam) {
-      btnOptCam.addEventListener('click', () => {
-        const mode = this.cameraManager.toggleMode();
-        btnOptCam.innerText = mode === 'THIRD_PERSON' ? '📷 3RD CAM' : '📷 ISO CAM';
-        if (this.uiCamBtn) this.uiCamBtn.innerText = btnOptCam.innerText;
-        this.showToast(`Camera: ${mode === 'THIRD_PERSON' ? 'Third-Person Chase' : '3D Isometric'}`);
-      });
+      if (this.isMobile) {
+        const camRow = btnOptCam.closest('.menu-setting-row');
+        if (camRow) camRow.style.display = 'none';
+      } else {
+        btnOptCam.addEventListener('click', () => {
+          const mode = this.cameraManager.toggleMode();
+          let btnText = '📷 3RD CAM';
+          let label = 'Third-Person Chase';
+          if (mode === 'ISOMETRIC_CLOSE') {
+            btnText = '📐 ISO CLOSE';
+            label = '3D Isometric (Close)';
+          } else if (mode === 'ISOMETRIC_FAR') {
+            btnText = '🌐 ISO WIDE';
+            label = '3D Isometric (Wide Overview)';
+          }
+          btnOptCam.innerText = btnText;
+          if (this.uiCamBtn) this.uiCamBtn.innerText = btnText;
+          this.showToast(`Camera: ${label}`);
+        });
+      }
     }
 
     if (btnOptControls) {

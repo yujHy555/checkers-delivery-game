@@ -40,10 +40,10 @@ export class ArcadeVehicle {
     this.brakeRate = 54.0; // Responsive clean brakes
     this.dragCoeff = 0.985;
 
-    // Speed-Sensitive Steering (Stable at high speeds, agile and snappy at low/mid speeds)
+    // Speed-Sensitive Steering (Ultra-responsive & snappy, agile at all speeds)
     this.steerInput = 0;
     this.steerAngle = 0;
-    this.steerResponse = 24.0;
+    this.steerResponse = 42.0;
 
     // Grip & Drift
     this.isDrifting = false;
@@ -293,21 +293,21 @@ export class ArcadeVehicle {
       }
     }
 
-    // 5. PROGRESSIVE ACCELERATION & BRAKING
+    // 5. PROGRESSIVE ACCELERATION & BRAKING (Instant throttle pickup & responsive reverse)
     if (!this.isAirborne) {
       if (input.throttle > 0) {
         if (this.speed < this.maxSpeed) {
-          const torqueFactor = Math.max(0.48, 1.0 - (this.speed / this.maxSpeed) * 0.52);
+          const torqueFactor = Math.max(0.65, 1.0 - (this.speed / this.maxSpeed) * 0.35);
           const accel = input.throttle * this.baseAccelRate * torqueFactor;
           this.velocity.addScaledVector(forward, accel * dt);
         }
       } else if (input.brake > 0) {
-        if (this.speed > 0.4) {
+        if (this.speed > 0.25) {
           const brake = input.brake * this.brakeRate;
           this.velocity.addScaledVector(forward, -brake * dt);
         } else {
           if (this.speed > -this.reverseMaxSpeed) {
-            this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.75) * dt);
+            this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.85) * dt);
           }
         }
       } else {
@@ -325,7 +325,7 @@ export class ArcadeVehicle {
           this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.75 * dt);
         }
       } else {
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 5.0 * dt);
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 8.0 * dt);
         if (this.driftFactor < 0.04) this.isDrifting = false;
       }
 
@@ -334,23 +334,26 @@ export class ArcadeVehicle {
       const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
       this.velocity.addScaledVector(right, lateralDecel);
 
-      // 7. YAW STEERING & OVERSTEER ROTATION (NO ROTATION WHEN STOPPED)
+      // 7. YAW STEERING & OVERSTEER ROTATION (Immediate steering authority even from standstill)
       let turnFactor = 0;
-      if (absSpeed > 0.1) {
-        turnFactor = Math.min(1.0, absSpeed / 1.4);
+      if (absSpeed > 0.05 || (input && (input.throttle > 0 || input.brake > 0))) {
+        // Immediate steering authority from standstill / low speeds so van maneuvers effortlessly
+        turnFactor = Math.max(0.75, Math.min(1.0, absSpeed / 1.0));
+      } else if (absSpeed > 0.01) {
+        turnFactor = Math.min(1.0, absSpeed / 0.8);
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
       // High-speed drift yaw: responsive oversteer rotation to whip tail out
       let yawRateCoeff;
       if (this.isDrifting) {
-        yawRateCoeff = 4.0; // Fast, responsive tail-out rotation
+        yawRateCoeff = 4.2; // Fast, responsive tail-out rotation
       } else {
-        yawRateCoeff = THREE.MathUtils.lerp(3.5, 1.9, speedRatio);
+        yawRateCoeff = THREE.MathUtils.lerp(3.8, 2.0, speedRatio);
       }
 
       const targetYawRate = this.steerInput * turnFactor * dirSign * yawRateCoeff;
-      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 22.0 * dt);
+      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 32.0 * dt);
       this.heading += this.angularVelocity * dt;
 
     } else {

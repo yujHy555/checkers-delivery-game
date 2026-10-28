@@ -5,7 +5,7 @@ export class CameraManager {
     this.camera = camera;
     this.domElement = domElement;
 
-    // Start in Third-Person Chase Cam by default for immediate intuitive driving!
+    // Start in Third-Person Chase Cam by default
     this.mode = 'THIRD_PERSON';
 
     // Current camera position and look target
@@ -21,7 +21,7 @@ export class CameraManager {
     this.chaseHeight = 2.6;
     this.baseFov = 62;
 
-    // Isometric tracking state
+    // Isometric tracking state (PC / Desktop only)
     this.isoCamHeading = 0;
     this.hasInitIso = false;
     this.colliders = [];
@@ -38,14 +38,33 @@ export class CameraManager {
   }
 
   toggleMode() {
-    this.mode = this.mode === 'THIRD_PERSON' ? 'ISOMETRIC' : 'THIRD_PERSON';
+    // For mobile devices, isometric mode is completely removed: strictly lock to Third-Person Chase
+    if (this.checkIsMobile()) {
+      this.mode = 'THIRD_PERSON';
+      this.hasInitIso = false;
+      return this.mode;
+    }
+
+    // On PC / Desktop: cycle between Third-Person -> Isometric Close -> Isometric Wide Overview
+    if (this.mode === 'THIRD_PERSON') {
+      this.mode = 'ISOMETRIC_CLOSE';
+    } else if (this.mode === 'ISOMETRIC_CLOSE' || this.mode === 'ISOMETRIC') {
+      this.mode = 'ISOMETRIC_FAR';
+    } else {
+      this.mode = 'THIRD_PERSON';
+    }
     this.hasInitIso = false;
     return this.mode;
   }
 
   setMode(mode) {
-    if (mode === 'ISOMETRIC' || mode === 'THIRD_PERSON') {
-      this.mode = mode;
+    if (this.checkIsMobile()) {
+      this.mode = 'THIRD_PERSON';
+      this.hasInitIso = false;
+      return;
+    }
+    if (mode === 'THIRD_PERSON' || mode === 'ISOMETRIC_CLOSE' || mode === 'ISOMETRIC_FAR' || mode === 'ISOMETRIC') {
+      this.mode = mode === 'ISOMETRIC' ? 'ISOMETRIC_CLOSE' : mode;
       this.hasInitIso = false;
     }
   }
@@ -58,21 +77,33 @@ export class CameraManager {
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
     const isMobile = this.checkIsMobile();
 
+    // Enforce third-person chase cam on mobile at all times
+    if (isMobile && this.mode !== 'THIRD_PERSON') {
+      this.mode = 'THIRD_PERSON';
+      this.hasInitIso = false;
+    }
+
     let desiredPos = new THREE.Vector3();
     let desiredTarget = new THREE.Vector3();
 
-    if (this.mode === 'ISOMETRIC') {
-      // 1. Rock-solid fixed FOV (50° on mobile, 48° on desktop)
-      // Completely eliminates disorienting FOV zoom pumping on throttle/brake!
-      const targetFov = isMobile ? 50 : 48;
+    const isIsometric = (this.mode === 'ISOMETRIC_CLOSE' || this.mode === 'ISOMETRIC_FAR' || this.mode === 'ISOMETRIC') && !isMobile;
+
+    if (isIsometric) {
+      const isFar = this.mode === 'ISOMETRIC_FAR';
+
+      // 1. Rock-solid fixed FOV
+      // 48° for close isometric view, 52° for wide tactical bird's eye view
+      const targetFov = isFar ? 52 : 48;
       if (Math.abs(this.camera.fov - targetFov) > 0.05) {
         this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 10.0 * dt);
         this.camera.updateProjectionMatrix();
       }
 
-      // 2. Elevated isometric vantage: optimal viewing angle and altitude above building rooftops
-      const isoDist = isMobile ? 9.8 : 12.0;
-      const isoHeight = isMobile ? 11.8 : 14.0;
+      // 2. Camera distance & altitude:
+      // Close: isoDist = 12.0, isoHeight = 14.0 (tight focus on van)
+      // Far:   isoDist = 26.0, isoHeight = 30.0 (wide tactical view of city, ramps, track)
+      const isoDist = isFar ? 26.0 : 12.0;
+      const isoHeight = isFar ? 30.0 : 14.0;
 
       if (!this.hasInitIso) {
         this.isoCamHeading = heading;
@@ -90,26 +121,24 @@ export class CameraManager {
         let diff = heading - this.isoCamHeading;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        const turnRate = isMobile ? 8.5 : 7.0;
+        const turnRate = isFar ? 5.5 : 7.0;
         this.isoCamHeading += diff * (1.0 - Math.exp(-turnRate * dt));
       }
 
       const sinH = Math.sin(this.isoCamHeading);
       const cosH = Math.cos(this.isoCamHeading);
 
-      // Desired position is mathematically locked to a constant spherical orbital radius
-      // Never cuts across the chord during turns, eliminating camera surge / chugging
+      // Spherical orbital positioning: radius is constant, zero chord cutting
       desiredPos.set(
         focusPos.x - sinH * isoDist,
         focusPos.y + isoHeight,
         focusPos.z - cosH * isoDist
       );
 
-      // Target is locked to van chassis center (zero look-ahead pitch tilt oscillation)
+      // Target locked to van chassis center
       desiredTarget.set(focusPos.x, focusPos.y + 0.75, focusPos.z);
 
       // Building Obstacle Clearance & White Flash Elimination:
-      // If the camera is inside or near any building footprint, smoothly elevate above the roof (+2.0m buffer)
       if (this.colliders) {
         for (const c of this.colliders) {
           if (c.type === 'box') {
@@ -131,15 +160,15 @@ export class CameraManager {
         }
       }
 
-      // Critically damped exponential smoothing for ultra-smooth buttery motion
-      const followRate = isMobile ? 14.0 : 11.0;
+      // Smooth exponential follow
+      const followRate = isFar ? 8.0 : 11.0;
       const lerpFactor = 1.0 - Math.exp(-followRate * dt);
       this.currentPos.lerp(desiredPos, lerpFactor);
       this.currentTarget.lerp(desiredTarget, lerpFactor);
 
     } else {
       this.hasInitIso = false;
-      // Dynamic Third-Person Chase Cam (Moved closer towards van on mobile!)
+      // Dynamic Third-Person Chase Cam (Optimized for Mobile & Desktop!)
       const baseDist = isMobile ? 4.6 : 6.4;
       const baseHeight = isMobile ? 1.95 : 2.6;
       const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
@@ -162,7 +191,7 @@ export class CameraManager {
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 6.0 * dt);
       this.camera.updateProjectionMatrix();
 
-      // Building clearance check for Third Person as well
+      // Building clearance check for Third Person
       if (this.colliders) {
         for (const c of this.colliders) {
           if (c.type === 'box') {
