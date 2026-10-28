@@ -756,7 +756,8 @@ class GameApp {
     // 8. Audio Engine, Handbrake Screech & Punchy Brake Sound
     const kmh = Math.abs(this.vehiclePhysics.speed * 3.6);
     this.audio.updateEngine(this.vehiclePhysics.speed, this.input.throttle, this.vehiclePhysics.maxSpeed);
-    const isSkidding = (this.input.handbrake || this.vehiclePhysics.isDrifting || this.vehiclePhysics.slipSpeed > 2.5) && Math.abs(this.vehiclePhysics.speed) > 1.2;
+    const isDonut = Boolean(this.input.handbrake && this.input.throttle > 0);
+    const isSkidding = isDonut || ((this.input.handbrake || this.vehiclePhysics.isDrifting || this.vehiclePhysics.slipSpeed > 2.0) && Math.abs(this.vehiclePhysics.speed) > 1.2);
     this.audio.updateSkid(isSkidding, Math.max(3.5, this.vehiclePhysics.slipSpeed));
     this.audio.updateBrake(this.vehiclePhysics.isBrakingHard || (this.input.brake > 0.35 && Math.abs(this.vehiclePhysics.speed) > 1.8), this.vehiclePhysics.speed);
 

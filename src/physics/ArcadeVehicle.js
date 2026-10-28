@@ -33,17 +33,17 @@ export class ArcadeVehicle {
     this.pitch = 0; // backward compat
     this.suspensionCompress = 0;
 
-    // AAA Progressive Driving Parameters
-    this.maxSpeed = 38.0; // ~137 km/h
-    this.reverseMaxSpeed = 12.0;
-    this.baseAccelRate = 32.0; // Punchy, responsive agile acceleration
-    this.brakeRate = 54.0; // Responsive clean brakes
-    this.dragCoeff = 0.985;
+    // AAA Progressive Driving Parameters (Comfortable, controllable speed & smooth acceleration)
+    this.maxSpeed = 26.5; // ~95 km/h (reduced from 38.0 for comfortable, realistic city cruising)
+    this.reverseMaxSpeed = 9.0;
+    this.baseAccelRate = 22.0; // Smooth, progressive acceleration (reduced from twitchy 32.0)
+    this.brakeRate = 42.0; // Responsive, smooth braking
+    this.dragCoeff = 0.988;
 
-    // Speed-Sensitive Steering (Ultra-responsive & snappy, agile at all speeds)
+    // Speed-Sensitive Steering (Silky smooth, fluid analog feel without sharpness)
     this.steerInput = 0;
     this.steerAngle = 0;
-    this.steerResponse = 58.0;
+    this.steerResponse = 14.0; // Smooth, progressive response curve (reduced from sharp 58.0)
 
     // Grip & Drift
     this.isDrifting = false;
@@ -159,16 +159,13 @@ export class ArcadeVehicle {
     this.slipSpeed = Math.abs(this.lateralVelocity);
     const absSpeed = Math.abs(this.speed);
 
-    // 2. SPEED-SENSITIVE STEERING ANGLE
-    const speedRatio = Math.min(1.0, absSpeed / 26.0);
-    // When drifting, grant full 34 degree steering authority for counter-steering control
-    const baseSteerDeg = this.isDrifting ? 34.0 : THREE.MathUtils.lerp(32.0, 16.0, speedRatio);
+    // 2. SPEED-SENSITIVE STEERING ANGLE (Smooth, progressive analog response without twitchiness)
+    const speedRatio = Math.min(1.0, absSpeed / 22.0);
+    // When drifting, grant 34° for wide counter-steering control; gently tapers to 16° at high speeds
+    const baseSteerDeg = this.isDrifting ? 34.0 : THREE.MathUtils.lerp(30.0, 16.0, speedRatio);
     const dynamicMaxSteer = THREE.MathUtils.degToRad(baseSteerDeg);
 
-    // Instant direction switch: if reversing steer direction, zero out opposite momentum immediately
-    if ((input.steer > 0 && this.steerInput < 0) || (input.steer < 0 && this.steerInput > 0)) {
-      this.steerInput = 0;
-    }
+    // Silky progressive steering interpolation with zero abrupt snapping
     this.steerInput = THREE.MathUtils.lerp(this.steerInput, input.steer, this.steerResponse * dt);
     this.steerAngle = this.steerInput * dynamicMaxSteer;
 
@@ -331,29 +328,45 @@ export class ArcadeVehicle {
         this.velocity.multiplyScalar(Math.pow(this.dragCoeff, dt * 60.0));
       }
 
-      // 6. SATISFYING HIGH-SPEED DRIFT & POWER SLIDE PHYSICS (Ultra smooth, dramatic arcade power-slides)
-      if (input.handbrake && absSpeed > 0.8) {
+      // 6. SILKY SMOOTH ARCADE DRIFT & REALISTIC HANDBRAKE DONUT CIRCLES
+      const isDonutIntent = Boolean(input.handbrake && input.throttle > 0);
+      const isHighSpeedDriftIntent = Boolean(input.handbrake && absSpeed > 1.2);
+
+      if (isDonutIntent || isHighSpeedDriftIntent) {
         this.isDrifting = true;
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 24.0 * dt);
-        // Conserve high-speed momentum throughout the drift
-        this.velocity.multiplyScalar(Math.pow(0.998, dt * 60.0));
-        // Power slide: throttle pushes car smoothly forward through the slide
-        if (input.throttle > 0 && this.speed < this.maxSpeed) {
-          this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.85 * dt);
+        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 14.0 * dt);
+
+        if (isDonutIntent) {
+          // HANDBRAKE + ACCELERATOR: Real vehicle burnout / donut drift circle!
+          // Locks rear wheels, spins tires, and powers the car smoothly in a circle
+          const targetDonutSpeed = 5.2; // Smooth stable circular forward speed
+          if (this.speed < targetDonutSpeed) {
+            this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.95 * dt);
+          } else {
+            this.velocity.multiplyScalar(Math.pow(0.96, dt * 60.0));
+          }
+        } else {
+          // Smooth high-speed drift momentum conservation
+          this.velocity.multiplyScalar(Math.pow(0.998, dt * 60.0));
+          if (input.throttle > 0 && this.speed < this.maxSpeed) {
+            this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.85 * dt);
+          }
         }
       } else {
         this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 5.5 * dt);
         if (this.driftFactor < 0.03) this.isDrifting = false;
       }
 
-      // Lateral grip: cancel side-slip at normal driving speeds; allow sliding during power-slides
+      // Lateral grip: smooth, controlled slip during drift; locked traction during normal driving
       const currentLateral = this.velocity.dot(right);
       if (!this.isDrifting) {
-        // High grip: eliminate unwanted sideways sliding so van tracks smoothly forward
-        this.velocity.addScaledVector(right, -currentLateral);
-        this.lateralVelocity = 0;
+        // Normal driving: high traction with progressive lateral damping for buttery smooth steering
+        const lateralDecel = -currentLateral * Math.min(1.0, 32.0 * dt);
+        this.velocity.addScaledVector(right, lateralDecel);
+        this.lateralVelocity = this.velocity.dot(right);
       } else {
-        const gripRate = THREE.MathUtils.lerp(45.0, 0.65, this.driftFactor);
+        // Drift mode: low lateral grip allows rear end to slide wide in smooth sweeping arcs
+        const gripRate = THREE.MathUtils.lerp(32.0, 1.8, this.driftFactor);
         const lateralDecel = -currentLateral * Math.min(1.0, gripRate * dt);
         this.velocity.addScaledVector(right, lateralDecel);
         this.lateralVelocity = this.velocity.dot(right);
@@ -363,35 +376,39 @@ export class ArcadeVehicle {
       this.speed = this.velocity.dot(forward);
       const currentAbsSpeed = Math.abs(this.speed);
 
-      // 7. PHYSICALLY ACCURATE ACKERMANN / BICYCLE KINEMATICS (Zero center-pivot 360 spins when slow or stopped)
-      // Real vehicles turn because forward motion rolls the wheels along an arc (omega = (v / L) * tan(delta))
-      // When stopped or moving slowly, heading change is strictly bounded by wheel roll distance
+      // 7. SILKY SMOOTH KINEMATIC YAW & CONTINUOUS DONUT CIRCLES
       const wheelbase = this.wheelBaseHalf * 2;
       const dirSign = this.speed >= -0.05 ? 1 : -1;
 
-      if (currentAbsSpeed <= 0.12) {
-        // Completely stationary or slowing to a stop: front wheels turn visually, but vehicle CANNOT rotate in place
-        this.angularVelocity = 0;
+      if (currentAbsSpeed <= 0.12 && !isDonutIntent) {
+        // Stationary when not performing a burnout donut: zero center-pivot rotation
+        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, 0, 18.0 * dt);
         if (!input.throttle && !input.brake) {
           this.speed = 0;
           this.velocity.set(0, 0, 0);
         }
       } else {
-        // Kinematic yaw rate strictly proportional to actual rolling velocity
+        // Natural kinematic yaw rate
         const tanSteer = Math.tan(this.steerAngle);
         const kinematicYawRate = (this.speed / wheelbase) * tanSteer;
 
-        // Agile scaling at medium/high road speeds for responsive arcade feel, but strictly 1.0 at low speeds
-        const agilityBonus = THREE.MathUtils.lerp(1.0, 1.45, THREE.MathUtils.clamp((currentAbsSpeed - 3.0) / 12.0, 0.0, 1.0));
+        // Silky agility scaling at higher road speeds
+        const agilityBonus = THREE.MathUtils.lerp(1.0, 1.35, THREE.MathUtils.clamp((currentAbsSpeed - 3.0) / 10.0, 0.0, 1.0));
         let targetYawRate = kinematicYawRate * agilityBonus;
 
-        // Drift oversteer only triggers when actively power-sliding at speed (never when slow or stopping)
-        if (this.isDrifting && currentAbsSpeed > 2.0) {
-          const driftOversteer = this.steerInput * dirSign * 3.2 * this.driftFactor;
+        if (isDonutIntent) {
+          // Holding handbrake + gas whips the car in a smooth, continuous circle like a real vehicle doing donuts
+          // If user steers left/right, donut in that direction; if centered, initiate smooth rotation from wheel bias
+          const steerDir = Math.abs(this.steerInput) > 0.08 ? Math.sign(this.steerInput) : 1.0;
+          const donutYawRate = steerDir * 2.65 * Math.max(0.6, Math.abs(this.steerInput));
+          targetYawRate = donutYawRate;
+        } else if (this.isDrifting && currentAbsSpeed > 1.2) {
+          // Smooth progressive oversteer during high-speed drifts
+          const driftOversteer = this.steerInput * dirSign * 2.4 * this.driftFactor;
           targetYawRate += driftOversteer;
         }
 
-        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 28.0 * dt);
+        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 14.0 * dt);
         this.heading += this.angularVelocity * dt;
       }
 
@@ -758,12 +775,13 @@ export class ArcadeVehicle {
     const groundDistR = Math.abs(this.position.y - (gRR.height + this.roadLevel));
     const tiresFirmlyOnGround = !this.isAirborne && groundDistL < 0.20 && groundDistR < 0.20;
 
-    const isHandbrakeSkid = tiresFirmlyOnGround && (this.isDrifting || input.handbrake) && absSpeed > 1.8;
-    const isHighSpeedBrakeSkid = tiresFirmlyOnGround && input.brake > 0.45 && absSpeed > 6.0;
+    const isDonutSkid = tiresFirmlyOnGround && input.handbrake && input.throttle > 0;
+    const isHandbrakeSkid = tiresFirmlyOnGround && (isDonutSkid || ((this.isDrifting || input.handbrake) && absSpeed > 1.2));
+    const isHighSpeedBrakeSkid = tiresFirmlyOnGround && input.brake > 0.45 && absSpeed > 5.0;
     const isSkidding = isHandbrakeSkid || isHighSpeedBrakeSkid;
 
     if (isSkidding) {
-      if (this.isDrifting || this.slipSpeed > 2.5) {
+      if (this.isDrifting || this.slipSpeed > 1.5 || isDonutSkid) {
         this.spawnSmoke(rlPos);
         this.spawnSmoke(rrPos);
       }
