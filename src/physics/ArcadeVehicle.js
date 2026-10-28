@@ -250,7 +250,7 @@ export class ArcadeVehicle {
       this.velocity.y -= this.gravity * dt;
 
       // Landing check (only when falling back down)
-      if (this.jumpLaunchCooldown <= 0 && this.velocity.y <= 0 && this.position.y <= targetGroundY + 0.05) {
+      if (this.velocity.y <= 0 && this.position.y <= targetGroundY + 0.08) {
         this.isAirborne = false;
         this.airTime = 0;
         this.position.y = targetGroundY;
@@ -292,7 +292,7 @@ export class ArcadeVehicle {
         if (isOnRamp && isClimbingTowardsPeak && isNearPeak && absSpeed > 3.0 && this.jumpLaunchCooldown <= 0) {
           this.isAirborne = true;
           this.airTime = 0.01;
-          this.jumpLaunchCooldown = 0.35;
+          this.jumpLaunchCooldown = 0.08;
           // Natural physical takeoff: forward velocity converted to vertical velocity by the ramp angle (ZERO artificial boost)
           const naturalSlopeAngle = Math.abs(this.surfacePitch);
           const naturalVy = absSpeed * Math.sin(naturalSlopeAngle);
@@ -708,25 +708,33 @@ export class ArcadeVehicle {
           const clampedZ = THREE.MathUtils.clamp(carLocalZ, -hd, hd);
           const rampH = Math.max(0, 1.0 - (Math.abs(clampedZ) / hd)) * c.height;
 
-          // If car is driving ON top of the slope within ramp width, let it drive normally
-          const isRidingOnSlope = (Math.abs(carLocalX) <= hw) && (this.position.y >= rampH - 0.20);
-          if (isRidingOnSlope) {
-            continue;
+          // 1. CAR IS ON OR OVER THE RAMP TOP SURFACE (|carLocalX| <= hw)
+          // Ramps are solid 3D wedges: within ramp width, the vehicle rides ON the top slope and CANNOT sink below it
+          if (Math.abs(carLocalX) <= hw) {
+            const surfaceY = rampH + this.roadLevel;
+            if (this.position.y < surfaceY) {
+              this.position.y = surfaceY;
+              if (this.velocity.y < 0) {
+                this.velocity.y = 0;
+                this.isAirborne = false;
+                this.airTime = 0;
+              }
+            }
+            continue; // NEVER apply lateral side wall repulsion to a vehicle on top of the ramp!
           }
 
-          // SOLID SIDE WALLS: When below the ramp surface, vehicle CANNOT penetrate the triangular side walls
-          // This applies whether the car is driving on the road, slipping off the edge, or airborne falling down!
+          // 2. SOLID SIDE WALLS: ONLY apply when vehicle is OUTSIDE the ramp width (|carLocalX| > hw)
+          // Prevents vehicles driving or slipping on the road from penetrating into the ramp's triangular concrete sides
           const carBottomY = this.position.y - this.roadLevel;
-          if (carBottomY < rampH && rampH > 0.20) {
-            // Check Right Side Wall (localX = +hw)
-            if (carLocalX >= 0) {
-              const minAllowedX = hw + halfW;
-              if (carLocalX < minAllowedX) {
-                const penetration = minAllowedX - carLocalX;
+          if (carBottomY < rampH && rampH > 0.15) {
+            if (carLocalX > hw) {
+              // Right side wall (+hw): vehicle left perimeter is (carLocalX - halfW)
+              if (carLocalX - halfW < hw) {
+                const penetration = hw - (carLocalX - halfW);
                 const normX = cosA;
                 const normZ = -sinA;
-                this.position.x += normX * (penetration + 0.02);
-                this.position.z += normZ * (penetration + 0.02);
+                this.position.x += normX * (penetration + 0.015);
+                this.position.z += normZ * (penetration + 0.015);
 
                 const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
                 if (vInward > 0) {
@@ -735,16 +743,14 @@ export class ArcadeVehicle {
                   this.velocity.multiplyScalar(0.85);
                 }
               }
-            }
-            // Check Left Side Wall (localX = -hw)
-            else {
-              const maxAllowedX = -hw - halfW;
-              if (carLocalX > maxAllowedX) {
-                const penetration = carLocalX - maxAllowedX;
+            } else if (carLocalX < -hw) {
+              // Left side wall (-hw): vehicle right perimeter is (carLocalX + halfW)
+              if (carLocalX + halfW > -hw) {
+                const penetration = (carLocalX + halfW) - (-hw);
                 const normX = -cosA;
                 const normZ = sinA;
-                this.position.x += normX * (penetration + 0.02);
-                this.position.z += normZ * (penetration + 0.02);
+                this.position.x += normX * (penetration + 0.015);
+                this.position.z += normZ * (penetration + 0.015);
 
                 const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
                 if (vInward > 0) {

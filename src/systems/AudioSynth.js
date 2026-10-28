@@ -305,4 +305,63 @@ export class AudioSynth {
     osc.start(now);
     osc.stop(now + 0.075);
   }
+
+  playUiHover() {
+    if (this.isMuted) return;
+    this.resume();
+    if (!this.initialized || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(1180, now + 0.038);
+
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.045);
+    } catch (_) {}
+  }
+
+  playUiClick() {
+    if (this.isMuted) return;
+    this.resume();
+    if (!this.initialized || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Note 1: crisp transient pop
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(620, now);
+      osc1.frequency.exponentialRampToValueAtTime(920, now + 0.05);
+
+      gain1.gain.setValueAtTime(0.18, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+
+      osc1.connect(gain1);
+      gain1.connect(this.masterGain);
+      osc1.start(now);
+      osc1.stop(now + 0.06);
+
+      // Note 2: high confirmation chime
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1244, now + 0.025);
+      gain2.gain.setValueAtTime(0.13, now + 0.025);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+      osc2.connect(gain2);
+      gain2.connect(this.masterGain);
+      osc2.start(now + 0.025);
+      osc2.stop(now + 0.115);
+    } catch (_) {}
+  }
 }

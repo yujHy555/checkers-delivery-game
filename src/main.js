@@ -88,15 +88,18 @@ class GameApp {
     // Resize listener
     window.addEventListener('resize', () => this.onWindowResize());
 
-    // Robust audio unlock on user interaction (only once active in game)
+    // Robust audio unlock on user interaction
     const unlockAudio = () => {
-      if (!this.inMainMenu) {
-        this.audio.resume();
-      }
+      this.audio.resume();
     };
     window.addEventListener('pointerdown', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
     window.addEventListener('touchstart', unlockAudio);
+
+    // Initialize UI Audio, Fullscreen Toggle, and Gamepad Menu Navigation
+    this.initUiAudio();
+    this.initFullscreenToggle();
+    this.initMenuGamepadNavigation();
 
     // Start loop
     this.animate();
@@ -556,6 +559,244 @@ class GameApp {
     }
   }
 
+  initFullscreenToggle() {
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        e.preventDefault();
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          const docEl = document.documentElement;
+          const rfs = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+          if (rfs) {
+            rfs.call(docEl).catch(() => {});
+          }
+          this.showToast('🖥️ Fullscreen: Enabled (Press F to exit)');
+        } else {
+          const efs = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+          if (efs) {
+            efs.call(document).catch(() => {});
+          }
+          this.showToast('🖥️ Fullscreen: Exited');
+        }
+      }
+    });
+  }
+
+  initUiAudio() {
+    let lastHoveredBtn = null;
+    let lastHoverTime = 0;
+
+    // Play subtle audio blip when pointer hovers over any interactive button
+    document.addEventListener('pointerenter', (e) => {
+      const btn = e.target.closest('button, .menu-btn, .btn-top-action, .btn-drive-start, .guide-tab-btn, .guide-btn-close, input[type="range"]');
+      if (btn && btn !== lastHoveredBtn) {
+        const now = performance.now();
+        if (now - lastHoverTime > 35) {
+          this.audio.playUiHover();
+          lastHoverTime = now;
+        }
+        lastHoveredBtn = btn;
+      }
+    }, true);
+
+    document.addEventListener('pointerleave', (e) => {
+      const btn = e.target.closest('button, .menu-btn, .btn-top-action, .btn-drive-start, .guide-tab-btn, .guide-btn-close, input[type="range"]');
+      if (btn && btn === lastHoveredBtn) {
+        lastHoveredBtn = null;
+      }
+    }, true);
+
+    // Play crisp confirmation sound when any button is clicked
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('button, .menu-btn, .btn-top-action, .btn-drive-start, .guide-tab-btn, .guide-btn-close');
+      if (btn) {
+        this.audio.playUiClick();
+      }
+    }, true);
+  }
+
+  initMenuGamepadNavigation() {
+    this.gamepadMenuIndex = 0;
+    this.gamepadNavCooldown = 0;
+    this.prevGpButtons = {};
+    this.lastFocusedElement = null;
+  }
+
+  updateMenuGamepad(dt) {
+    if (!this.input || !this.input.pollGamepad) return;
+    const gp = this.input.pollGamepad();
+    if (!gp) {
+      if (this.lastFocusedElement) {
+        this.lastFocusedElement.classList.remove('gamepad-focused');
+        this.lastFocusedElement = null;
+      }
+      return;
+    }
+
+    if (this.gamepadNavCooldown > 0) {
+      this.gamepadNavCooldown -= dt;
+    }
+
+    const garageModal = document.getElementById('garage-modal');
+    const optionsModal = document.getElementById('options-modal');
+    const guideModal = document.getElementById('guide-modal');
+    const mainMenu = document.getElementById('main-menu-screen');
+
+    let activeContainer = null;
+    let isModal = false;
+
+    if (guideModal && guideModal.classList.contains('open')) {
+      activeContainer = guideModal;
+      isModal = true;
+    } else if (optionsModal && optionsModal.classList.contains('open')) {
+      activeContainer = optionsModal;
+      isModal = true;
+    } else if (garageModal && garageModal.classList.contains('open')) {
+      activeContainer = garageModal;
+      isModal = true;
+    } else if (this.inMainMenu && mainMenu && !mainMenu.classList.contains('hidden')) {
+      activeContainer = mainMenu;
+    }
+
+    // When playing in-game (no menu active), pressing Start button (9) opens the main menu
+    const btnStart = Boolean(gp.buttons[9] && gp.buttons[9].pressed);
+    if (!activeContainer) {
+      if (this.lastFocusedElement) {
+        this.lastFocusedElement.classList.remove('gamepad-focused');
+        this.lastFocusedElement = null;
+      }
+      if (btnStart && !this.prevGpButtons[9]) {
+        this.inMainMenu = true;
+        this.audio.silenceEngine();
+        this.audio.playUiClick();
+        if (mainMenu) mainMenu.classList.remove('hidden');
+        this.gamepadMenuIndex = 0;
+      }
+      this.prevGpButtons[9] = btnStart;
+      return;
+    }
+
+    // Find all visible interactive elements in current active container
+    const interactiveElements = Array.from(
+      activeContainer.querySelectorAll('button, input[type="range"]')
+    ).filter(el => el.offsetParent !== null && !el.disabled && el.style.display !== 'none');
+
+    if (interactiveElements.length === 0) return;
+
+    if (this.gamepadMenuIndex < 0 || this.gamepadMenuIndex >= interactiveElements.length) {
+      this.gamepadMenuIndex = 0;
+    }
+
+    // Gamepad Navigation Inputs (D-Pad or Left Analog Stick)
+    const stickY = gp.axes[1] || 0;
+    const stickX = gp.axes[0] || 0;
+    const dpadUp = Boolean(gp.buttons[12] && gp.buttons[12].pressed);
+    const dpadDown = Boolean(gp.buttons[13] && gp.buttons[13].pressed);
+    const dpadLeft = Boolean(gp.buttons[14] && gp.buttons[14].pressed);
+    const dpadRight = Boolean(gp.buttons[15] && gp.buttons[15].pressed);
+
+    const navUp = dpadUp || (stickY < -0.45);
+    const navDown = dpadDown || (stickY > 0.45);
+    const navLeft = dpadLeft || (stickX < -0.45);
+    const navRight = dpadRight || (stickX > 0.45);
+
+    if (this.gamepadNavCooldown <= 0) {
+      if (navUp) {
+        this.gamepadMenuIndex = (this.gamepadMenuIndex - 1 + interactiveElements.length) % interactiveElements.length;
+        this.gamepadNavCooldown = 0.22;
+        this.audio.playUiHover();
+      } else if (navDown) {
+        this.gamepadMenuIndex = (this.gamepadMenuIndex + 1) % interactiveElements.length;
+        this.gamepadNavCooldown = 0.22;
+        this.audio.playUiHover();
+      }
+    }
+
+    if (!navUp && !navDown) {
+      if (this.gamepadNavCooldown > 0) this.gamepadNavCooldown = 0;
+    }
+
+    // Update focused element visual state
+    const currentEl = interactiveElements[this.gamepadMenuIndex];
+    if (this.lastFocusedElement !== currentEl) {
+      if (this.lastFocusedElement) {
+        this.lastFocusedElement.classList.remove('gamepad-focused');
+      }
+      if (currentEl) {
+        currentEl.classList.add('gamepad-focused');
+        this.lastFocusedElement = currentEl;
+      }
+    }
+
+    // Volume Slider horizontal control via D-Pad Left/Right or Stick X
+    if (currentEl && currentEl.type === 'range') {
+      if (this.gamepadNavCooldown <= 0 && (navLeft || navRight)) {
+        const step = 5;
+        const currentVal = parseInt(currentEl.value, 10);
+        const newVal = navLeft ? Math.max(0, currentVal - step) : Math.min(100, currentVal + step);
+        if (newVal !== currentVal) {
+          currentEl.value = newVal;
+          currentEl.dispatchEvent(new Event('input', { bubbles: true }));
+          this.audio.playUiHover();
+          this.gamepadNavCooldown = 0.12;
+        }
+      }
+    }
+
+    // Button A (0) - Confirm / Click
+    const btnA = Boolean(gp.buttons[0] && gp.buttons[0].pressed);
+    if (btnA && !this.prevGpButtons[0]) {
+      if (currentEl) {
+        this.audio.playUiClick();
+        currentEl.click();
+      }
+    }
+    this.prevGpButtons[0] = btnA;
+
+    // Button B (1) - Back / Cancel / Close Modal
+    const btnB = Boolean(gp.buttons[1] && gp.buttons[1].pressed);
+    if (btnB && !this.prevGpButtons[1]) {
+      this.audio.playUiClick();
+      if (isModal) {
+        if (guideModal && guideModal.classList.contains('open')) {
+          const btnClose = document.getElementById('btn-close-guide');
+          if (btnClose) btnClose.click();
+        } else if (optionsModal && optionsModal.classList.contains('open')) {
+          const btnClose = document.getElementById('btn-close-options');
+          if (btnClose) btnClose.click();
+        } else if (garageModal && garageModal.classList.contains('open')) {
+          const btnClose = document.getElementById('btn-close-garage');
+          if (btnClose) btnClose.click();
+        }
+        this.gamepadMenuIndex = 0;
+      } else if (this.inMainMenu) {
+        const btnCareer = document.getElementById('btn-menu-career');
+        if (btnCareer) btnCareer.click();
+      }
+    }
+    this.prevGpButtons[1] = btnB;
+
+    // Start Button (9)
+    if (btnStart && !this.prevGpButtons[9]) {
+      this.audio.playUiClick();
+      if (isModal) {
+        if (optionsModal && optionsModal.classList.contains('open')) {
+          const btnClose = document.getElementById('btn-options-back');
+          if (btnClose) btnClose.click();
+        } else if (garageModal && garageModal.classList.contains('open')) {
+          const btnClose = document.getElementById('btn-close-garage');
+          if (btnClose) btnClose.click();
+        } else if (guideModal && guideModal.classList.contains('open')) {
+          const btnClose = document.getElementById('btn-close-guide');
+          if (btnClose) btnClose.click();
+        }
+      } else if (this.inMainMenu) {
+        if (currentEl) currentEl.click();
+      }
+    }
+    this.prevGpButtons[9] = btnStart;
+  }
+
   showDeliveryCelebration(result) {
     const banner = document.getElementById('celebration-banner');
     if (banner) {
@@ -705,14 +946,17 @@ class GameApp {
   animate() {
     requestAnimationFrame(() => this.animate());
 
+    const dt = Math.min(this.clock.getDelta(), 0.08);
+
+    // Update Gamepad Menu Navigation (functions on main menu, sub-modals, and in-game)
+    this.updateMenuGamepad(dt);
+
     // When on the main menu, silence all vehicle audio and skip simulation updates
     if (this.inMainMenu) {
       if (this.audio) this.audio.silenceEngine();
       this.renderer.render(this.scene, this.camera);
       return;
     }
-
-    const dt = Math.min(this.clock.getDelta(), 0.08);
 
     // 0. Update Dynamic Day-Night Cycle (1 min Day, 1 min Night, Auto Headlights)
     this.updateDayNightCycle(dt);
