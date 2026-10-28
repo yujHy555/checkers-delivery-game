@@ -659,7 +659,8 @@ export class CityWorld {
       const mat = new THREE.MeshStandardMaterial({
         color: b.col,
         roughness: 0.85,
-        metalness: 0.04
+        metalness: 0.04,
+        side: THREE.DoubleSide
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.rotation.x = -Math.PI / 2;
@@ -700,7 +701,8 @@ export class CityWorld {
       const tierMat = new THREE.MeshStandardMaterial({
         color: 0xf8fafc,
         roughness: 0.8,
-        metalness: 0.04
+        metalness: 0.04,
+        side: THREE.DoubleSide
       });
       const tierMesh = new THREE.Mesh(tierGeo, tierMat);
       tierMesh.rotation.x = -Math.PI / 2;
@@ -721,7 +723,8 @@ export class CityWorld {
       const trimMat = new THREE.MeshStandardMaterial({
         color: 0x334155,
         roughness: 0.5,
-        metalness: 0.05
+        metalness: 0.05,
+        side: THREE.DoubleSide
       });
       const trimMesh = new THREE.Mesh(trimGeo, trimMat);
       trimMesh.rotation.x = -Math.PI / 2;
@@ -737,7 +740,8 @@ export class CityWorld {
         x: b.x,
         z: b.z,
         width: b.w + 0.6,
-        depth: b.d + 0.6
+        depth: b.d + 0.6,
+        height: b.h + tierH + 1.2
       });
 
       // Delivery Destination Zone

@@ -36,6 +36,7 @@ class GameApp {
     // 3. World Environment with Double-Sided Ramps
     this.world = new CityWorld(this.scene);
     this.cityWorld = this.world;
+    this.cameraManager.setColliders(this.world.colliders);
 
     // 4. Arcade Vehicle Physics (Grounded, zero bounce, high agility)
     this.vehiclePhysics = new ArcadeVehicle(this.scene, { x: 0, y: 0.35, z: -40, heading: 0 });

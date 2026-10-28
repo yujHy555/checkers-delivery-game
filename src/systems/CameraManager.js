@@ -22,8 +22,13 @@ export class CameraManager {
     this.baseFov = 62;
 
     // Isometric tracking state
-    this.isoHeading = 0;
+    this.isoCamHeading = 0;
     this.hasInitIso = false;
+    this.colliders = [];
+  }
+
+  setColliders(colliders) {
+    this.colliders = colliders || [];
   }
 
   checkIsMobile() {
@@ -57,30 +62,77 @@ export class CameraManager {
     let desiredTarget = new THREE.Vector3();
 
     if (this.mode === 'ISOMETRIC') {
-      // Dynamic, Fast & Silky-Smooth Elevated Isometric View (Optimized for Mobile!)
-      // Tighter distance and height on mobile so speed sensation is thrilling and snappy
-      const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
-      const isoDist = isMobile ? 5.4 : 12.0;
-      const isoHeight = isMobile ? 5.8 : 14.0;
+      // 1. Rock-solid fixed FOV (50° on mobile, 48° on desktop)
+      // Completely eliminates disorienting FOV zoom pumping on throttle/brake!
+      const targetFov = isMobile ? 50 : 48;
+      if (Math.abs(this.camera.fov - targetFov) > 0.05) {
+        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 10.0 * dt);
+        this.camera.updateProjectionMatrix();
+      }
 
-      // Position camera directly elevated behind vehicle alignment for instant responsiveness
-      desiredPos.copy(focusPos)
-        .addScaledVector(forward, -isoDist)
-        .add(new THREE.Vector3(0, isoHeight, 0));
+      // 2. Elevated isometric vantage: optimal viewing angle and altitude above building rooftops
+      const isoDist = isMobile ? 9.8 : 12.0;
+      const isoHeight = isMobile ? 11.8 : 14.0;
 
-      // Dynamic look-ahead along forward direction
-      desiredTarget.copy(focusPos)
-        .addScaledVector(forward, isMobile ? 2.0 + speedNorm * 1.5 : 2.5)
-        .add(new THREE.Vector3(0, isMobile ? 0.7 : 0.8, 0));
+      if (!this.hasInitIso) {
+        this.isoCamHeading = heading;
+        this.hasInitIso = true;
+        const sinH = Math.sin(this.isoCamHeading);
+        const cosH = Math.cos(this.isoCamHeading);
+        this.currentPos.set(
+          focusPos.x - sinH * isoDist,
+          focusPos.y + isoHeight,
+          focusPos.z - cosH * isoDist
+        );
+        this.currentTarget.set(focusPos.x, focusPos.y + 0.75, focusPos.z);
+      } else {
+        // Smoothly rotate the orbital angle behind vehicle heading via shortest arc
+        let diff = heading - this.isoCamHeading;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        const turnRate = isMobile ? 8.5 : 7.0;
+        this.isoCamHeading += diff * (1.0 - Math.exp(-turnRate * dt));
+      }
 
-      // Speed FOV expansion gives punchy speed feedback
-      const baseFov = isMobile ? 58 : 50;
-      const targetFov = baseFov + speedNorm * (isMobile ? 12.0 : 8.0);
-      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 8.0 * dt);
-      this.camera.updateProjectionMatrix();
+      const sinH = Math.sin(this.isoCamHeading);
+      const cosH = Math.cos(this.isoCamHeading);
 
-      // Silky-smooth frame-rate independent exponential damping: zero micro-jitter or lag
-      const followRate = isMobile ? 18.0 : 12.0;
+      // Desired position is mathematically locked to a constant spherical orbital radius
+      // Never cuts across the chord during turns, eliminating camera surge / chugging
+      desiredPos.set(
+        focusPos.x - sinH * isoDist,
+        focusPos.y + isoHeight,
+        focusPos.z - cosH * isoDist
+      );
+
+      // Target is locked to van chassis center (zero look-ahead pitch tilt oscillation)
+      desiredTarget.set(focusPos.x, focusPos.y + 0.75, focusPos.z);
+
+      // Building Obstacle Clearance & White Flash Elimination:
+      // If the camera is inside or near any building footprint, smoothly elevate above the roof (+2.0m buffer)
+      if (this.colliders) {
+        for (const c of this.colliders) {
+          if (c.type === 'box') {
+            const hw = (c.width / 2) + 1.2;
+            const hd = (c.depth / 2) + 1.2;
+            const bHeight = c.height || 12.0;
+
+            if (Math.abs(desiredPos.x - c.x) <= hw && Math.abs(desiredPos.z - c.z) <= hd) {
+              if (desiredPos.y < bHeight + 2.0) {
+                desiredPos.y = bHeight + 2.0;
+              }
+            }
+            if (Math.abs(this.currentPos.x - c.x) <= hw && Math.abs(this.currentPos.z - c.z) <= hd) {
+              if (this.currentPos.y < bHeight + 1.5) {
+                this.currentPos.y = bHeight + 1.5;
+              }
+            }
+          }
+        }
+      }
+
+      // Critically damped exponential smoothing for ultra-smooth buttery motion
+      const followRate = isMobile ? 14.0 : 11.0;
       const lerpFactor = 1.0 - Math.exp(-followRate * dt);
       this.currentPos.lerp(desiredPos, lerpFactor);
       this.currentTarget.lerp(desiredTarget, lerpFactor);
@@ -109,6 +161,28 @@ export class CameraManager {
       const targetFov = baseFov + speedNorm * (isMobile ? 10.0 : 14.0);
       this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 6.0 * dt);
       this.camera.updateProjectionMatrix();
+
+      // Building clearance check for Third Person as well
+      if (this.colliders) {
+        for (const c of this.colliders) {
+          if (c.type === 'box') {
+            const hw = (c.width / 2) + 0.8;
+            const hd = (c.depth / 2) + 0.8;
+            const bHeight = c.height || 12.0;
+
+            if (Math.abs(desiredPos.x - c.x) <= hw && Math.abs(desiredPos.z - c.z) <= hd) {
+              if (desiredPos.y < bHeight + 1.5) {
+                desiredPos.y = bHeight + 1.5;
+              }
+            }
+            if (Math.abs(this.currentPos.x - c.x) <= hw && Math.abs(this.currentPos.z - c.z) <= hd) {
+              if (this.currentPos.y < bHeight + 1.5) {
+                this.currentPos.y = bHeight + 1.5;
+              }
+            }
+          }
+        }
+      }
 
       // Smooth camera damping
       const posLerp = 1.0 - Math.exp(-this.posLerpSpeed * dt);
