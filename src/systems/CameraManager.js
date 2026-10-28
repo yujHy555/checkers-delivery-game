@@ -25,6 +25,8 @@ export class CameraManager {
     // Immediately place camera in proper third-person chase pose at van's spawn
     this.currentPos = new THREE.Vector3(0, 2.8, -45.85);
     this.currentTarget = new THREE.Vector3(0, 1.27, -37.5);
+    this.desiredPos = new THREE.Vector3(0, 2.8, -45.85);
+    this.desiredTarget = new THREE.Vector3(0, 1.27, -37.5);
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentTarget);
     this.isoCamHeading = 0;
@@ -79,6 +81,8 @@ export class CameraManager {
     const focusPos = focusObject.position;
     const heading = vehiclePhysics.heading;
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
+    const desiredPos = this.desiredPos;
+    const desiredTarget = this.desiredTarget;
 
     const baseDist = 5.6;
     const baseHeight = 2.45;
@@ -91,6 +95,8 @@ export class CameraManager {
 
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentTarget);
+    this.desiredPos.copy(this.currentPos);
+    this.desiredTarget.copy(this.currentTarget);
     this.hasInitChase = true;
   }
 
@@ -108,6 +114,8 @@ export class CameraManager {
     const focusPos = focusObject.position;
     const heading = vehiclePhysics.heading;
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
+    const desiredPos = this.desiredPos;
+    const desiredTarget = this.desiredTarget;
 
     if (isIsometric) {
       const isFar = this.mode === 'ISOMETRIC_FAR';
