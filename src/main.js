@@ -42,8 +42,13 @@ class GameApp {
     this.vehiclePhysics = new ArcadeVehicle(this.scene, { x: 0, y: 0.35, z: -40, heading: 0 });
     this.vehiclePhysics.setColliders(this.world.colliders);
 
-    // 5. Van Model
-    this.vanModel = new VanModel(this.scene);
+    // 5. Preloader & Van Model (Guarantees model is 100% loaded before game starts)
+    this.initPreloader();
+    this.vanModel = new VanModel(this.scene, {
+      onProgress: (xhr) => this.onVanProgress(xhr),
+      onLoaded: () => this.onVanLoaded(),
+      onError: (err) => this.onVanLoadError(err)
+    });
 
     // 6. SINGLE QUALITY AAA OVERHEAD GROUNDED SHADOW
     this.setupAAAGroundedShadow();
@@ -84,6 +89,69 @@ class GameApp {
 
     // Start loop
     this.animate();
+  }
+
+  initPreloader() {
+    this.preloaderOverlay = document.getElementById('preloader-overlay');
+    this.preloaderFill = document.getElementById('preloader-bar-fill');
+    this.preloaderStatus = document.getElementById('preloader-status-text');
+    this.preloaderPct = document.getElementById('preloader-percent-text');
+    this.modelLoaded = false;
+
+    // Incremental progress placeholder in case Content-Length isn't reported
+    this.simulatedProgress = 10;
+    this.progressInterval = setInterval(() => {
+      if (!this.modelLoaded && this.simulatedProgress < 90) {
+        this.simulatedProgress += Math.random() * 6;
+        this.updatePreloaderUI(Math.floor(this.simulatedProgress), 'Downloading Sixty60 Delivery Van...');
+      }
+    }, 220);
+  }
+
+  onVanProgress(xhr) {
+    if (xhr.lengthComputable && xhr.total > 0) {
+      const pct = Math.min(Math.round((xhr.loaded / xhr.total) * 100), 98);
+      const loadedMB = (xhr.loaded / (1024 * 1024)).toFixed(1);
+      const totalMB = (xhr.total / (1024 * 1024)).toFixed(1);
+      this.simulatedProgress = pct;
+      this.updatePreloaderUI(pct, `Loading HD Delivery Van (${loadedMB}MB / ${totalMB}MB)...`);
+    }
+  }
+
+  onVanLoaded() {
+    this.modelLoaded = true;
+    if (this.progressInterval) clearInterval(this.progressInterval);
+    this.updatePreloaderUI(100, 'Van Ready! Welcome to Checkers Hyper Sixty60!');
+
+    setTimeout(() => {
+      if (this.preloaderOverlay) {
+        this.preloaderOverlay.classList.add('fade-out');
+        setTimeout(() => {
+          this.preloaderOverlay.style.display = 'none';
+        }, 550);
+      }
+    }, 350);
+  }
+
+  onVanLoadError(err) {
+    console.warn('Van loading error:', err);
+    this.modelLoaded = true;
+    if (this.progressInterval) clearInterval(this.progressInterval);
+    this.updatePreloaderUI(100, 'Ready!');
+    setTimeout(() => {
+      if (this.preloaderOverlay) {
+        this.preloaderOverlay.classList.add('fade-out');
+        setTimeout(() => {
+          this.preloaderOverlay.style.display = 'none';
+        }, 550);
+      }
+    }, 250);
+  }
+
+  updatePreloaderUI(pct, text) {
+    if (this.preloaderFill) this.preloaderFill.style.width = `${pct}%`;
+    if (this.preloaderPct) this.preloaderPct.textContent = `${pct}%`;
+    if (this.preloaderStatus && text) this.preloaderStatus.textContent = text;
   }
 
   setupAAAGroundedShadow() {

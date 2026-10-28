@@ -3,8 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TextureGenerator } from '../utils/TextureGenerator.js';
 
 export class VanModel {
-  constructor(scene) {
+  constructor(scene, options = {}) {
     this.scene = scene;
+    this.options = options;
     this.root = new THREE.Group();
     this.root.name = 'CheckersHyperVan';
 
@@ -88,29 +89,59 @@ export class VanModel {
     this.headlightR.target.position.set(0.65, 0.1, 15);
     this.chassisGroup.add(this.headlightR, this.headlightR.target);
 
-    // 5. Dual Rear Dynamic Brake Lights & Lenses
-    this.brakeLightL = new THREE.PointLight(0xff0022, 0, 8, 1.8);
-    this.brakeLightL.position.set(-0.70, 0.75, -2.22);
-    this.chassisGroup.add(this.brakeLightL);
+    // 5. Dual Rear Dynamic Brake Lights (PURE EMISSION, ZERO BLACK HOUSING)
+    // When brakes are OFF: completely invisible (NO dark/black box geometry over the taillights)
+    // When brakes are ON: brilliant additive neon red emission precisely mapped over the rear light clusters
+    this.brakeLightsGroup = new THREE.Group();
+    this.chassisGroup.add(this.brakeLightsGroup);
 
-    this.brakeLightR = new THREE.PointLight(0xff0022, 0, 8, 1.8);
-    this.brakeLightR.position.set(0.70, 0.75, -2.22);
-    this.chassisGroup.add(this.brakeLightR);
+    this.brakeLightL = new THREE.PointLight(0xff0022, 0, 7.0, 2.0);
+    this.brakeLightL.position.set(-0.77, 0.395, -2.26);
+    this.brakeLightsGroup.add(this.brakeLightL);
 
-    this.tailGlowMat = new THREE.MeshStandardMaterial({
-      color: 0x3a0808,
-      emissive: 0x100202,
-      emissiveIntensity: 0.15,
-      roughness: 0.2
+    this.brakeLightR = new THREE.PointLight(0xff0022, 0, 7.0, 2.0);
+    this.brakeLightR.position.set(0.77, 0.395, -2.26);
+    this.brakeLightsGroup.add(this.brakeLightR);
+
+    // Additive glowing materials (depthWrite: false ensures no sorting or black cutoff artifacts)
+    this.brakeCoreMat = new THREE.MeshBasicMaterial({
+      color: 0xff1828,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
     });
-    const tailLensGeo = new THREE.BoxGeometry(0.12, 0.28, 0.04);
-    const tailLensL = new THREE.Mesh(tailLensGeo, this.tailGlowMat);
-    tailLensL.position.set(-0.70, 0.75, -2.22);
-    this.chassisGroup.add(tailLensL);
 
-    const tailLensR = new THREE.Mesh(tailLensGeo, this.tailGlowMat);
-    tailLensR.position.set(0.70, 0.75, -2.22);
-    this.chassisGroup.add(tailLensR);
+    this.brakeHaloMat = new THREE.MeshBasicMaterial({
+      color: 0xff0022,
+      transparent: true,
+      opacity: 0.50,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const lensGeo = new THREE.PlaneGeometry(0.13, 0.32);
+    lensGeo.rotateY(Math.PI); // Facing rearward (-Z)
+    const haloGeo = new THREE.PlaneGeometry(0.25, 0.46);
+    haloGeo.rotateY(Math.PI);
+
+    this.tailLensL = new THREE.Mesh(lensGeo, this.brakeCoreMat);
+    this.tailLensL.position.set(-0.77, 0.395, -2.216);
+    const haloL = new THREE.Mesh(haloGeo, this.brakeHaloMat);
+    haloL.position.set(0, 0, -0.004);
+    this.tailLensL.add(haloL);
+    this.brakeLightsGroup.add(this.tailLensL);
+
+    this.tailLensR = new THREE.Mesh(lensGeo, this.brakeCoreMat);
+    this.tailLensR.position.set(0.77, 0.395, -2.216);
+    const haloR = new THREE.Mesh(haloGeo, this.brakeHaloMat);
+    haloR.position.set(0, 0, -0.004);
+    this.tailLensR.add(haloR);
+    this.brakeLightsGroup.add(this.tailLensR);
+
+    // Initial state: INVISIBLE so the vehicle's printed rear lights are 100% visible and unblemished
+    this.tailLensL.visible = false;
+    this.tailLensR.visible = false;
 
     // 6. Temporary lightweight fallback body (ensures instant startup with zero blank frames while 60MB GLB loads)
     this.createFallbackBody();
@@ -161,9 +192,9 @@ export class VanModel {
             return;
           }
 
-          // 2. Hide unbaked / duplicate / high-poly reference meshes from Blender workspace
-          // Keeps Cube.001 (the high-res unwrapped van body with baked 2K Diffuse & Normal maps)
-          if (name.includes('node_0') || name.includes('tripo') || name.includes('cube.002') || child.name === 'Cube') {
+          // 2. Hide unbaked / duplicate / low-res reference meshes
+          // Keeps Cube (which has 3 full uncompressed 2K textures: SIDES, REAR, TOP)
+          if (name.includes('node_0') || name.includes('tripo') || name.includes('cube.001') || name.includes('cube.002')) {
             child.visible = false;
             return;
           }
@@ -171,9 +202,21 @@ export class VanModel {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
-            if (child.material) {
-              child.material.roughness = 0.45;
-              child.material.metalness = 0.08;
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            for (const mat of mats) {
+              if (!mat) continue;
+              if (mat.map) {
+                // High-fidelity anisotropic filtering & crisp sRGB mipmapping
+                mat.map.anisotropy = 16;
+                mat.map.colorSpace = THREE.SRGBColorSpace;
+                mat.map.generateMipmaps = true;
+                mat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                mat.map.magFilter = THREE.LinearFilter;
+                mat.map.needsUpdate = true;
+              }
+              mat.roughness = 0.35;
+              mat.metalness = 0.05;
+              mat.needsUpdate = true;
             }
           }
         });
@@ -189,11 +232,21 @@ export class VanModel {
           this.fallbackBody = null;
         }
 
-        console.log('✅ Custom 3D Kei Van Body successfully loaded into chassis group!');
+        console.log('✅ Custom 3D Kei Van Body with crisp 2K textures successfully loaded!');
+        if (this.options && this.options.onLoaded) {
+          this.options.onLoaded(model);
+        }
       },
-      undefined,
+      (xhr) => {
+        if (this.options && this.options.onProgress) {
+          this.options.onProgress(xhr);
+        }
+      },
       (err) => {
         console.warn('ℹ️ Could not load /models/checkers_van_body_01.glb, using fallback body:', err);
+        if (this.options && this.options.onError) {
+          this.options.onError(err);
+        }
       }
     );
   }
@@ -245,17 +298,16 @@ export class VanModel {
 
     const brakeActive = isBraking || isHandbraking || isReversing || isDecelBraking;
 
-    if (this.tailGlowMat) {
+    // 6. Dynamic Brake Lights (Zero black housing, pure neon emission when active)
+    if (this.tailLensL && this.tailLensR) {
       if (brakeActive) {
-        this.tailGlowMat.color.setHex(0xff1122);
-        this.tailGlowMat.emissive.setHex(0xff0022);
-        this.tailGlowMat.emissiveIntensity = 2.8;
-        if (this.brakeLightL) this.brakeLightL.intensity = 2.4;
-        if (this.brakeLightR) this.brakeLightR.intensity = 2.4;
+        this.tailLensL.visible = true;
+        this.tailLensR.visible = true;
+        if (this.brakeLightL) this.brakeLightL.intensity = 3.5;
+        if (this.brakeLightR) this.brakeLightR.intensity = 3.5;
       } else {
-        this.tailGlowMat.color.setHex(0x3a0808);
-        this.tailGlowMat.emissive.setHex(0x100202);
-        this.tailGlowMat.emissiveIntensity = 0.15;
+        this.tailLensL.visible = false;
+        this.tailLensR.visible = false;
         if (this.brakeLightL) this.brakeLightL.intensity = 0;
         if (this.brakeLightR) this.brakeLightR.intensity = 0;
       }

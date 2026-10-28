@@ -169,11 +169,12 @@ export class CameraManager {
     } else {
       this.hasInitIso = false;
       // Dynamic Third-Person Chase Cam (Optimized for Mobile & Desktop!)
-      const baseDist = isMobile ? 4.6 : 6.4;
-      const baseHeight = isMobile ? 1.95 : 2.6;
+      // Mobile: Tight framing (4.4m), virtually zero speed stretch (0.15m), and 24.0 lerp speed so the cam keeps up during rapid acceleration!
+      const baseDist = isMobile ? 4.4 : 6.4;
+      const baseHeight = isMobile ? 1.85 : 2.6;
       const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
-      const dynamicDist = baseDist + speedNorm * (isMobile ? 1.1 : 1.8);
-      const dynamicHeight = baseHeight + speedNorm * (isMobile ? 0.3 : 0.45);
+      const dynamicDist = baseDist + speedNorm * (isMobile ? 0.15 : 1.8);
+      const dynamicHeight = baseHeight + speedNorm * (isMobile ? 0.05 : 0.45);
 
       // Position camera directly behind vehicle with smooth follow
       desiredPos.copy(focusPos)
@@ -182,13 +183,13 @@ export class CameraManager {
 
       // Look ahead along forward vector
       desiredTarget.copy(focusPos)
-        .addScaledVector(forward, isMobile ? 2.5 : 3.2)
-        .add(new THREE.Vector3(0, isMobile ? 0.82 : 0.9, 0));
+        .addScaledVector(forward, isMobile ? 2.2 : 3.2)
+        .add(new THREE.Vector3(0, isMobile ? 0.80 : 0.9, 0));
 
-      // Speed FOV expansion
-      const baseFov = isMobile ? 64 : 62;
-      const targetFov = baseFov + speedNorm * (isMobile ? 10.0 : 14.0);
-      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 6.0 * dt);
+      // Speed FOV expansion (On mobile, minimal 3.0° expansion so van doesn't pull away visually)
+      const baseFov = 62;
+      const targetFov = baseFov + speedNorm * (isMobile ? 3.0 : 14.0);
+      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, (isMobile ? 12.0 : 6.0) * dt);
       this.camera.updateProjectionMatrix();
 
       // Building clearance check for Third Person
@@ -213,9 +214,11 @@ export class CameraManager {
         }
       }
 
-      // Smooth camera damping
-      const posLerp = 1.0 - Math.exp(-this.posLerpSpeed * dt);
-      const targetLerp = 1.0 - Math.exp(-this.targetLerpSpeed * dt);
+      // Smooth camera damping (Mobile: snappy 24.0 lerp speed prevents rubber-banding on rapid launch)
+      const activePosLerp = isMobile ? 24.0 : this.posLerpSpeed;
+      const activeTargetLerp = isMobile ? 26.0 : this.targetLerpSpeed;
+      const posLerp = 1.0 - Math.exp(-activePosLerp * dt);
+      const targetLerp = 1.0 - Math.exp(-activeTargetLerp * dt);
       this.currentPos.lerp(desiredPos, posLerp);
       this.currentTarget.lerp(desiredTarget, targetLerp);
     }
