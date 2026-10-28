@@ -184,39 +184,41 @@ export class VanModel {
         const model = gltf.scene;
 
         model.traverse((child) => {
-          const name = child.name ? child.name.toLowerCase() : '';
+          if (child === model) return;
+          const name = (child.name || '').toLowerCase();
+          const parentName = (child.parent?.name || '').toLowerCase();
 
-          // 1. Hide non-vehicle reference objects (human mannequin, ground plane, embedded wheels)
-          if (name.includes('male') || name.includes('standing') || name.includes('plane') || name.includes('wheel')) {
-            child.visible = false;
-            return;
-          }
+          // Strict whitelist: ONLY permit the dedicated high-resolution 2K Kei Van shell (Cube_1, Cube_2, Cube_3)
+          // Completely eliminates all overlapping meshes (Cube001, Cube002, node_0, meshes0, meshes0_1, Plane, wheels, characters)
+          const isAllowedBody = name === 'cube' ||
+                                parentName === 'cube' ||
+                                (name.startsWith('cube_') && !name.includes('001') && !name.includes('002'));
 
-          // 2. Hide unbaked / duplicate / low-res reference meshes
-          // Keeps Cube (which has 3 full uncompressed 2K textures: SIDES, REAR, TOP)
-          if (name.includes('node_0') || name.includes('tripo') || name.includes('cube.001') || name.includes('cube.002')) {
-            child.visible = false;
-            return;
-          }
+          child.visible = isAllowedBody;
 
           if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            const mats = Array.isArray(child.material) ? child.material : [child.material];
-            for (const mat of mats) {
-              if (!mat) continue;
-              if (mat.map) {
-                // High-fidelity anisotropic filtering & crisp sRGB mipmapping
-                mat.map.anisotropy = 16;
-                mat.map.colorSpace = THREE.SRGBColorSpace;
-                mat.map.generateMipmaps = true;
-                mat.map.minFilter = THREE.LinearMipmapLinearFilter;
-                mat.map.magFilter = THREE.LinearFilter;
-                mat.map.needsUpdate = true;
+            if (isAllowedBody) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              for (const mat of mats) {
+                if (!mat) continue;
+                if (mat.map) {
+                  // Maximum hardware anisotropic filtering & sRGB linear mipmapping for razor-sharp textures
+                  mat.map.anisotropy = 16;
+                  mat.map.colorSpace = THREE.SRGBColorSpace;
+                  mat.map.generateMipmaps = true;
+                  mat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                  mat.map.magFilter = THREE.LinearFilter;
+                  mat.map.needsUpdate = true;
+                }
+                mat.roughness = 0.28;
+                mat.metalness = 0.04;
+                mat.needsUpdate = true;
               }
-              mat.roughness = 0.35;
-              mat.metalness = 0.05;
-              mat.needsUpdate = true;
+            } else {
+              child.castShadow = false;
+              child.receiveShadow = false;
             }
           }
         });

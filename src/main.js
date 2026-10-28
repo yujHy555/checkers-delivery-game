@@ -22,7 +22,9 @@ class GameApp {
       (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
       (window.innerWidth <= 960 && 'ontouchstart' in window);
     this.isMobile = isMobile;
-    this.renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
+    // Set 2.0x DPR for razor-sharp HD rendering on both retina mobile screens and high-DPI desktop displays
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
