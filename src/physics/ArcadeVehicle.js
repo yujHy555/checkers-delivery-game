@@ -228,7 +228,7 @@ export class ArcadeVehicle {
 
     const isOnRamp = gFL.isOnRamp || gFR.isOnRamp || gRL.isOnRamp || gRR.isOnRamp || gCenter.isOnRamp;
     this.isOnRamp = isOnRamp;
-    const isNearPeak = gCenter.isNearPeak || (hFront > 0.6 && hRear > 0.6 && Math.abs(hFront - hRear) < 0.35);
+    const isNearPeak = Boolean(gCenter.isNearPeak || gFL.isNearPeak || gFR.isNearPeak || gRL.isNearPeak || gRR.isNearPeak);
 
     const isOnCurb = gFL.isOnCurb || gFR.isOnCurb || gRL.isOnCurb || gRR.isOnCurb || gCenter.isOnCurb;
     this.isOnCurb = isOnCurb;

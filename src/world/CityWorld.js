@@ -530,18 +530,18 @@ export class CityWorld {
     const createDeckSegment = (zCenter, length, height) => {
       const seg = new THREE.Group();
 
-      // Top road deck (Box: height 0.30m, top flush with 'height')
-      const roadGeo = new THREE.BoxGeometry(bridgeW, 0.30, length);
+      // Top road deck (Box: height 0.25m, top flush with 'height')
+      const roadGeo = new THREE.BoxGeometry(bridgeW, 0.25, length);
       const roadMesh = new THREE.Mesh(roadGeo, deckMat);
-      roadMesh.position.set(0, height - 0.15, 0);
+      roadMesh.position.set(0, height - 0.125, 0);
       roadMesh.receiveShadow = true;
       roadMesh.castShadow = true;
       seg.add(roadMesh);
 
-      // Underside structural concrete support girder
-      const girderGeo = new THREE.BoxGeometry(bridgeW - 0.8, 0.50, length);
+      // Underside structural concrete support girder (sits cleanly beneath road deck)
+      const girderGeo = new THREE.BoxGeometry(bridgeW - 1.2, 0.35, length);
       const girderMesh = new THREE.Mesh(girderGeo, structureMat);
-      girderMesh.position.set(0, height - 0.55, 0);
+      girderMesh.position.set(0, height - 0.425, 0);
       girderMesh.receiveShadow = true;
       girderMesh.castShadow = true;
       seg.add(girderMesh);
@@ -570,25 +570,41 @@ export class CityWorld {
     const createRampSegment = (zCenter, length, hStart, hEnd, isStuntRamp = false) => {
       const seg = new THREE.Group();
       const hl = length / 2;
+      // Stunt jump ramp on Bridge 1 sits on top of deck (base at hStart), ground ramps sit 2cm above ground
+      const baseY = isStuntRamp ? hStart : 0.02;
 
-      // Solid wedge geometry for ramp surface
-      const positions = new Float32Array([
+      // Solid wedge geometry for ramp surface (sealed, non-intersecting)
+      const positions = [
         // Top driving surface
         -hw, hStart, -hl,   hw, hEnd, hl,    hw, hStart, -hl,
         -hw, hStart, -hl,  -hw, hEnd, hl,    hw, hEnd, hl,
         // Bottom base
-        -hw, 0, -hl,       -hw, 0, hl,       hw, 0, hl,
-        -hw, 0, -hl,        hw, 0, hl,       hw, 0, -hl,
+        -hw, baseY, -hl,   -hw, baseY, hl,   hw, baseY, hl,
+        -hw, baseY, -hl,    hw, baseY, hl,   hw, baseY, -hl,
         // Left flank
-        -hw, 0, -hl,       -hw, 0, hl,      -hw, hEnd, hl,
-        -hw, 0, -hl,       -hw, hEnd, hl,   -hw, hStart, -hl,
+        -hw, baseY, -hl,   -hw, baseY, hl,  -hw, hEnd, hl,
+        -hw, baseY, -hl,   -hw, hEnd, hl,   -hw, hStart, -hl,
         // Right flank
-        hw, 0, -hl,        hw, hEnd, hl,     hw, 0, hl,
-        hw, 0, -hl,        hw, hStart, -hl,  hw, hEnd, hl
-      ]);
+        hw, baseY, -hl,    hw, hEnd, hl,     hw, baseY, hl,
+        hw, baseY, -hl,    hw, hStart, -hl,  hw, hEnd, hl
+      ];
+
+      // Vertical face at whichever end is elevated above baseY
+      if (hStart > baseY + 0.05) {
+        positions.push(
+          -hw, hStart, -hl,   hw, baseY, -hl,    hw, hStart, -hl,
+          -hw, hStart, -hl,  -hw, baseY, -hl,    hw, baseY, -hl
+        );
+      }
+      if (hEnd > baseY + 0.05) {
+        positions.push(
+          -hw, baseY, hl,     hw, baseY, hl,    hw, hEnd, hl,
+          -hw, baseY, hl,     hw, hEnd, hl,    -hw, hEnd, hl
+        );
+      }
 
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
       geo.computeVertexNormals();
 
       const rampMesh = new THREE.Mesh(geo, isStuntRamp ? jumpRampMat : deckMat);
@@ -597,7 +613,8 @@ export class CityWorld {
       seg.add(rampMesh);
 
       // Angled safety barriers along sides
-      const slopeAngle = Math.atan2(hEnd - hStart, length);
+      // In Three.js: -Math.atan2 tilts +Z upwards, perfectly matching the incline!
+      const slopeAngle = -Math.atan2(hEnd - hStart, length);
       const barrierLen = Math.hypot(length, hEnd - hStart);
 
       [-hw + 0.22, hw - 0.22].forEach((barrierX) => {
@@ -637,11 +654,12 @@ export class CityWorld {
       bridgeGroup.add(seg);
     };
 
-    // 3. Helper: Structural Concrete Bridge Piers
+    // 3. Helper: Structural Concrete Bridge Piers (sits cleanly beneath girder, touches ground with zero z-fighting)
     const addBridgePier = (zPos, h) => {
+      const pierH = Math.max(1.0, h - 0.55);
       [-hw + 1.2, hw - 1.2].forEach((px) => {
-        const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.78, h - 0.2, 16), structureMat);
-        pier.position.set(bx + px, (h - 0.2) / 2, zPos);
+        const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.78, pierH, 16), structureMat);
+        pier.position.set(bx + px, pierH / 2 + 0.03, zPos);
         pier.castShadow = true;
         pier.receiveShadow = true;
         bridgeGroup.add(pier);
@@ -692,7 +710,7 @@ export class CityWorld {
       hEnd: 5.2,
       isJumpRamp: true
     });
-    addBridgePier(-2.8, 5.0);
+    addBridgePier(-3.0, hBridge);
 
     // D. The Stunt Gap (Chasm)
     // From z = -2 to z = +7 (9.0-meter open jump gap over the air!)
