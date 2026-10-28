@@ -40,10 +40,10 @@ export class ArcadeVehicle {
     this.brakeRate = 42.0; // Responsive, smooth braking
     this.dragCoeff = 0.988;
 
-    // Speed-Sensitive Steering (Silky smooth, fluid analog feel without sharpness)
+    // Speed-Sensitive Steering (Silky smooth, progressive analog response without twitchiness)
     this.steerInput = 0;
     this.steerAngle = 0;
-    this.steerResponse = 14.0; // Smooth, progressive response curve (reduced from sharp 58.0)
+    this.steerResponse = 8.5; // Smooth, progressive response curve for silky direction controls
 
     // Grip & Drift
     this.isDrifting = false;
@@ -162,8 +162,8 @@ export class ArcadeVehicle {
 
     // 2. SPEED-SENSITIVE STEERING ANGLE (Smooth, progressive analog response without twitchiness)
     const speedRatio = Math.min(1.0, absSpeed / 22.0);
-    // When drifting, grant 34° for wide counter-steering control; gently tapers to 16° at high speeds
-    const baseSteerDeg = this.isDrifting ? 34.0 : THREE.MathUtils.lerp(30.0, 16.0, speedRatio);
+    // Smooth, refined steer angles: 20° at low speed, tapering to 11.5° at high speed so steering never over-rotates the van
+    const baseSteerDeg = this.isDrifting ? 26.0 : THREE.MathUtils.lerp(20.0, 11.5, speedRatio);
     const dynamicMaxSteer = THREE.MathUtils.degToRad(baseSteerDeg);
 
     // Silky progressive steering interpolation with zero abrupt snapping
@@ -361,14 +361,14 @@ export class ArcadeVehicle {
         while (relAngle > Math.PI) relAngle -= Math.PI * 2;
         while (relAngle < -Math.PI) relAngle += Math.PI * 2;
 
-        const maxSlip = 0.65; // ~37 degrees max slip angle for glorious, controllable drift
+        const maxSlip = 0.48; // ~27 degrees max slip angle for smooth, controllable drift
         const targetSlip = this.steerInput * maxSlip;
         const slipError = targetSlip - relAngle;
 
         const tanSteer = Math.tan(this.steerAngle);
         const kinematicYawRate = (driftSpeed / (this.wheelBaseHalf * 2)) * tanSteer;
-        const driftYawRate = kinematicYawRate * 0.70 + slipError * 4.5 * this.driftFactor;
-        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, driftYawRate, 14.0 * dt);
+        const driftYawRate = kinematicYawRate * 0.65 + slipError * 2.8 * this.driftFactor;
+        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, driftYawRate, 10.0 * dt);
         this.heading += this.angularVelocity * dt;
 
         // Curve velocity vector along the drift arc: allows car to slide sideways while carving around corners without stopping
@@ -418,8 +418,8 @@ export class ArcadeVehicle {
         } else {
           const tanSteer = Math.tan(this.steerAngle);
           const kinematicYawRate = (this.velocity.dot(forward) / wheelbase) * tanSteer;
-          const agilityBonus = THREE.MathUtils.lerp(1.0, 1.35, THREE.MathUtils.clamp((currentAbs - 3.0) / 10.0, 0.0, 1.0));
-          this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, kinematicYawRate * agilityBonus, 14.0 * dt);
+          const speedStabilizer = THREE.MathUtils.lerp(1.0, 0.85, THREE.MathUtils.clamp((currentAbs - 4.0) / 14.0, 0.0, 1.0));
+          this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, kinematicYawRate * speedStabilizer, 10.0 * dt);
           this.heading += this.angularVelocity * dt;
         }
       }

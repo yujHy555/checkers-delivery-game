@@ -16,16 +16,16 @@ export class CameraManager {
     this.posLerpSpeed = 9.0;
     this.targetLerpSpeed = 14.0;
 
-    // Third-Person Chase settings
-    this.chaseDistance = 5.6;
-    this.chaseHeight = 2.45;
+    // Third-Person Chase settings (moved back slightly for PC, iOS & Mobile for expansive visibility)
+    this.chaseDistance = 6.4;
+    this.chaseHeight = 2.65;
     this.baseFov = 62;
     this.hasInitChase = false;
 
     // Immediately place camera in proper third-person chase pose at van's spawn
-    this.currentPos = new THREE.Vector3(0, 2.8, -45.85);
+    this.currentPos = new THREE.Vector3(0, 2.95, -46.65);
     this.currentTarget = new THREE.Vector3(0, 1.27, -37.5);
-    this.desiredPos = new THREE.Vector3(0, 2.8, -45.85);
+    this.desiredPos = new THREE.Vector3(0, 2.95, -46.65);
     this.desiredTarget = new THREE.Vector3(0, 1.27, -37.5);
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentTarget);
@@ -84,8 +84,8 @@ export class CameraManager {
     const desiredPos = this.desiredPos;
     const desiredTarget = this.desiredTarget;
 
-    const baseDist = 5.6;
-    const baseHeight = 2.45;
+    const baseDist = 6.4;
+    const baseHeight = 2.65;
     this.currentPos.copy(focusPos)
       .addScaledVector(forward, -baseDist)
       .add(new THREE.Vector3(0, baseHeight, 0));
@@ -197,12 +197,12 @@ export class CameraManager {
 
     } else {
       this.hasInitIso = false;
-      // Dynamic Third-Person Chase Cam (Tightly tuned for PC, iOS & Android so car NEVER pulls away on acceleration)
-      const baseDist = 5.6;
-      const baseHeight = 2.45;
+      // Dynamic Third-Person Chase Cam (Moved back slightly for expansive visibility across PC, iOS & Android)
+      const baseDist = 6.4;
+      const baseHeight = 2.65;
       const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
-      const dynamicDist = baseDist + speedNorm * 0.25;
-      const dynamicHeight = baseHeight + speedNorm * 0.10;
+      const dynamicDist = baseDist + speedNorm * 0.30;
+      const dynamicHeight = baseHeight + speedNorm * 0.12;
 
       // Position camera directly behind vehicle with smooth follow
       desiredPos.copy(focusPos)

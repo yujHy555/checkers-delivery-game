@@ -392,6 +392,14 @@ class GameApp {
       if (optionsModal) optionsModal.classList.remove('open');
       this.audio.resume();
 
+      // Ensure no buttons retain browser focus or gamepad focus classes when entering the game
+      if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+      }
+      document.querySelectorAll('.gamepad-focused').forEach(el => el.classList.remove('gamepad-focused'));
+      this.lastFocusedElement = null;
+      this.gamepadMenuIndex = 0;
+
       if (mode === 'freeroam') {
         this.isFreeRoam = true;
         this.showToast('🏁 FREE ROAM: Explore city streets & stunt ramps!');
@@ -411,6 +419,20 @@ class GameApp {
       // Ensure van model and camera are immediately placed behind the car upon start
       this.vanModel.update(0, this.vehiclePhysics, null);
       this.cameraManager.snap(this.vanModel.root, this.vehiclePhysics);
+    };
+
+    const openMainMenu = () => {
+      this.inMainMenu = true;
+      this.audio.silenceEngine();
+      if (mainMenu) mainMenu.classList.remove('hidden');
+
+      // Clear any previous focus or residual active button state
+      if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+      }
+      document.querySelectorAll('.gamepad-focused').forEach(el => el.classList.remove('gamepad-focused'));
+      this.lastFocusedElement = null;
+      this.gamepadMenuIndex = 0;
     };
 
     if (btnMenuCareer) btnMenuCareer.addEventListener('click', () => startDriving('career'));
@@ -513,9 +535,7 @@ class GameApp {
 
     if (btnOpenMainMenu) {
       btnOpenMainMenu.addEventListener('click', () => {
-        this.inMainMenu = true;
-        this.audio.silenceEngine();
-        if (mainMenu) mainMenu.classList.remove('hidden');
+        openMainMenu();
       });
     }
 
@@ -536,9 +556,7 @@ class GameApp {
         // If no modal open, toggle main menu
         if (mainMenu) {
           if (mainMenu.classList.contains('hidden')) {
-            mainMenu.classList.remove('hidden');
-            this.inMainMenu = true;
-            this.audio.silenceEngine();
+            openMainMenu();
           } else {
             mainMenu.classList.add('hidden');
             this.inMainMenu = false;
@@ -606,11 +624,13 @@ class GameApp {
       }
     }, true);
 
-    // Play crisp confirmation sound when any button is clicked
+    // Play crisp confirmation sound when any button is clicked and clear persistent selection
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('button, .menu-btn, .btn-top-action, .btn-drive-start, .guide-tab-btn, .guide-btn-close');
       if (btn) {
         this.audio.playUiClick();
+        if (btn.blur) btn.blur();
+        btn.classList.remove('gamepad-focused');
       }
     }, true);
   }
@@ -665,15 +685,27 @@ class GameApp {
         this.lastFocusedElement.classList.remove('gamepad-focused');
         this.lastFocusedElement = null;
       }
+      this.lastActiveContainer = null;
       if (btnStart && !this.prevGpButtons[9]) {
         this.inMainMenu = true;
         this.audio.silenceEngine();
         this.audio.playUiClick();
         if (mainMenu) mainMenu.classList.remove('hidden');
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        document.querySelectorAll('.gamepad-focused').forEach(el => el.classList.remove('gamepad-focused'));
+        this.lastFocusedElement = null;
         this.gamepadMenuIndex = 0;
       }
       this.prevGpButtons[9] = btnStart;
       return;
+    }
+
+    // Reset index and clear focus if container switched (e.g. from modal to menu)
+    if (this.lastActiveContainer !== activeContainer) {
+      document.querySelectorAll('.gamepad-focused').forEach(el => el.classList.remove('gamepad-focused'));
+      this.lastFocusedElement = null;
+      this.gamepadMenuIndex = 0;
+      this.lastActiveContainer = activeContainer;
     }
 
     // Find all visible interactive elements in current active container

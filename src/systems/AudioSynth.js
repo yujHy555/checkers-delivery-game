@@ -42,7 +42,7 @@ export class AudioSynth {
       this.engineFilter.connect(this.engineGain);
       this.engineGain.connect(this.masterGain);
 
-      this.engineGain.gain.value = 0.12;
+      this.engineGain.gain.value = 0.06;
 
       this.engineOsc1.start();
       this.engineOsc2.start();
@@ -175,14 +175,15 @@ export class AudioSynth {
 
     const normSpeed = Math.min(1.0, Math.abs(speed) / maxSpeed);
 
-    const baseFreq = 48 + normSpeed * 175 + throttle * 45;
+    // Warm, smooth, non-intrusive engine acoustic profile (less loud and harsh on acceleration)
+    const baseFreq = 44 + normSpeed * 125 + throttle * 28;
     this.engineOsc1.frequency.setTargetAtTime(baseFreq, this.ctx.currentTime, 0.05);
     this.engineOsc2.frequency.setTargetAtTime(baseFreq * 2.02, this.ctx.currentTime, 0.05);
 
-    const targetGain = 0.14 + normSpeed * 0.24 + throttle * 0.20;
+    const targetGain = 0.06 + normSpeed * 0.10 + throttle * 0.08;
     this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.08);
 
-    this.engineFilter.frequency.setTargetAtTime(400 + normSpeed * 950, this.ctx.currentTime, 0.08);
+    this.engineFilter.frequency.setTargetAtTime(320 + normSpeed * 480, this.ctx.currentTime, 0.08);
   }
 
   updateSkid(isSkidding, slipVel) {

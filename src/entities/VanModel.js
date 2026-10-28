@@ -111,11 +111,11 @@ export class VanModel {
     this.chassisGroup.add(this.rearRunningGroup);
 
     this.rearRunningLightL = new THREE.PointLight(0xfff5d0, 0, 2.8, 2.0);
-    this.rearRunningLightL.position.set(-0.765, 0.465, -2.26);
+    this.rearRunningLightL.position.set(-0.825, 0.58, -2.26);
     this.rearRunningGroup.add(this.rearRunningLightL);
 
     this.rearRunningLightR = new THREE.PointLight(0xfff5d0, 0, 2.8, 2.0);
-    this.rearRunningLightR.position.set(0.765, 0.465, -2.26);
+    this.rearRunningLightR.position.set(0.825, 0.58, -2.26);
     this.rearRunningGroup.add(this.rearRunningLightR);
 
     // 6. Temporary lightweight fallback body (ensures instant startup with zero blank frames while 60MB GLB loads)
