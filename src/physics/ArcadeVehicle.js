@@ -47,6 +47,7 @@ export class ArcadeVehicle {
 
     // Grip & Drift
     this.isDrifting = false;
+    this.isDonut = false;
     this.isBrakingHard = false;
     this.driftFactor = 0;
     this.lateralVelocity = 0;
@@ -223,7 +224,9 @@ export class ArcadeVehicle {
     );
     const targetGroundY = rawGroundH + this.roadLevel;
 
-    const isOnRamp = gFL.isOnRamp || gFR.isOnRamp || gRL.isOnRamp || gRR.isOnRamp || gCenter.isOnRamp;
+    // Vehicle is supported by a ramp only if center is on ramp or at least two wheels are on the ramp
+    const rampWheelCount = (gFL.isOnRamp ? 1 : 0) + (gFR.isOnRamp ? 1 : 0) + (gRL.isOnRamp ? 1 : 0) + (gRR.isOnRamp ? 1 : 0);
+    const isOnRamp = (gCenter.isOnRamp && rampWheelCount >= 1) || (rampWheelCount >= 2);
     this.isOnRamp = isOnRamp;
     const isNearPeak = Boolean(gCenter.isNearPeak || gFL.isNearPeak || gFR.isNearPeak || gRL.isNearPeak || gRR.isNearPeak);
 
@@ -307,110 +310,121 @@ export class ArcadeVehicle {
       }
     }
 
-    // 5. PROGRESSIVE ACCELERATION & BRAKING (Instant throttle pickup & responsive reverse)
+    // 5. PROGRESSIVE ACCELERATION, DONUTS & HIGH-SPEED CORNER POWER-DRIFT
+    const totalSpeed = this.velocity.length();
+
+    // Donut intent: handbrake + throttle from a stop / slow speed (< 3.8 m/s) or continuing an active donut
+    const isDonutIntent = Boolean(input.handbrake && input.throttle > 0 && (this.isDonut || totalSpeed < 3.8));
+    this.isDonut = isDonutIntent;
+
+    // Corner drift intent: initiated with handbrake while travelling at speed (>= 2.0 m/s)
+    const isCornerDriftIntent = Boolean(input.handbrake && totalSpeed >= 2.0 && !isDonutIntent);
+
+    if (isDonutIntent || isCornerDriftIntent) {
+      this.isDrifting = true;
+      this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 8.0 * dt);
+    } else {
+      // Smooth progressive recovery: gently eases out of the drift over ~0.8s without sudden snaps
+      this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 2.5 * dt);
+      if (this.driftFactor < 0.02) this.isDrifting = false;
+    }
+
     if (!this.isAirborne) {
-      if (input.throttle > 0) {
-        if (this.speed < this.maxSpeed) {
-          const torqueFactor = Math.max(0.65, 1.0 - (this.speed / this.maxSpeed) * 0.35);
-          const accel = input.throttle * this.baseAccelRate * torqueFactor;
-          this.velocity.addScaledVector(forward, accel * dt);
-        }
-      } else if (input.brake > 0) {
-        if (this.speed > 0.25) {
-          const brake = input.brake * this.brakeRate;
-          this.velocity.addScaledVector(forward, -brake * dt);
+      if (isDonutIntent) {
+        // HANDBRAKE + ACCELERATOR FROM STOP: Real vehicle burnout / donut drift circle!
+        // Powers rear wheels smoothly in a tight circular burnout
+        const targetDonutSpeed = 5.2;
+        if (this.speed < targetDonutSpeed) {
+          this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.95 * dt);
         } else {
-          if (this.speed > -this.reverseMaxSpeed) {
-            this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.85) * dt);
-          }
+          this.velocity.multiplyScalar(Math.pow(0.96, dt * 60.0));
         }
+
+        const steerDir = Math.abs(this.steerInput) > 0.08 ? Math.sign(this.steerInput) : 1.0;
+        const donutYawRate = steerDir * 2.65 * Math.max(0.6, Math.abs(this.steerInput));
+        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, donutYawRate, 14.0 * dt);
+        this.heading += this.angularVelocity * dt;
+
+      } else if (this.isDrifting && totalSpeed >= 2.0) {
+        // HIGH-SPEED CORNERING POWER DRIFT:
+        // Maintains high-speed momentum so the car slides gracefully for a generous distance around the bend
+        let driftSpeed = totalSpeed;
+        if (input.throttle > 0 && driftSpeed < this.maxSpeed) {
+          driftSpeed = Math.min(this.maxSpeed, driftSpeed + input.throttle * this.baseAccelRate * 0.70 * dt);
+        } else {
+          driftSpeed *= Math.pow(0.998, dt * 60.0);
+        }
+
+        // Steer input controls drift slip angle (up to ~37 degrees) and guiding turn rate
+        const velHeading = Math.atan2(this.velocity.x, this.velocity.z);
+        let relAngle = this.heading - velHeading;
+        while (relAngle > Math.PI) relAngle -= Math.PI * 2;
+        while (relAngle < -Math.PI) relAngle += Math.PI * 2;
+
+        const maxSlip = 0.65; // ~37 degrees max slip angle for glorious, controllable drift
+        const targetSlip = this.steerInput * maxSlip;
+        const slipError = targetSlip - relAngle;
+
+        const tanSteer = Math.tan(this.steerAngle);
+        const kinematicYawRate = (driftSpeed / (this.wheelBaseHalf * 2)) * tanSteer;
+        const driftYawRate = kinematicYawRate * 0.70 + slipError * 4.5 * this.driftFactor;
+        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, driftYawRate, 14.0 * dt);
+        this.heading += this.angularVelocity * dt;
+
+        // Curve velocity vector along the drift arc: allows car to slide sideways while carving around corners without stopping
+        const updatedForward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
+        const velDir = this.velocity.clone().normalize();
+        const slipAlignRate = THREE.MathUtils.lerp(22.0, 3.2, this.driftFactor);
+        velDir.lerp(updatedForward, slipAlignRate * dt).normalize();
+        this.velocity.copy(velDir.multiplyScalar(driftSpeed));
+
       } else {
-        this.velocity.multiplyScalar(Math.pow(this.dragCoeff, dt * 60.0));
-      }
-
-      // 6. SILKY SMOOTH ARCADE DRIFT & REALISTIC HANDBRAKE DONUT CIRCLES
-      const isDonutIntent = Boolean(input.handbrake && input.throttle > 0);
-      const isHighSpeedDriftIntent = Boolean(input.handbrake && absSpeed > 1.2);
-
-      if (isDonutIntent || isHighSpeedDriftIntent) {
-        this.isDrifting = true;
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 14.0 * dt);
-
-        if (isDonutIntent) {
-          // HANDBRAKE + ACCELERATOR: Real vehicle burnout / donut drift circle!
-          // Locks rear wheels, spins tires, and powers the car smoothly in a circle
-          const targetDonutSpeed = 5.2; // Smooth stable circular forward speed
-          if (this.speed < targetDonutSpeed) {
-            this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.95 * dt);
+        // Normal driving / easing out of drift
+        if (input.throttle > 0) {
+          if (this.speed < this.maxSpeed) {
+            const torqueFactor = Math.max(0.65, 1.0 - (this.speed / this.maxSpeed) * 0.35);
+            const accel = input.throttle * this.baseAccelRate * torqueFactor;
+            this.velocity.addScaledVector(forward, accel * dt);
+          }
+        } else if (input.brake > 0) {
+          if (this.speed > 0.25) {
+            const brake = input.brake * this.brakeRate;
+            this.velocity.addScaledVector(forward, -brake * dt);
           } else {
-            this.velocity.multiplyScalar(Math.pow(0.96, dt * 60.0));
+            if (this.speed > -this.reverseMaxSpeed) {
+              this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.85) * dt);
+            }
           }
         } else {
-          // Smooth high-speed drift momentum conservation
-          this.velocity.multiplyScalar(Math.pow(0.998, dt * 60.0));
-          if (input.throttle > 0 && this.speed < this.maxSpeed) {
-            this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.85 * dt);
-          }
+          this.velocity.multiplyScalar(Math.pow(this.dragCoeff, dt * 60.0));
         }
-      } else {
-        this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 0.0, 5.5 * dt);
-        if (this.driftFactor < 0.03) this.isDrifting = false;
-      }
 
-      // Lateral grip: smooth, controlled slip during drift; locked traction during normal driving
-      const currentLateral = this.velocity.dot(right);
-      if (!this.isDrifting) {
-        // Normal driving: high traction with progressive lateral damping for buttery smooth steering
-        const lateralDecel = -currentLateral * Math.min(1.0, 32.0 * dt);
-        this.velocity.addScaledVector(right, lateralDecel);
-        this.lateralVelocity = this.velocity.dot(right);
-      } else {
-        // Drift mode: low lateral grip allows rear end to slide wide in smooth sweeping arcs
-        const gripRate = THREE.MathUtils.lerp(32.0, 1.8, this.driftFactor);
+        // Lateral grip damping (high grip during normal driving, smooth transition during ease-out)
+        const currentLateral = this.velocity.dot(right);
+        const gripRate = THREE.MathUtils.lerp(32.0, 3.2, this.driftFactor);
         const lateralDecel = -currentLateral * Math.min(1.0, gripRate * dt);
         this.velocity.addScaledVector(right, lateralDecel);
         this.lateralVelocity = this.velocity.dot(right);
+
+        // Kinematic yaw & steering
+        const wheelbase = this.wheelBaseHalf * 2;
+        const currentAbs = Math.abs(this.velocity.dot(forward));
+        if (currentAbs <= 0.12) {
+          this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, 0, 18.0 * dt);
+          if (!input.throttle && !input.brake) {
+            this.speed = 0;
+            this.velocity.set(0, 0, 0);
+          }
+        } else {
+          const tanSteer = Math.tan(this.steerAngle);
+          const kinematicYawRate = (this.velocity.dot(forward) / wheelbase) * tanSteer;
+          const agilityBonus = THREE.MathUtils.lerp(1.0, 1.35, THREE.MathUtils.clamp((currentAbs - 3.0) / 10.0, 0.0, 1.0));
+          this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, kinematicYawRate * agilityBonus, 14.0 * dt);
+          this.heading += this.angularVelocity * dt;
+        }
       }
 
-      // Update current forward speed after throttle, brake, and grip integration
       this.speed = this.velocity.dot(forward);
-      const currentAbsSpeed = Math.abs(this.speed);
-
-      // 7. SILKY SMOOTH KINEMATIC YAW & CONTINUOUS DONUT CIRCLES
-      const wheelbase = this.wheelBaseHalf * 2;
-      const dirSign = this.speed >= -0.05 ? 1 : -1;
-
-      if (currentAbsSpeed <= 0.12 && !isDonutIntent) {
-        // Stationary when not performing a burnout donut: zero center-pivot rotation
-        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, 0, 18.0 * dt);
-        if (!input.throttle && !input.brake) {
-          this.speed = 0;
-          this.velocity.set(0, 0, 0);
-        }
-      } else {
-        // Natural kinematic yaw rate
-        const tanSteer = Math.tan(this.steerAngle);
-        const kinematicYawRate = (this.speed / wheelbase) * tanSteer;
-
-        // Silky agility scaling at higher road speeds
-        const agilityBonus = THREE.MathUtils.lerp(1.0, 1.35, THREE.MathUtils.clamp((currentAbsSpeed - 3.0) / 10.0, 0.0, 1.0));
-        let targetYawRate = kinematicYawRate * agilityBonus;
-
-        if (isDonutIntent) {
-          // Holding handbrake + gas whips the car in a smooth, continuous circle like a real vehicle doing donuts
-          // If user steers left/right, donut in that direction; if centered, initiate smooth rotation from wheel bias
-          const steerDir = Math.abs(this.steerInput) > 0.08 ? Math.sign(this.steerInput) : 1.0;
-          const donutYawRate = steerDir * 2.65 * Math.max(0.6, Math.abs(this.steerInput));
-          targetYawRate = donutYawRate;
-        } else if (this.isDrifting && currentAbsSpeed > 1.2) {
-          // Smooth progressive oversteer during high-speed drifts
-          const driftOversteer = this.steerInput * dirSign * 2.4 * this.driftFactor;
-          targetYawRate += driftOversteer;
-        }
-
-        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 14.0 * dt);
-        this.heading += this.angularVelocity * dt;
-      }
 
     } else {
       this.heading += this.steerInput * 0.35 * dt;
@@ -676,13 +690,9 @@ export class ArcadeVehicle {
             this.velocity.multiplyScalar(0.70);
           }
         } else if (c.type === 'ramp') {
-          // SOLID RAMP SIDE BARRIER:
-          // ONLY blocks a car approaching the ramp's side walls from the outside (|carLocalX| > hw)
-          // NEVER diverts a car driving up or approaching the entrance slope (|carLocalX| <= hw)
-          if (this.isOnRamp || this.isAirborne) continue;
-
-          const cosA = Math.cos(c.angleY);
-          const sinA = Math.sin(c.angleY);
+          // SOLID 3D RAMP COLLISION (Airtight sides - zero clipping through ramp when driving close to or off the edge)
+          const cosA = Math.cos(c.angleY || 0);
+          const sinA = Math.sin(c.angleY || 0);
           const hw = c.width / 2;
           const hd = c.depth / 2;
 
@@ -691,67 +701,63 @@ export class ArcadeVehicle {
           const carLocalX = dxCenter * cosA - dzCenter * sinA;
           const carLocalZ = dxCenter * sinA + dzCenter * cosA;
 
-          // If the car is within the ramp width (aiming to drive up the slope), NEVER divert!
-          if (Math.abs(carLocalX) <= hw || Math.abs(carLocalZ) > hd + 1.2) {
+          // Only evaluate within the ramp's longitudinal footprint + buffer
+          if (Math.abs(carLocalZ) > hd + 0.8) continue;
+
+          // Calculate exact slope height at vehicle's Z position
+          const clampedZ = THREE.MathUtils.clamp(carLocalZ, -hd, hd);
+          const rampH = Math.max(0, 1.0 - (Math.abs(clampedZ) / hd)) * c.height;
+
+          // If car is driving ON top of the slope within ramp width, let it drive normally
+          const isRidingOnSlope = (Math.abs(carLocalX) <= hw) && (this.position.y >= rampH - 0.20);
+          if (isRidingOnSlope) {
             continue;
           }
 
-          const isLeftSide = carLocalX < -hw;
-          const isRightSide = carLocalX > hw;
+          // SOLID SIDE WALLS: When below the ramp surface, vehicle CANNOT penetrate the triangular side walls
+          // This applies whether the car is driving on the road, slipping off the edge, or airborne falling down!
+          const carBottomY = this.position.y - this.roadLevel;
+          if (carBottomY < rampH && rampH > 0.20) {
+            // Check Right Side Wall (localX = +hw)
+            if (carLocalX >= 0) {
+              const minAllowedX = hw + halfW;
+              if (carLocalX < minAllowedX) {
+                const penetration = minAllowedX - carLocalX;
+                const normX = cosA;
+                const normZ = -sinA;
+                this.position.x += normX * (penetration + 0.02);
+                this.position.z += normZ * (penetration + 0.02);
 
-          // Van perimeter points: front bumper, corners, mid sides, rear bumper
-          const checkPoints = [
-            { x: this.position.x + forward.x * halfL, z: this.position.z + forward.z * halfL },
-            { x: this.position.x + forward.x * halfL - right.x * halfW, z: this.position.z + forward.z * halfL - right.z * halfW },
-            { x: this.position.x + forward.x * halfL + right.x * halfW, z: this.position.z + forward.z * halfL + right.z * halfW },
-            { x: this.position.x - right.x * halfW, z: this.position.z - right.z * halfW },
-            { x: this.position.x + right.x * halfW, z: this.position.z + right.z * halfW },
-            { x: this.position.x - forward.x * halfL - right.x * halfW, z: this.position.z - forward.z * halfL - right.z * halfW },
-            { x: this.position.x - forward.x * halfL + right.x * halfW, z: this.position.z - forward.z * halfL + right.z * halfW },
-            { x: this.position.x - forward.x * halfL, z: this.position.z - forward.z * halfL }
-          ];
+                const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+                if (vInward > 0) {
+                  this.velocity.x -= (-normX) * vInward;
+                  this.velocity.z -= (-normZ) * vInward;
+                  this.velocity.multiplyScalar(0.85);
+                }
+              }
+            }
+            // Check Left Side Wall (localX = -hw)
+            else {
+              const maxAllowedX = -hw - halfW;
+              if (carLocalX > maxAllowedX) {
+                const penetration = carLocalX - maxAllowedX;
+                const normX = -cosA;
+                const normZ = sinA;
+                this.position.x += normX * (penetration + 0.02);
+                this.position.z += normZ * (penetration + 0.02);
 
-          let maxPen = 0;
-
-          for (const pt of checkPoints) {
-            const dx = pt.x - c.x;
-            const dz = pt.z - c.z;
-            const plx = dx * cosA - dz * sinA;
-            const plz = dx * sinA + dz * cosA;
-
-            if (Math.abs(plz) <= hd - 0.4) {
-              const rampH = Math.max(0, 1.0 - (Math.abs(plz) / hd)) * c.height;
-
-              // Only block if car is below the ramp height (hitting side wall from road)
-              if (this.position.y < rampH - 0.15 && rampH > 0.3) {
-                if (isLeftSide && plx > -hw) {
-                  const pen = plx - (-hw);
-                  if (pen > maxPen) maxPen = pen;
-                } else if (isRightSide && plx < hw) {
-                  const pen = hw - plx;
-                  if (pen > maxPen) maxPen = pen;
+                const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
+                if (vInward > 0) {
+                  this.velocity.x -= (-normX) * vInward;
+                  this.velocity.z -= (-normZ) * vInward;
+                  this.velocity.multiplyScalar(0.85);
                 }
               }
             }
           }
-
-          if (maxPen > 0) {
-            const pushDist = maxPen + 0.02;
-            const normX = isLeftSide ? -cosA : cosA;
-            const normZ = isLeftSide ? sinA : -sinA;
-            this.position.x += normX * pushDist;
-            this.position.z += normZ * pushDist;
-
-            const vInward = this.velocity.x * (-normX) + this.velocity.z * (-normZ);
-            if (vInward > 0) {
-              this.velocity.x -= (-normX) * vInward * 1.35;
-              this.velocity.z -= (-normZ) * vInward * 1.35;
-              this.velocity.multiplyScalar(0.75);
-            }
-          }
         }
+      }
     }
-  }
   }
 
   updateSkidsAndSmoke(dt, forward, right, input) {

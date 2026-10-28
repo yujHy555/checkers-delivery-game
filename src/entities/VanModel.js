@@ -94,110 +94,29 @@ export class VanModel {
     this.headlightFlood.position.set(0, 0.70, 3.2);
     this.chassisGroup.add(this.headlightFlood);
 
-    // 5. Dual Rear Dynamic Brake Lights (PURE EMISSION, ZERO WHITE PLANE, ZERO BLACK HOUSING)
-    // When brakes are OFF: completely invisible (NO dark/black box geometry over the taillights)
-    // When brakes are ON: soft organic ruby-red glow positioned directly over the red lenses
+    // 5. Dual Rear Dynamic Brake Lights (PURE PHYSICAL LIGHT EMISSION - ZERO VISIBLE PLANES OR RED CIRCLES)
     this.brakeLightsGroup = new THREE.Group();
     this.chassisGroup.add(this.brakeLightsGroup);
 
-    this.brakeLightL = new THREE.PointLight(0xff0022, 0, 7.0, 2.0);
-    this.brakeLightL.position.set(-0.765, 0.465, -2.28);
+    this.brakeLightL = new THREE.PointLight(0xff1122, 0, 5.0, 2.0);
+    this.brakeLightL.position.set(-0.765, 0.465, -2.26);
     this.brakeLightsGroup.add(this.brakeLightL);
 
-    this.brakeLightR = new THREE.PointLight(0xff0022, 0, 7.0, 2.0);
-    this.brakeLightR.position.set(0.765, 0.465, -2.28);
+    this.brakeLightR = new THREE.PointLight(0xff1122, 0, 5.0, 2.0);
+    this.brakeLightR.position.set(0.765, 0.465, -2.26);
     this.brakeLightsGroup.add(this.brakeLightR);
 
-    // Procedural soft glowing ruby-red lens texture (prevents white plane saturation / hard edges)
-    const brakeCanvas = document.createElement('canvas');
-    brakeCanvas.width = 128;
-    brakeCanvas.height = 256;
-    const bCtx = brakeCanvas.getContext('2d');
-    bCtx.clearRect(0, 0, 128, 256);
-    const grad = bCtx.createRadialGradient(64, 128, 8, 64, 128, 75);
-    grad.addColorStop(0, 'rgba(255, 30, 45, 0.95)');
-    grad.addColorStop(0.35, 'rgba(235, 10, 30, 0.75)');
-    grad.addColorStop(0.70, 'rgba(200, 0, 20, 0.35)');
-    grad.addColorStop(1, 'rgba(160, 0, 10, 0.0)');
-    bCtx.fillStyle = grad;
-    bCtx.fillRect(0, 0, 128, 256);
-    this.brakeGlowTex = new THREE.CanvasTexture(brakeCanvas);
-
-    // NormalBlending ensures rich ruby-red saturation without any white clipping plane
-    this.brakeCoreMat = new THREE.MeshBasicMaterial({
-      map: this.brakeGlowTex,
-      color: 0xff1525,
-      transparent: true,
-      opacity: 0.90,
-      blending: THREE.NormalBlending,
-      depthWrite: false,
-      toneMapped: false
-    });
-
-    const lensGeo = new THREE.PlaneGeometry(0.14, 0.34);
-    lensGeo.rotateY(Math.PI); // Facing rearward (-Z)
-
-    this.tailLensL = new THREE.Mesh(lensGeo, this.brakeCoreMat);
-    this.tailLensL.position.set(-0.765, 0.465, -2.215);
-    this.brakeLightsGroup.add(this.tailLensL);
-
-    this.tailLensR = new THREE.Mesh(lensGeo, this.brakeCoreMat);
-    this.tailLensR.position.set(0.765, 0.465, -2.215);
-    this.brakeLightsGroup.add(this.tailLensR);
-
-    // Initial state: INVISIBLE so the vehicle's printed rear lights are 100% visible and unblemished
-    this.tailLensL.visible = false;
-    this.tailLensR.visible = false;
-
-    // 5b. Rear Running Position Lights (Warm White / Slight Yellow, stay on with headlights at night)
+    // 5b. Rear Running Position Lights (Soft, subtle warm backlight glow when headlights are on)
     this.rearRunningGroup = new THREE.Group();
     this.chassisGroup.add(this.rearRunningGroup);
 
-    this.rearRunningLightL = new THREE.PointLight(0xfffae0, 0, 6.0, 2.0);
-    this.rearRunningLightL.position.set(-0.765, 0.465, -2.28);
+    this.rearRunningLightL = new THREE.PointLight(0xfff5d0, 0, 2.8, 2.0);
+    this.rearRunningLightL.position.set(-0.765, 0.465, -2.26);
     this.rearRunningGroup.add(this.rearRunningLightL);
 
-    this.rearRunningLightR = new THREE.PointLight(0xfffae0, 0, 6.0, 2.0);
-    this.rearRunningLightR.position.set(0.765, 0.465, -2.28);
+    this.rearRunningLightR = new THREE.PointLight(0xfff5d0, 0, 2.8, 2.0);
+    this.rearRunningLightR.position.set(0.765, 0.465, -2.26);
     this.rearRunningGroup.add(this.rearRunningLightR);
-
-    const runningCanvas = document.createElement('canvas');
-    runningCanvas.width = 128;
-    runningCanvas.height = 256;
-    const rCtx = runningCanvas.getContext('2d');
-    rCtx.clearRect(0, 0, 128, 256);
-    const rGrad = rCtx.createRadialGradient(64, 128, 6, 64, 128, 65);
-    rGrad.addColorStop(0, 'rgba(255, 252, 220, 0.88)');
-    rGrad.addColorStop(0.35, 'rgba(255, 240, 180, 0.60)');
-    rGrad.addColorStop(0.70, 'rgba(255, 220, 140, 0.22)');
-    rGrad.addColorStop(1, 'rgba(255, 200, 100, 0.0)');
-    rCtx.fillStyle = rGrad;
-    rCtx.fillRect(0, 0, 128, 256);
-    this.rearRunningGlowTex = new THREE.CanvasTexture(runningCanvas);
-
-    this.rearRunningMat = new THREE.MeshBasicMaterial({
-      map: this.rearRunningGlowTex,
-      color: 0xfffae0,
-      transparent: true,
-      opacity: 0.80,
-      blending: THREE.NormalBlending,
-      depthWrite: false,
-      toneMapped: false
-    });
-
-    const runningLensGeo = new THREE.PlaneGeometry(0.12, 0.28);
-    runningLensGeo.rotateY(Math.PI);
-
-    this.rearRunningLensL = new THREE.Mesh(runningLensGeo, this.rearRunningMat);
-    this.rearRunningLensL.position.set(-0.765, 0.465, -2.214);
-    this.rearRunningGroup.add(this.rearRunningLensL);
-
-    this.rearRunningLensR = new THREE.Mesh(runningLensGeo, this.rearRunningMat);
-    this.rearRunningLensR.position.set(0.765, 0.465, -2.214);
-    this.rearRunningGroup.add(this.rearRunningLensR);
-
-    this.rearRunningLensL.visible = false;
-    this.rearRunningLensR.visible = false;
 
     // 6. Temporary lightweight fallback body (ensures instant startup with zero blank frames while 60MB GLB loads)
     this.createFallbackBody();
@@ -327,12 +246,10 @@ export class VanModel {
     if (this.headlightR) this.headlightR.intensity = spotIntensity;
     if (this.headlightFlood) this.headlightFlood.intensity = floodIntensity;
 
-    // Rear running lights (warm white / slight yellow emission, modest reach)
-    const rearRunningIntensity = on ? 1.6 : 0.0;
+    // Rear running lights (Subtle, gentle warm backlight glow with modest reach)
+    const rearRunningIntensity = on ? 0.35 : 0.0;
     if (this.rearRunningLightL) this.rearRunningLightL.intensity = rearRunningIntensity;
     if (this.rearRunningLightR) this.rearRunningLightR.intensity = rearRunningIntensity;
-    if (this.rearRunningLensL) this.rearRunningLensL.visible = on;
-    if (this.rearRunningLensR) this.rearRunningLensR.visible = on;
   }
 
   update(dt, vehiclePhysics, input = null) {
@@ -372,20 +289,10 @@ export class VanModel {
 
     const brakeActive = isBraking || isHandbraking || isReversing || isDecelBraking;
 
-    // 6. Dynamic Brake Lights (Zero black housing, pure neon emission when active)
-    if (this.tailLensL && this.tailLensR) {
-      if (brakeActive) {
-        this.tailLensL.visible = true;
-        this.tailLensR.visible = true;
-        if (this.brakeLightL) this.brakeLightL.intensity = 3.5;
-        if (this.brakeLightR) this.brakeLightR.intensity = 3.5;
-      } else {
-        this.tailLensL.visible = false;
-        this.tailLensR.visible = false;
-        if (this.brakeLightL) this.brakeLightL.intensity = 0;
-        if (this.brakeLightR) this.brakeLightR.intensity = 0;
-      }
-    }
+    // 6. Dynamic Brake Lights (Pure physical red light emission, zero quad plane artifacts)
+    const brakeIntensity = brakeActive ? 3.0 : 0.0;
+    if (this.brakeLightL) this.brakeLightL.intensity = brakeIntensity;
+    if (this.brakeLightR) this.brakeLightR.intensity = brakeIntensity;
 
     // 7. Animate Doors (if present)
     if (this.sideSlideDoor) {
