@@ -52,6 +52,10 @@ class GameApp {
       onError: (err) => this.onVanLoadError(err)
     });
 
+    // Immediate initial sync of van pose & camera so neither starts at (0, 0, 0)
+    this.vanModel.update(0, this.vehiclePhysics, null);
+    this.cameraManager.snap(this.vanModel.root, this.vehiclePhysics);
+
     // 6. SINGLE QUALITY AAA OVERHEAD GROUNDED SHADOW
     this.setupAAAGroundedShadow();
 
@@ -259,6 +263,8 @@ class GameApp {
       if (this.world && this.world.resetCones) {
         this.world.resetCones();
       }
+      this.vanModel.update(0, this.vehiclePhysics, null);
+      this.cameraManager.snap(this.vanModel.root, this.vehiclePhysics);
       this.showToast('Van reset on center road!');
     };
   }
@@ -398,6 +404,10 @@ class GameApp {
         this.isFreeRoam = false;
         this.showToast('⚡ CAREER: Sixty60 Delivery Run in progress!');
       }
+
+      // Ensure van model and camera are immediately placed behind the car upon start
+      this.vanModel.update(0, this.vehiclePhysics, null);
+      this.cameraManager.snap(this.vanModel.root, this.vehiclePhysics);
     };
 
     if (btnMenuCareer) btnMenuCareer.addEventListener('click', () => startDriving('career'));
