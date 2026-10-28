@@ -346,34 +346,47 @@ export class ArcadeVehicle {
         if (this.driftFactor < 0.03) this.isDrifting = false;
       }
 
-      // Lateral grip: drops down to 0.55 for long, glorious, dramatic sideways sliding around bends!
-      const gripRate = THREE.MathUtils.lerp(45.0, 0.55, this.driftFactor);
-      const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
-      this.velocity.addScaledVector(right, lateralDecel);
-
-      // 7. YAW STEERING (Physically realistic: yaw rotation requires vehicle motion, ZERO 360-spin when stopped)
-      let turnFactor = 0;
-      if (absSpeed > 0.12) {
-        // Smoothly scale up steering authority from 0.12 m/s to 1.8 m/s
-        turnFactor = THREE.MathUtils.clamp((absSpeed - 0.12) / 1.5, 0.0, 1.0);
+      // Lateral grip: 100% locked traction at normal/slow speeds so van strictly follows wheels without sliding
+      if (!this.isDrifting && absSpeed < 6.0) {
+        this.velocity.copy(forward).multiplyScalar(this.speed);
+        this.lateralVelocity = 0;
       } else {
-        // When stationary or virtually stopped, wheels turn visually but heading does NOT spin!
-        turnFactor = 0;
+        const gripRate = THREE.MathUtils.lerp(45.0, 0.65, this.driftFactor);
+        const lateralDecel = -this.lateralVelocity * Math.min(1.0, gripRate * dt);
+        this.velocity.addScaledVector(right, lateralDecel);
+      }
+
+      // 7. PHYSICALLY ACCURATE ACKERMANN / BICYCLE KINEMATICS (Zero center-pivot 360 spins when slow or stopped)
+      // Real vehicles turn because forward motion rolls the wheels along an arc (omega = (v / L) * tan(delta))
+      // When stopped or moving slowly, heading change is strictly bounded by wheel roll distance
+      const wheelbase = this.wheelBaseHalf * 2;
+      const dirSign = this.speed >= -0.05 ? 1 : -1;
+
+      if (absSpeed <= 0.20) {
+        // Completely stationary or slowing to a stop: front wheels turn visually, but vehicle CANNOT rotate in place
         this.angularVelocity = 0;
-      }
-
-      const dirSign = this.speed >= -0.1 ? 1 : -1;
-      // High-speed drift yaw: responsive oversteer rotation to whip tail out with style
-      let yawRateCoeff;
-      if (this.isDrifting) {
-        yawRateCoeff = 4.8; // Fast, responsive tail-out rotation for epic arcade drifts!
+        if (!input.throttle && !input.brake) {
+          this.speed = 0;
+          this.velocity.set(0, 0, 0);
+        }
       } else {
-        yawRateCoeff = THREE.MathUtils.lerp(3.8, 2.0, speedRatio);
-      }
+        // Kinematic yaw rate strictly proportional to actual rolling velocity
+        const tanSteer = Math.tan(this.steerAngle);
+        const kinematicYawRate = (this.speed / wheelbase) * tanSteer;
 
-      const targetYawRate = this.steerInput * turnFactor * dirSign * yawRateCoeff;
-      this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 36.0 * dt);
-      this.heading += this.angularVelocity * dt;
+        // Agile scaling at medium/high road speeds for responsive arcade feel, but strictly 1.0 at low speeds
+        const agilityBonus = THREE.MathUtils.lerp(1.0, 1.45, THREE.MathUtils.clamp((absSpeed - 3.0) / 12.0, 0.0, 1.0));
+        let targetYawRate = kinematicYawRate * agilityBonus;
+
+        // Drift oversteer only triggers when actively power-sliding at speed (never when slow or stopping)
+        if (this.isDrifting && absSpeed > 2.0) {
+          const driftOversteer = this.steerInput * dirSign * 3.2 * this.driftFactor;
+          targetYawRate += driftOversteer;
+        }
+
+        this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, targetYawRate, 28.0 * dt);
+        this.heading += this.angularVelocity * dt;
+      }
 
     } else {
       this.heading += this.steerInput * 0.35 * dt;
