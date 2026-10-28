@@ -21,9 +21,10 @@ class GameApp {
     const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
       (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
       (window.innerWidth <= 960 && 'ontouchstart' in window);
+    this.isMobile = isMobile;
     this.renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // AAA Soft Shadows
+    this.renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.container.appendChild(this.renderer.domElement);
@@ -98,9 +99,10 @@ class GameApp {
     this.sunLight = new THREE.DirectionalLight(0xffffff, 1.35);
     this.sunLight.castShadow = true;
 
-    // High resolution 2048 shadow map
-    this.sunLight.shadow.mapSize.width = 2048;
-    this.sunLight.shadow.mapSize.height = 2048;
+    // Adaptive shadow map resolution: 1024 on mobile for solid 60/120fps, 2048 on desktop
+    const shadowRes = this.isMobile ? 1024 : 2048;
+    this.sunLight.shadow.mapSize.width = shadowRes;
+    this.sunLight.shadow.mapSize.height = shadowRes;
 
     // Generous 50x50m shadow camera: completely eliminates cube/box shadow frustum clipping artifacts on ramps
     const boxSize = 25.0;

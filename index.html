@@ -1017,52 +1017,112 @@
     }
 
     /* MOBILE RESPONSIVE TWEAKS FOR UNCLUTTERED GAME VIEW */
-    @media (max-width: 900px) {
+    @media (max-width: 900px), (max-height: 520px) {
       #hud-top {
-        top: 10px;
-        left: 12px;
-        right: 12px;
+        top: 6px;
+        left: 8px;
+        right: 8px;
       }
       .hud-card {
-        padding: 6px 12px;
+        padding: 4px 8px;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      }
+      .brand-title {
+        gap: 5px;
+      }
+      .brand-badge {
+        font-size: 8.5px;
+        padding: 2px 5px;
+        border-radius: 4px;
+        letter-spacing: 0.3px;
       }
       .brand-text {
-        font-size: 16px;
+        font-size: 11px;
+        letter-spacing: 0.3px;
       }
       .order-box {
-        font-size: 13px;
+        margin-top: 2px;
+        font-size: 9.5px;
+        gap: 4px;
+      }
+      .order-dist {
+        padding: 1px 4px;
+        font-size: 9px;
+        border-radius: 3px;
+      }
+      .top-btn-row {
+        margin-top: 4px !important;
+        gap: 4px !important;
+      }
+      .btn-top-action {
+        padding: 2.5px 6px;
+        font-size: 9px;
+        border-radius: 5px;
+        gap: 3px;
+        letter-spacing: 0.2px;
+      }
+      .right-hud {
+        gap: 6px;
+      }
+      .stats-card {
+        padding: 4px 8px;
+        border-radius: 8px;
+      }
+      .score-label {
+        font-size: 8px;
+        letter-spacing: 0.5px;
       }
       .score-value {
-        font-size: 20px;
+        font-size: 14px;
+        line-height: 1.1;
+      }
+      .speedo-wrap {
+        margin-top: 1px;
+        gap: 2px;
       }
       .speedo-val {
-        font-size: 24px;
+        font-size: 15px;
+        line-height: 1;
+      }
+      .speedo-unit {
+        font-size: 8.5px;
       }
       #minimap {
-        width: 80px;
-        height: 80px;
+        width: 50px;
+        height: 50px;
+        border-width: 1.5px;
+        box-shadow: 0 0 10px rgba(0, 188, 212, 0.25);
+      }
+      #minimap-player {
+        width: 6px;
+        height: 8px;
+      }
+      #minimap-target {
+        width: 7px;
+        height: 7px;
       }
       #touch-controls {
-        bottom: 12px;
-        left: 12px;
-        right: 12px;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
       }
       .touch-steer-btn {
-        width: 76px;
-        height: 66px;
+        width: 70px;
+        height: 60px;
       }
       .pedal-brake {
-        width: 72px;
-        height: 72px;
+        width: 64px;
+        height: 64px;
       }
       .pedal-gas {
-        width: 58px;
-        height: 110px;
+        width: 52px;
+        height: 98px;
       }
       .handbrake-btn {
-        width: 72px;
-        height: 34px;
-        font-size: 10px;
+        width: 64px;
+        height: 30px;
+        font-size: 9.5px;
       }
       #desktop-keys-bar {
         display: none !important;
@@ -1258,7 +1318,7 @@
         <span id="order-title">Order: Palm Villa</span>
         <span class="order-dist" id="order-dist">45m</span>
       </div>
-      <div style="margin-top: 10px; display: flex; gap: 8px;">
+      <div class="top-btn-row" style="margin-top: 10px; display: flex; gap: 8px;">
         <button class="btn-top-action" id="btn-cam" tabindex="-1" onfocus="this.blur()">📷 3RD CAM</button>
         <button class="btn-top-action" id="btn-audio" tabindex="-1" onfocus="this.blur()">🔊 AUDIO: ON</button>
         <button class="btn-top-action" id="btn-controls-guide" tabindex="-1" onfocus="this.blur()">🎮 CONTROLS</button>

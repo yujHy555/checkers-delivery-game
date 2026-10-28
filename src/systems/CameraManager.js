@@ -57,44 +57,37 @@ export class CameraManager {
     let desiredTarget = new THREE.Vector3();
 
     if (this.mode === 'ISOMETRIC') {
-      // Silky Smooth Elevated 45-degree Isometric View (Optimized for Mobile!)
-      const isoDist = isMobile ? 8.8 : 16.0;
-      const isoHeight = isMobile ? 9.6 : 18.0;
+      // Dynamic, Fast & Silky-Smooth Elevated Isometric View (Optimized for Mobile!)
+      // Tighter distance and height on mobile so speed sensation is thrilling and snappy
+      const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
+      const isoDist = isMobile ? 5.4 : 12.0;
+      const isoHeight = isMobile ? 5.8 : 14.0;
 
-      if (!this.hasInitIso) {
-        this.isoHeading = heading;
-        this.hasInitIso = true;
-      }
-
-      // Smooth heading tracking: smooths out jittery steering so camera doesn't violently whip the screen
-      let diff = heading - this.isoHeading;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      const turnFollowSpeed = isMobile ? 12.0 : 8.0;
-      this.isoHeading += diff * Math.min(1.0, turnFollowSpeed * dt);
-
-      const isoForward = new THREE.Vector3(Math.sin(this.isoHeading), 0, Math.cos(this.isoHeading));
+      // Position camera directly elevated behind vehicle alignment for instant responsiveness
       desiredPos.copy(focusPos)
-        .addScaledVector(isoForward, -isoDist)
+        .addScaledVector(forward, -isoDist)
         .add(new THREE.Vector3(0, isoHeight, 0));
 
+      // Dynamic look-ahead along forward direction
       desiredTarget.copy(focusPos)
-        .addScaledVector(isoForward, isMobile ? 1.6 : 2.0)
-        .add(new THREE.Vector3(0, isMobile ? 0.6 : 0.8, 0));
+        .addScaledVector(forward, isMobile ? 2.0 + speedNorm * 1.5 : 2.5)
+        .add(new THREE.Vector3(0, isMobile ? 0.7 : 0.8, 0));
 
-      const targetFov = isMobile ? 52 : 46;
-      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 6.0 * dt);
+      // Speed FOV expansion gives punchy speed feedback
+      const baseFov = isMobile ? 58 : 50;
+      const targetFov = baseFov + speedNorm * (isMobile ? 12.0 : 8.0);
+      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 8.0 * dt);
       this.camera.updateProjectionMatrix();
 
-      // Responsive, silky-smooth damping for isometric
-      const posSpeed = isMobile ? 16.0 : this.posLerpSpeed;
-      const targetSpeed = isMobile ? 20.0 : this.targetLerpSpeed;
-      this.currentPos.lerp(desiredPos, posSpeed * dt);
-      this.currentTarget.lerp(desiredTarget, targetSpeed * dt);
+      // Silky-smooth frame-rate independent exponential damping: zero micro-jitter or lag
+      const followRate = isMobile ? 18.0 : 12.0;
+      const lerpFactor = 1.0 - Math.exp(-followRate * dt);
+      this.currentPos.lerp(desiredPos, lerpFactor);
+      this.currentTarget.lerp(desiredTarget, lerpFactor);
 
     } else {
       this.hasInitIso = false;
-      // Dynamic Third-Person Chase Cam (Moved a lot closer towards van on mobile!)
+      // Dynamic Third-Person Chase Cam (Moved closer towards van on mobile!)
       const baseDist = isMobile ? 4.6 : 6.4;
       const baseHeight = isMobile ? 1.95 : 2.6;
       const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
@@ -118,8 +111,10 @@ export class CameraManager {
       this.camera.updateProjectionMatrix();
 
       // Smooth camera damping
-      this.currentPos.lerp(desiredPos, this.posLerpSpeed * dt);
-      this.currentTarget.lerp(desiredTarget, this.targetLerpSpeed * dt);
+      const posLerp = 1.0 - Math.exp(-this.posLerpSpeed * dt);
+      const targetLerp = 1.0 - Math.exp(-this.targetLerpSpeed * dt);
+      this.currentPos.lerp(desiredPos, posLerp);
+      this.currentTarget.lerp(desiredTarget, targetLerp);
     }
 
     this.camera.position.copy(this.currentPos);

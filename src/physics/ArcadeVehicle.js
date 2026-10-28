@@ -36,7 +36,7 @@ export class ArcadeVehicle {
     // AAA Progressive Driving Parameters
     this.maxSpeed = 38.0; // ~137 km/h
     this.reverseMaxSpeed = 12.0;
-    this.baseAccelRate = 26.0; // Responsive punchy acceleration
+    this.baseAccelRate = 32.0; // Punchy, responsive agile acceleration
     this.brakeRate = 54.0; // Responsive clean brakes
     this.dragCoeff = 0.985;
 
@@ -297,17 +297,17 @@ export class ArcadeVehicle {
     if (!this.isAirborne) {
       if (input.throttle > 0) {
         if (this.speed < this.maxSpeed) {
-          const torqueFactor = Math.max(0.35, 1.0 - (this.speed / this.maxSpeed) * 0.65);
+          const torqueFactor = Math.max(0.48, 1.0 - (this.speed / this.maxSpeed) * 0.52);
           const accel = input.throttle * this.baseAccelRate * torqueFactor;
           this.velocity.addScaledVector(forward, accel * dt);
         }
       } else if (input.brake > 0) {
-        if (this.speed > 0.6) {
+        if (this.speed > 0.4) {
           const brake = input.brake * this.brakeRate;
           this.velocity.addScaledVector(forward, -brake * dt);
         } else {
           if (this.speed > -this.reverseMaxSpeed) {
-            this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.6) * dt);
+            this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 0.75) * dt);
           }
         }
       } else {
@@ -319,7 +319,7 @@ export class ArcadeVehicle {
         this.isDrifting = true;
         this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, 1.0, 20.0 * dt);
         // Conserve high-speed momentum throughout the drift (minimal gentle drag)
-        this.velocity.multiplyScalar(Math.pow(0.994, dt * 60.0));
+        this.velocity.multiplyScalar(Math.pow(0.995, dt * 60.0));
         // Power slide: throttle pushes car forward through the slide
         if (input.throttle > 0 && this.speed < this.maxSpeed) {
           this.velocity.addScaledVector(forward, input.throttle * this.baseAccelRate * 0.75 * dt);
@@ -336,8 +336,8 @@ export class ArcadeVehicle {
 
       // 7. YAW STEERING & OVERSTEER ROTATION (NO ROTATION WHEN STOPPED)
       let turnFactor = 0;
-      if (absSpeed > 0.2) {
-        turnFactor = Math.min(1.0, (absSpeed - 0.2) / 2.2);
+      if (absSpeed > 0.1) {
+        turnFactor = Math.min(1.0, absSpeed / 1.4);
       }
 
       const dirSign = this.speed >= -0.1 ? 1 : -1;
