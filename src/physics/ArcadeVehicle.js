@@ -719,14 +719,6 @@ export class ArcadeVehicle {
 
   updateSkidsAndSmoke(dt, forward, right, input) {
     const absSpeed = Math.abs(this.speed);
-    // User requirement: skid marks appear ONLY when van does a handbrake turn OR hard brakes at high speed
-    const groundDistL = Math.abs(this.position.y - (gRL.height + this.roadLevel));
-    const groundDistR = Math.abs(this.position.y - (gRR.height + this.roadLevel));
-    const tiresFirmlyOnGround = !this.isAirborne && groundDistL < 0.16 && groundDistR < 0.16;
-
-    const isHandbrakeSkid = tiresFirmlyOnGround && (this.isDrifting || input.handbrake) && absSpeed > 1.8;
-    const isHighSpeedBrakeSkid = tiresFirmlyOnGround && input.brake > 0.45 && absSpeed > 6.0;
-    const isSkidding = isHandbrakeSkid || isHighSpeedBrakeSkid;
 
     const rlPos = this.position.clone()
       .addScaledVector(forward, -this.wheelBaseHalf)
@@ -740,6 +732,15 @@ export class ArcadeVehicle {
     const gRR = this.samplePointGround(rrPos.x, rrPos.z);
     rlPos.y = gRL.height + this.roadLevel + 0.01;
     rrPos.y = gRR.height + this.roadLevel + 0.01;
+
+    // User requirement: tire tracks must never appear in mid-air
+    const groundDistL = Math.abs(this.position.y - (gRL.height + this.roadLevel));
+    const groundDistR = Math.abs(this.position.y - (gRR.height + this.roadLevel));
+    const tiresFirmlyOnGround = !this.isAirborne && groundDistL < 0.20 && groundDistR < 0.20;
+
+    const isHandbrakeSkid = tiresFirmlyOnGround && (this.isDrifting || input.handbrake) && absSpeed > 1.8;
+    const isHighSpeedBrakeSkid = tiresFirmlyOnGround && input.brake > 0.45 && absSpeed > 6.0;
+    const isSkidding = isHandbrakeSkid || isHighSpeedBrakeSkid;
 
     if (isSkidding) {
       if (this.isDrifting || this.slipSpeed > 2.5) {
