@@ -537,25 +537,29 @@ export class ArcadeVehicle {
         this.maxSpeed = currentTopSpeed;
         const currentAccelRate = this.isNitroActive ? (this.baseAccelRate * 1.85) : this.baseAccelRate;
 
-        if (input.throttle > 0 || this.isNitroActive) {
+        // Priority check: If user commands brake or reverse, user intent overrides nitro so car can immediately reverse (e.g. when hitting a wall)
+        const isBrakingOrReversing = Boolean(input.brake > 0 && (!input.throttle || input.throttle < 0.2));
+
+        if (isBrakingOrReversing) {
+          if (this.speed > 0.15) {
+            // Rapid braking deceleration to quickly halt forward momentum
+            const brakeDecel = Math.min(this.speed, input.brake * this.brakeRate * 1.40 * dt);
+            this.velocity.addScaledVector(forward, -brakeDecel);
+            // Rapidly cancel residual lateral slip when initiating reverse
+            this.velocity.addScaledVector(right, -this.velocity.dot(right) * Math.min(1.0, 20.0 * dt));
+          } else {
+            // Instant reverse kick-in even in nitro mode! (Guarantees smooth backing away from walls)
+            if (this.speed > -this.reverseMaxSpeed) {
+              const reverseAccel = input.brake * (this.baseAccelRate * 1.35) * dt;
+              this.velocity.addScaledVector(forward, -reverseAccel);
+            }
+          }
+        } else if (input.throttle > 0 || this.isNitroActive) {
           const throttlePower = Math.max(input.throttle || 0, this.isNitroActive ? 0.95 : 0);
           if (this.speed < currentTopSpeed) {
             const torqueFactor = Math.max(0.70, 1.0 - (this.speed / currentTopSpeed) * 0.30);
             const accel = throttlePower * currentAccelRate * torqueFactor;
             this.velocity.addScaledVector(forward, accel * dt);
-          }
-        } else if (input.brake > 0) {
-          if (this.speed > 0.15) {
-            // Rapid braking deceleration to quickly halt forward/sliding momentum
-            const brakeDecel = Math.min(this.speed, input.brake * this.brakeRate * 1.30 * dt);
-            this.velocity.addScaledVector(forward, -brakeDecel);
-            // Rapidly cancel residual lateral slip when initiating reverse
-            this.velocity.addScaledVector(right, -this.velocity.dot(right) * Math.min(1.0, 18.0 * dt));
-          } else {
-            // Instant reverse kick-in without any delay!
-            if (this.speed > -this.reverseMaxSpeed) {
-              this.velocity.addScaledVector(forward, -input.brake * (this.baseAccelRate * 1.1) * dt);
-            }
           }
         } else {
           this.velocity.multiplyScalar(Math.pow(this.dragCoeff, dt * 60.0));

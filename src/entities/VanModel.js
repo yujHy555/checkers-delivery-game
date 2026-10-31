@@ -353,7 +353,8 @@ export class VanModel {
     speedLineMat.disableLighting = true;
     speedLineMat.backFaceCulling = false;
     speedLineMat.disableDepthWrite = true; // Alpha blending with standard depth testing (allows car body to occlude far-side lines)
-    speedLineMat.freeze(); // Freeze material bindings and shaders to eliminate render stutter
+    // Keep speedLineMat dynamic so we can update emissiveColor and glow during nitro mode
+    this.speedLineMat = speedLineMat;
 
     this.speedLines = [];
     const count = 16; // Lean, optimized count (8 left side, 8 right side)
@@ -427,9 +428,11 @@ export class VanModel {
   updateAnimeSpeedLines(dt, vehiclePhysics) {
     if (!this.speedLinesGroup || !this.speedLines) return;
 
-    // Trigger reactive anime speed lines only at 70 km/h and above (70 km/h ≈ 19.44 m/s)
+    const isNitro = Boolean(vehiclePhysics && vehiclePhysics.isNitroActive);
     const speedKmh = Math.abs(vehiclePhysics.speed) * 3.6;
-    if (speedKmh < 70.0) {
+
+    // Trigger reactive anime speed lines at 70 km/h and above, or whenever nitro mode is active!
+    if (speedKmh < 70.0 && !isNitro) {
       if (this.speedLinesGroup.isEnabled()) {
         this.speedLinesGroup.setEnabled(false);
       }
@@ -440,28 +443,41 @@ export class VanModel {
       this.speedLinesGroup.setEnabled(true);
     }
 
-    // Dynamic length growth: stretches with speed, but kept contained so it does not stream too far back
+    // Dynamic length & thickness growth:
+    // When in nitro mode, speed lines get dramatically longer stretching back towards the camera
+    // and vibrate excitedly with high-intensity anime jitter!
     const speedExcess = Math.max(0.0, speedKmh - 70.0);
-    const lengthMultiplier = 1.0 + Math.min(1.0, speedExcess / 25.0) * 0.65; // 1.0x at 70 km/h up to 1.65x at 95 km/h
-    const thicknessMultiplier = 1.0 + Math.min(1.0, speedExcess / 25.0) * 0.35;
-    const streamVelocity = Math.abs(vehiclePhysics.speed) * 2.8;
+    const lengthMultiplier = isNitro ? 3.6 : (1.0 + Math.min(1.0, speedExcess / 25.0) * 0.65);
+    const thicknessMultiplier = isNitro ? 1.6 : (1.0 + Math.min(1.0, speedExcess / 25.0) * 0.35);
+    const streamVelocity = Math.abs(vehiclePhysics.speed) * (isNitro ? 4.8 : 2.8);
+    // When in nitro mode, lines stretch far past the van (towards camera at ~ -6.5m) before resetting
+    const resetThreshold = isNitro ? -9.2 : -3.2;
+
+    if (this.speedLineMat) {
+      if (isNitro) {
+        // Glowing electric turquoise matching nitro #1bb1aa
+        this.speedLineMat.emissiveColor.set(0.40, 0.98, 0.95);
+      } else {
+        this.speedLineMat.emissiveColor.set(1.0, 1.0, 1.0);
+      }
+    }
 
     for (let i = 0; i < 16; i++) {
       const sl = this.speedLines[i];
       sl.z -= streamVelocity * sl.speedMult * dt;
 
-      // Reactive length scaling based on van speed
+      // Reactive length scaling based on van speed & nitro
       const currentLength = sl.baseLength * lengthMultiplier;
       const tailZ = sl.z - currentLength;
 
-      // Reset when the tail reaches just past the rear of the car (~1m behind rear bumper at -2.2)
-      if (tailZ < -3.2) {
+      // Reset when the tail reaches past threshold
+      if (tailZ < resetThreshold) {
         this.resetSpeedLine(sl, true);
       }
 
-      // Classic anime rapid strobing jitter
+      // Classic anime rapid strobing jitter (more excited & rapid during nitro)
       const currentThickness = sl.baseThickness * thicknessMultiplier;
-      const jitter = 0.88 + 0.24 * Math.random();
+      const jitter = isNitro ? (0.72 + 0.55 * Math.random()) : (0.88 + 0.24 * Math.random());
 
       sl.node.position.set(sl.x, sl.y, sl.z);
       sl.node.scaling.set(
@@ -729,13 +745,49 @@ export class VanModel {
     this.vehicleGroup.rotation.x = vehiclePhysics.surfacePitch || 0;
     this.vehicleGroup.rotation.z = vehiclePhysics.surfaceRoll || 0;
 
-    // 3. Dynamic Suspension Lean & Landing Compression
+    // 3. Dynamic Suspension Lean, Landing Compression & Arcade Nitro Squash/Stretch Wobble/Bounce
     const comp = vehiclePhysics.suspensionOffset !== undefined ? vehiclePhysics.suspensionOffset : (vehiclePhysics.suspensionCompress || 0);
     const pitchOffset = vehiclePhysics.suspensionPitchOffset || 0;
     const wobbleRoll = vehiclePhysics.chassisWobbleRoll || 0;
-    this.chassisGroup.position.y = 0.355 - comp;
-    this.chassisGroup.rotation.x = (vehiclePhysics.dynamicPitch || 0) + pitchOffset;
-    this.chassisGroup.rotation.z = (vehiclePhysics.dynamicRoll || 0) + wobbleRoll;
+
+    if (!this.nitroSquashScale) {
+      this.nitroSquashScale = new Vector3(1, 1, 1);
+    }
+
+    const isNitro = Boolean(vehiclePhysics && vehiclePhysics.isNitroActive);
+    let targetScaleX = 1.0;
+    let targetScaleY = 1.0;
+    let targetScaleZ = 1.0;
+    let nitroBounceY = 0.0;
+    let nitroWobbleRoll = 0.0;
+    let nitroWobblePitch = 0.0;
+
+    if (isNitro) {
+      const t = performance.now() * 0.024;
+      // Longitudinal arcade stretch forward along Z
+      const stretchPulse = Math.sin(t * 2.0) * 0.045 + 0.075; // stretches 7.5% to 12% longer
+      targetScaleZ = 1.0 + stretchPulse;
+      // Volume-preserving lateral and vertical squash (squashes down and in as it rockets forward)
+      const lateralSquash = 1.0 / Math.sqrt(targetScaleZ);
+      targetScaleX = lateralSquash * (1.0 + Math.sin(t * 2.6) * 0.025);
+      targetScaleY = lateralSquash * (1.0 - Math.abs(Math.sin(t * 3.8)) * 0.06);
+      // Rhythmic energetic arcade suspension bounce (cartoon hopping/vibration)
+      nitroBounceY = Math.abs(Math.sin(t * 3.8)) * 0.038;
+      // Cartoonish chassis wobble vibrations
+      nitroWobbleRoll = Math.sin(t * 2.3) * 0.026;
+      nitroWobblePitch = -0.022 + Math.sin(t * 1.9) * 0.016;
+    }
+
+    // Elastic spring lerp settling smoothly back to 1.0 when nitro ends
+    const scaleLerpSpeed = isNitro ? Math.min(1.0, 18.0 * dt) : Math.min(1.0, 12.0 * dt);
+    this.nitroSquashScale.x += (targetScaleX - this.nitroSquashScale.x) * scaleLerpSpeed;
+    this.nitroSquashScale.y += (targetScaleY - this.nitroSquashScale.y) * scaleLerpSpeed;
+    this.nitroSquashScale.z += (targetScaleZ - this.nitroSquashScale.z) * scaleLerpSpeed;
+
+    this.chassisGroup.scaling.copyFrom(this.nitroSquashScale);
+    this.chassisGroup.position.y = 0.355 - comp + nitroBounceY;
+    this.chassisGroup.rotation.x = (vehiclePhysics.dynamicPitch || 0) + pitchOffset + nitroWobblePitch;
+    this.chassisGroup.rotation.z = (vehiclePhysics.dynamicRoll || 0) + wobbleRoll + nitroWobbleRoll;
 
     // 4. Wheel Spin, Steering & In-Air Suspension Droop
     const rollDelta = (vehiclePhysics.speed / 0.355) * dt;
