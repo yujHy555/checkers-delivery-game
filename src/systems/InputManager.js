@@ -38,17 +38,36 @@ export class InputManager {
 
   bindKeyboard() {
     window.addEventListener('keydown', (e) => {
-      // Spacebar MUST ONLY handbrake turn, NEVER click focused UI buttons or scroll
+      // When in Main Menu or sub-modals, do NOT intercept navigation keys or blur menu focus!
+      const mainMenu = document.getElementById('main-menu-screen');
+      const isMainMenuVisible = Boolean(mainMenu && !mainMenu.classList.contains('hidden') && mainMenu.style.display !== 'none');
+      const isMenuOpen = Boolean(
+        isMainMenuVisible ||
+        (window.gameApp && window.gameApp.inMainMenu) ||
+        document.getElementById('garage-modal')?.classList.contains('open') ||
+        document.getElementById('options-modal')?.classList.contains('open') ||
+        document.getElementById('controls-guide-modal')?.classList.contains('open')
+      );
+
+      if (isMenuOpen) {
+        // Let menu navigation handle keys cleanly
+        return;
+      }
+
+      // Spacebar MUST ONLY handbrake turn during driving, NEVER click focused UI buttons or scroll
       if (e.code === 'Space') {
         e.preventDefault();
       }
 
       this.keys[e.code] = true;
 
-      // Blur any accidentally focused DOM element
-      if (document.activeElement && document.activeElement.blur) {
+      // Blur any accidentally focused DOM element during driving
+      if (document.activeElement && document.activeElement.blur && document.activeElement.tagName !== 'BODY') {
         document.activeElement.blur();
       }
+
+      // Ignore OS key auto-repeat for single-shot action triggers
+      if (e.repeat) return;
 
       // Explicit camera toggle only via C key
       if (e.code === 'KeyC') {
@@ -220,11 +239,13 @@ export class InputManager {
     // 3. HTML5 Gamepad Input (Xbox, PlayStation, etc.)
     const gp = this.pollGamepad();
     if (gp) {
-      // Analog Steering (Left Stick X, with 0.12 deadzone)
+      // Analog Steering (Left Stick X, with 0.12 deadzone and progressive power curve)
       const stickX = gp.axes[0] || 0;
-      if (Math.abs(stickX) > 0.12) {
-        // Swap sign to match: left stick tilts left
-        s -= stickX;
+      const deadzone = 0.12;
+      if (Math.abs(stickX) > deadzone) {
+        const normalized = (Math.abs(stickX) - deadzone) / (1.0 - deadzone);
+        const curved = Math.sign(-stickX) * Math.pow(normalized, 1.4);
+        s += curved;
       }
 
       // D-Pad Steering

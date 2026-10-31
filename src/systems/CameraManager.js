@@ -1,37 +1,33 @@
-import * as THREE from 'three';
+import { Vector3, Tools } from '@babylonjs/core';
 
 export class CameraManager {
-  constructor(camera, domElement) {
+  constructor(camera, canvas) {
     this.camera = camera;
-    this.domElement = domElement;
+    this.canvas = canvas;
 
     // Start in Third-Person Chase Cam by default
     this.mode = 'THIRD_PERSON';
 
     // Current camera position and look target
-    this.currentPos = new THREE.Vector3(0, 5, -45);
-    this.currentTarget = new THREE.Vector3(0, 0, -35);
+    this.currentPos = new Vector3(0, 2.95, -46.65);
+    this.currentTarget = new Vector3(0, 1.27, -37.5);
+    this.desiredPos = new Vector3(0, 2.95, -46.65);
+    this.desiredTarget = new Vector3(0, 1.27, -37.5);
 
-    // Dynamic Follow Speeds
-    this.posLerpSpeed = 9.0;
-    this.targetLerpSpeed = 14.0;
+    this.baseFov = 62 * (Math.PI / 180);
+    this.camera.fov = this.baseFov;
 
-    // Third-Person Chase settings (moved back slightly for PC, iOS & Mobile for expansive visibility)
-    this.chaseDistance = 6.4;
-    this.chaseHeight = 2.65;
-    this.baseFov = 62;
-    this.hasInitChase = false;
+    this.camera.position.copyFrom(this.currentPos);
+    this.camera.setTarget(this.currentTarget);
 
-    // Immediately place camera in proper third-person chase pose at van's spawn
-    this.currentPos = new THREE.Vector3(0, 2.95, -46.65);
-    this.currentTarget = new THREE.Vector3(0, 1.27, -37.5);
-    this.desiredPos = new THREE.Vector3(0, 2.95, -46.65);
-    this.desiredTarget = new THREE.Vector3(0, 1.27, -37.5);
-    this.camera.position.copy(this.currentPos);
-    this.camera.lookAt(this.currentTarget);
     this.isoCamHeading = 0;
     this.hasInitIso = false;
+    this.hasInitChase = false;
     this.colliders = [];
+
+    // High-speed subtle camera wobble / shake state
+    this.shakeTime = 0;
+    this.currentShakeIntensity = 0;
   }
 
   setColliders(colliders) {
@@ -45,14 +41,12 @@ export class CameraManager {
   }
 
   toggleMode() {
-    // For mobile devices, isometric mode is completely removed: strictly lock to Third-Person Chase
     if (this.checkIsMobile()) {
       this.mode = 'THIRD_PERSON';
       this.hasInitIso = false;
       return this.mode;
     }
 
-    // On PC / Desktop: cycle between Third-Person -> Isometric Close -> Isometric Wide Overview
     if (this.mode === 'THIRD_PERSON') {
       this.mode = 'ISOMETRIC_CLOSE';
     } else if (this.mode === 'ISOMETRIC_CLOSE' || this.mode === 'ISOMETRIC') {
@@ -80,28 +74,32 @@ export class CameraManager {
     if (!focusObject || !vehiclePhysics) return;
     const focusPos = focusObject.position;
     const heading = vehiclePhysics.heading;
-    const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
-    const desiredPos = this.desiredPos;
-    const desiredTarget = this.desiredTarget;
+    const forwardX = Math.sin(heading);
+    const forwardZ = Math.cos(heading);
 
     const baseDist = 6.4;
-    const baseHeight = 2.65;
-    this.currentPos.copy(focusPos)
-      .addScaledVector(forward, -baseDist)
-      .add(new THREE.Vector3(0, baseHeight, 0));
-    this.currentTarget.copy(focusPos)
-      .addScaledVector(forward, 2.5)
-      .add(new THREE.Vector3(0, 0.92, 0));
+    const baseHeight = 2.45;
 
-    this.camera.position.copy(this.currentPos);
-    this.camera.lookAt(this.currentTarget);
-    this.desiredPos.copy(this.currentPos);
-    this.desiredTarget.copy(this.currentTarget);
+    this.currentPos.set(
+      focusPos.x - forwardX * baseDist,
+      focusPos.y + baseHeight,
+      focusPos.z - forwardZ * baseDist
+    );
+    this.currentTarget.set(
+      focusPos.x + forwardX * 2.5,
+      focusPos.y + 1.15,
+      focusPos.z + forwardZ * 2.5
+    );
+
+    this.camera.position.copyFrom(this.currentPos);
+    this.camera.setTarget(this.currentTarget);
+    this.desiredPos.copyFrom(this.currentPos);
+    this.desiredTarget.copyFrom(this.currentTarget);
     this.hasInitChase = true;
   }
 
   update(dt, focusObject, vehiclePhysics) {
-    if (!focusObject) return;
+    if (!focusObject || !vehiclePhysics) return;
 
     const isMobile = this.checkIsMobile();
     const isIsometric = (this.mode === 'ISOMETRIC_CLOSE' || this.mode === 'ISOMETRIC_FAR' || this.mode === 'ISOMETRIC') && !isMobile;
@@ -113,24 +111,16 @@ export class CameraManager {
 
     const focusPos = focusObject.position;
     const heading = vehiclePhysics.heading;
-    const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
-    const desiredPos = this.desiredPos;
-    const desiredTarget = this.desiredTarget;
+    const forwardX = Math.sin(heading);
+    const forwardZ = Math.cos(heading);
 
     if (isIsometric) {
       const isFar = this.mode === 'ISOMETRIC_FAR';
-
-      // 1. Rock-solid fixed FOV
-      // 48° for close isometric view, 52° for wide tactical bird's eye view
-      const targetFov = isFar ? 52 : 48;
-      if (Math.abs(this.camera.fov - targetFov) > 0.05) {
-        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 10.0 * dt);
-        this.camera.updateProjectionMatrix();
+      const targetFov = (isFar ? 52 : 48) * (Math.PI / 180);
+      if (Math.abs(this.camera.fov - targetFov) > 0.001) {
+        this.camera.fov = this.camera.fov + (targetFov - this.camera.fov) * Math.min(1.0, 10.0 * dt);
       }
 
-      // 2. Camera distance & altitude:
-      // Close: isoDist = 12.0, isoHeight = 14.0 (tight focus on van)
-      // Far:   isoDist = 26.0, isoHeight = 30.0 (wide tactical view of city, ramps, track)
       const isoDist = isFar ? 26.0 : 12.0;
       const isoHeight = isFar ? 30.0 : 14.0;
 
@@ -146,7 +136,6 @@ export class CameraManager {
         );
         this.currentTarget.set(focusPos.x, focusPos.y + 0.75, focusPos.z);
       } else {
-        // Smoothly rotate the orbital angle behind vehicle heading via shortest arc
         let diff = heading - this.isoCamHeading;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
@@ -157,17 +146,14 @@ export class CameraManager {
       const sinH = Math.sin(this.isoCamHeading);
       const cosH = Math.cos(this.isoCamHeading);
 
-      // Spherical orbital positioning: radius is constant, zero chord cutting
-      desiredPos.set(
+      this.desiredPos.set(
         focusPos.x - sinH * isoDist,
         focusPos.y + isoHeight,
         focusPos.z - cosH * isoDist
       );
+      this.desiredTarget.set(focusPos.x, focusPos.y + 0.75, focusPos.z);
 
-      // Target locked to van chassis center
-      desiredTarget.set(focusPos.x, focusPos.y + 0.75, focusPos.z);
-
-      // Building Obstacle Clearance & White Flash Elimination:
+      // Building clearance
       if (this.colliders) {
         for (const c of this.colliders) {
           if (c.type === 'box') {
@@ -175,9 +161,9 @@ export class CameraManager {
             const hd = (c.depth / 2) + 1.2;
             const bHeight = c.height || 12.0;
 
-            if (Math.abs(desiredPos.x - c.x) <= hw && Math.abs(desiredPos.z - c.z) <= hd) {
-              if (desiredPos.y < bHeight + 2.0) {
-                desiredPos.y = bHeight + 2.0;
+            if (Math.abs(this.desiredPos.x - c.x) <= hw && Math.abs(this.desiredPos.z - c.z) <= hd) {
+              if (this.desiredPos.y < bHeight + 2.0) {
+                this.desiredPos.y = bHeight + 2.0;
               }
             }
             if (Math.abs(this.currentPos.x - c.x) <= hw && Math.abs(this.currentPos.z - c.z) <= hd) {
@@ -189,38 +175,52 @@ export class CameraManager {
         }
       }
 
-      // Smooth exponential follow
       const followRate = isFar ? 8.0 : 11.0;
       const lerpFactor = 1.0 - Math.exp(-followRate * dt);
-      this.currentPos.lerp(desiredPos, lerpFactor);
-      this.currentTarget.lerp(desiredTarget, lerpFactor);
+      Vector3.LerpToRef(this.currentPos, this.desiredPos, lerpFactor, this.currentPos);
+      Vector3.LerpToRef(this.currentTarget, this.desiredTarget, lerpFactor, this.currentTarget);
 
     } else {
       this.hasInitIso = false;
-      // Dynamic Third-Person Chase Cam (Moved back slightly for expansive visibility across PC, iOS & Android)
       const baseDist = 6.4;
-      const baseHeight = 2.65;
-      const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / vehiclePhysics.maxSpeed);
+      const baseHeight = 2.45;
+      const speedNorm = Math.min(1.0, Math.abs(vehiclePhysics.speed) / (vehiclePhysics.maxSpeed || 20.0));
       const dynamicDist = baseDist + speedNorm * 0.30;
       const dynamicHeight = baseHeight + speedNorm * 0.12;
 
-      // Position camera directly behind vehicle with smooth follow
-      desiredPos.copy(focusPos)
-        .addScaledVector(forward, -dynamicDist)
-        .add(new THREE.Vector3(0, dynamicHeight, 0));
+      let trackDirX = forwardX;
+      let trackDirZ = forwardZ;
+      const vel = vehiclePhysics.velocity;
+      if (vel) {
+        const velSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+        if (velSpeed > 2.0) {
+          const velNormX = vel.x / velSpeed;
+          const velNormZ = vel.z / velSpeed;
+          // Velocity-Aligned Camera Lookahead: Blends smoothly toward vehicle velocity during slides & drifts
+          const driftBlend = Math.min(0.40, (vehiclePhysics.driftFactor || 0) * 0.38 + (Math.abs(vehiclePhysics.lateralVelocity || 0) / 10.0) * 0.22);
+          trackDirX = forwardX * (1.0 - driftBlend) + velNormX * driftBlend;
+          trackDirZ = forwardZ * (1.0 - driftBlend) + velNormZ * driftBlend;
+          const len = Math.sqrt(trackDirX * trackDirX + trackDirZ * trackDirZ) || 1.0;
+          trackDirX /= len;
+          trackDirZ /= len;
+        }
+      }
 
-      // Look ahead along forward vector
-      desiredTarget.copy(focusPos)
-        .addScaledVector(forward, 2.5)
-        .add(new THREE.Vector3(0, 0.92, 0));
+      this.desiredPos.set(
+        focusPos.x - trackDirX * dynamicDist,
+        focusPos.y + dynamicHeight,
+        focusPos.z - trackDirZ * dynamicDist
+      );
+      this.desiredTarget.set(
+        focusPos.x + trackDirX * 2.5,
+        focusPos.y + 1.15,
+        focusPos.z + trackDirZ * 2.5
+      );
 
-      // Minimal subtle speed FOV expansion (3.5° max so van doesn't pull away visually)
-      const baseFov = 62;
-      const targetFov = baseFov + speedNorm * 3.5;
-      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 12.0 * dt);
-      this.camera.updateProjectionMatrix();
+      const targetFov = (62 + speedNorm * 3.5) * (Math.PI / 180);
+      this.camera.fov = this.camera.fov + (targetFov - this.camera.fov) * Math.min(1.0, 12.0 * dt);
 
-      // Building clearance check for Third Person (strictly applies to skyscrapers/buildings)
+      // Building & Ramp clearance
       if (this.colliders) {
         for (const c of this.colliders) {
           if (c.type === 'box' && c.isBuilding) {
@@ -228,9 +228,9 @@ export class CameraManager {
             const hd = (c.depth / 2) + 0.8;
             const bHeight = c.height || 12.0;
 
-            if (Math.abs(desiredPos.x - c.x) <= hw && Math.abs(desiredPos.z - c.z) <= hd) {
-              if (desiredPos.y < bHeight + 1.5) {
-                desiredPos.y = bHeight + 1.5;
+            if (Math.abs(this.desiredPos.x - c.x) <= hw && Math.abs(this.desiredPos.z - c.z) <= hd) {
+              if (this.desiredPos.y < bHeight + 1.5) {
+                this.desiredPos.y = bHeight + 1.5;
               }
             }
             if (Math.abs(this.currentPos.x - c.x) <= hw && Math.abs(this.currentPos.z - c.z) <= hd) {
@@ -238,20 +238,53 @@ export class CameraManager {
                 this.currentPos.y = bHeight + 1.5;
               }
             }
+          } else if (c.type === 'ramp') {
+            const cosA = Math.cos(c.angleY || 0);
+            const sinA = Math.sin(c.angleY || 0);
+            const hw = (c.width / 2) + 0.6;
+            const hd = (c.depth / 2) + 0.6;
+
+            // Desired camera position clearance over ramp
+            const dxDes = this.desiredPos.x - c.x;
+            const dzDes = this.desiredPos.z - c.z;
+            const lxDes = dxDes * cosA - dzDes * sinA;
+            const lzDes = dxDes * sinA + dzDes * cosA;
+
+            if (Math.abs(lxDes) <= hw && Math.abs(lzDes) <= hd) {
+              const rH = Math.max(0, 1.0 - (Math.abs(lzDes) / hd)) * c.height;
+              const minCamY = rH + 0.95;
+              if (this.desiredPos.y < minCamY) {
+                this.desiredPos.y = minCamY;
+              }
+            }
+
+            // Current camera position clearance prevents camera from ever penetrating ramp interior or near clipping
+            const dxCur = this.currentPos.x - c.x;
+            const dzCur = this.currentPos.z - c.z;
+            const lxCur = dxCur * cosA - dzCur * sinA;
+            const lzCur = dxCur * sinA + dzCur * cosA;
+
+            if (Math.abs(lxCur) <= hw && Math.abs(lzCur) <= hd) {
+              const rH = Math.max(0, 1.0 - (Math.abs(lzCur) / hd)) * c.height;
+              const minCamY = rH + 0.95;
+              if (this.currentPos.y < minCamY) {
+                this.currentPos.y = minCamY;
+              }
+            }
           }
         }
       }
 
-      // Snappy camera damping: eliminates lag and rubber-banding on rapid launches across PC, iOS, and Mobile
       const activePosLerp = 22.0;
       const activeTargetLerp = 25.0;
       const posLerp = 1.0 - Math.exp(-activePosLerp * dt);
       const targetLerp = 1.0 - Math.exp(-activeTargetLerp * dt);
-      this.currentPos.lerp(desiredPos, posLerp);
-      this.currentTarget.lerp(desiredTarget, targetLerp);
+      Vector3.LerpToRef(this.currentPos, this.desiredPos, posLerp, this.currentPos);
+      Vector3.LerpToRef(this.currentTarget, this.desiredTarget, targetLerp, this.currentTarget);
     }
 
-    this.camera.position.copy(this.currentPos);
-    this.camera.lookAt(this.currentTarget);
+    // Camera shake completely removed as requested - camera tracking is rock-solid and buttery smooth at all speeds
+    this.camera.position.copyFrom(this.currentPos);
+    this.camera.setTarget(this.currentTarget);
   }
 }

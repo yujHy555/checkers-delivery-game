@@ -1,15 +1,16 @@
 {
-  "name": "checkers-sixty60-hyper-delivery",
+  "name": "checkers-sixty60-hyper-delivery-babylonjs",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite --host --port 3001",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "sharp": "^0.35.5",
-    "three": "^0.180.0",
+    "@babylonjs/core": "^8.0.0",
+    "@babylonjs/havok": "^1.3.14",
+    "@babylonjs/loaders": "^8.0.0",
     "vite": "^6.2.0"
   }
 }
