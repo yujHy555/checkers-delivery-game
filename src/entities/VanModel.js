@@ -745,49 +745,14 @@ export class VanModel {
     this.vehicleGroup.rotation.x = vehiclePhysics.surfacePitch || 0;
     this.vehicleGroup.rotation.z = vehiclePhysics.surfaceRoll || 0;
 
-    // 3. Dynamic Suspension Lean, Landing Compression & Arcade Nitro Squash/Stretch Wobble/Bounce
+    // 3. Dynamic Suspension Lean & Landing Compression
     const comp = vehiclePhysics.suspensionOffset !== undefined ? vehiclePhysics.suspensionOffset : (vehiclePhysics.suspensionCompress || 0);
     const pitchOffset = vehiclePhysics.suspensionPitchOffset || 0;
     const wobbleRoll = vehiclePhysics.chassisWobbleRoll || 0;
-
-    if (!this.nitroSquashScale) {
-      this.nitroSquashScale = new Vector3(1, 1, 1);
-    }
-
-    const isNitro = Boolean(vehiclePhysics && vehiclePhysics.isNitroActive);
-    let targetScaleX = 1.0;
-    let targetScaleY = 1.0;
-    let targetScaleZ = 1.0;
-    let nitroBounceY = 0.0;
-    let nitroWobbleRoll = 0.0;
-    let nitroWobblePitch = 0.0;
-
-    if (isNitro) {
-      const t = performance.now() * 0.024;
-      // Longitudinal arcade stretch forward along Z
-      const stretchPulse = Math.sin(t * 2.0) * 0.045 + 0.075; // stretches 7.5% to 12% longer
-      targetScaleZ = 1.0 + stretchPulse;
-      // Volume-preserving lateral and vertical squash (squashes down and in as it rockets forward)
-      const lateralSquash = 1.0 / Math.sqrt(targetScaleZ);
-      targetScaleX = lateralSquash * (1.0 + Math.sin(t * 2.6) * 0.025);
-      targetScaleY = lateralSquash * (1.0 - Math.abs(Math.sin(t * 3.8)) * 0.06);
-      // Rhythmic energetic arcade suspension bounce (cartoon hopping/vibration)
-      nitroBounceY = Math.abs(Math.sin(t * 3.8)) * 0.038;
-      // Cartoonish chassis wobble vibrations
-      nitroWobbleRoll = Math.sin(t * 2.3) * 0.026;
-      nitroWobblePitch = -0.022 + Math.sin(t * 1.9) * 0.016;
-    }
-
-    // Elastic spring lerp settling smoothly back to 1.0 when nitro ends
-    const scaleLerpSpeed = isNitro ? Math.min(1.0, 18.0 * dt) : Math.min(1.0, 12.0 * dt);
-    this.nitroSquashScale.x += (targetScaleX - this.nitroSquashScale.x) * scaleLerpSpeed;
-    this.nitroSquashScale.y += (targetScaleY - this.nitroSquashScale.y) * scaleLerpSpeed;
-    this.nitroSquashScale.z += (targetScaleZ - this.nitroSquashScale.z) * scaleLerpSpeed;
-
-    this.chassisGroup.scaling.copyFrom(this.nitroSquashScale);
-    this.chassisGroup.position.y = 0.355 - comp + nitroBounceY;
-    this.chassisGroup.rotation.x = (vehiclePhysics.dynamicPitch || 0) + pitchOffset + nitroWobblePitch;
-    this.chassisGroup.rotation.z = (vehiclePhysics.dynamicRoll || 0) + wobbleRoll + nitroWobbleRoll;
+    this.chassisGroup.position.y = 0.355 - comp;
+    this.chassisGroup.rotation.x = (vehiclePhysics.dynamicPitch || 0) + pitchOffset;
+    this.chassisGroup.rotation.z = (vehiclePhysics.dynamicRoll || 0) + wobbleRoll;
+    this.chassisGroup.scaling.set(1.0, 1.0, 1.0);
 
     // 4. Wheel Spin, Steering & In-Air Suspension Droop
     const rollDelta = (vehiclePhysics.speed / 0.355) * dt;
