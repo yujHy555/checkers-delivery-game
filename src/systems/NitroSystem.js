@@ -19,6 +19,7 @@ export class NitroSystem {
     this.nitroActive = false;
     this.nitroTimer = 0; // Remaining active boost seconds (5.0s on pickup)
     this.nitroDuration = 5.0;
+    this.onPickupCollected = null;
 
     // Fixed locations for pickups in city and proving ground
     this.cityPickupCoords = [
@@ -240,6 +241,14 @@ export class NitroSystem {
 
     if (audio && audio.playNitroBoost) {
       audio.playNitroBoost();
+    }
+
+    if (this.onPickupCollected) {
+      try {
+        this.onPickupCollected(item);
+      } catch (err) {
+        console.error('Error in onPickupCollected callback:', err);
+      }
     }
   }
 }

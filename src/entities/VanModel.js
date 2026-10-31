@@ -10,6 +10,7 @@ import {
   PointLight,
   Texture,
   DynamicTexture,
+  FresnelParameters,
   Engine,
   SceneLoader
 } from '@babylonjs/core';
@@ -514,8 +515,24 @@ export class VanModel {
     const exhaustY = 0.16;
     const exhaustZ = -2.26;
 
-    // 1. Core high-energy beam tube material (Hex: #1bb1aa with hyper-bright incandescent center)
+    // 0. Soft Lightsaber Longitudinal Feathering Gradient (U=0 nozzle to U=1 tail)
+    const featherDt = new DynamicTexture('nitroFeatherTex', 256, this.scene, false);
+    const fCtx = featherDt.getContext();
+    const fGrad = fCtx.createLinearGradient(0, 0, 256, 0);
+    fGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+    fGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.95)');
+    fGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.65)');
+    fGrad.addColorStop(0.85, 'rgba(255, 255, 255, 0.25)');
+    fGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    fCtx.fillStyle = fGrad;
+    fCtx.fillRect(0, 0, 256, 256);
+    featherDt.hasAlpha = true;
+    featherDt.update();
+
+    // 1. Core high-energy beam tube material (Hex: #1bb1aa with hyper-bright incandescent center and soft lightsaber edge)
     const coreMat = new StandardMaterial('nitroTubeCoreMat', this.scene);
+    coreMat.diffuseTexture = featherDt;
+    coreMat.opacityTexture = featherDt;
     coreMat.diffuseColor = Color3.FromHexString('#1bb1aa');
     coreMat.emissiveColor = new Color3(0.40, 0.98, 0.95); // High-intensity luminous core
     coreMat.specularColor = new Color3(0, 0, 0);
@@ -524,8 +541,23 @@ export class VanModel {
     coreMat.disableLighting = true;
     coreMat.backFaceCulling = false;
 
-    // 2. Volumetric plasma sheath material (Pure #1bb1aa saturated emission)
+    // Soft lightsaber silhouette edge falloff for core beam
+    coreMat.opacityFresnelParameters = new FresnelParameters();
+    coreMat.opacityFresnelParameters.leftColor = new Color3(0.02, 0.02, 0.02); // Glancing edge fades to transparent
+    coreMat.opacityFresnelParameters.rightColor = new Color3(1.0, 1.0, 1.0);  // Center facing camera is opaque
+    coreMat.opacityFresnelParameters.power = 1.6;
+    coreMat.opacityFresnelParameters.bias = 0.04;
+
+    coreMat.emissiveFresnelParameters = new FresnelParameters();
+    coreMat.emissiveFresnelParameters.leftColor = new Color3(0, 0, 0);
+    coreMat.emissiveFresnelParameters.rightColor = new Color3(0.40, 0.98, 0.95);
+    coreMat.emissiveFresnelParameters.power = 1.4;
+    coreMat.emissiveFresnelParameters.bias = 0.05;
+
+    // 2. Volumetric plasma sheath material (Soft lightsaber outer envelope in pure #1bb1aa)
     const sheathMat = new StandardMaterial('nitroTubeSheathMat', this.scene);
+    sheathMat.diffuseTexture = featherDt;
+    sheathMat.opacityTexture = featherDt;
     sheathMat.diffuseColor = Color3.FromHexString('#1bb1aa');
     sheathMat.emissiveColor = Color3.FromHexString('#1bb1aa');
     sheathMat.specularColor = new Color3(0, 0, 0);
@@ -533,6 +565,19 @@ export class VanModel {
     sheathMat.alphaMode = Engine.ALPHA_ADD;
     sheathMat.disableLighting = true;
     sheathMat.backFaceCulling = false;
+
+    // Soft lightsaber silhouette edge falloff: glancing edges smoothly fade to zero opacity & emission
+    sheathMat.opacityFresnelParameters = new FresnelParameters();
+    sheathMat.opacityFresnelParameters.leftColor = new Color3(0, 0, 0); // 0 at grazing angle
+    sheathMat.opacityFresnelParameters.rightColor = new Color3(1.0, 1.0, 1.0);
+    sheathMat.opacityFresnelParameters.power = 2.4;
+    sheathMat.opacityFresnelParameters.bias = 0.0;
+
+    sheathMat.emissiveFresnelParameters = new FresnelParameters();
+    sheathMat.emissiveFresnelParameters.leftColor = new Color3(0, 0, 0); // Zero outer edge cutoff
+    sheathMat.emissiveFresnelParameters.rightColor = Color3.FromHexString('#1bb1aa');
+    sheathMat.emissiveFresnelParameters.power = 2.0;
+    sheathMat.emissiveFresnelParameters.bias = 0.0;
 
     // 3. Exhaust nozzle supersonic shock diamonds (accent rings near exhaust tip)
     const ringMat = new StandardMaterial('nitroShockRingMat', this.scene);
@@ -543,6 +588,11 @@ export class VanModel {
     ringMat.alphaMode = Engine.ALPHA_ADD;
     ringMat.disableLighting = true;
     ringMat.backFaceCulling = false;
+
+    ringMat.opacityFresnelParameters = new FresnelParameters();
+    ringMat.opacityFresnelParameters.leftColor = new Color3(0.05, 0.05, 0.05);
+    ringMat.opacityFresnelParameters.rightColor = new Color3(1.0, 1.0, 1.0);
+    ringMat.opacityFresnelParameters.power = 1.8;
 
     // 4. Ground Wash Neon Aura beneath van in #1bb1aa
     const underglowDt = new DynamicTexture('nitroUnderglowTex', 256, this.scene, false);
@@ -593,15 +643,15 @@ export class VanModel {
       return pts;
     };
 
-    // Radius tapering functions: thickest near nozzle discharge, sleekly tapering to sharp plasma needle tail
+    // Radius tapering functions: sleek lightsaber plasma needle tail with zero blunt edge
     const coreRadiusFn = (index, distance) => {
       const t = index / (numPoints - 1);
-      return Math.max(0.012, 0.065 * (1.0 - t * 0.82));
+      return Math.max(0.001, 0.052 * Math.pow(1.0 - t, 0.70));
     };
 
     const sheathRadiusFn = (index, distance) => {
       const t = index / (numPoints - 1);
-      return Math.max(0.024, 0.155 * (1.0 - t * 0.75));
+      return Math.max(0.002, 0.145 * Math.pow(1.0 - t, 0.65));
     };
 
     for (let s = 0; s < 2; s++) {
@@ -613,6 +663,7 @@ export class VanModel {
         path: initialPath,
         radiusFunction: coreRadiusFn,
         sideOrientation: Mesh.DOUBLESIDE,
+        cap: Mesh.NO_CAP,
         updatable: true
       }, this.scene);
       coreTube.material = coreMat;
@@ -624,6 +675,7 @@ export class VanModel {
         path: initialPath,
         radiusFunction: sheathRadiusFn,
         sideOrientation: Mesh.DOUBLESIDE,
+        cap: Mesh.NO_CAP,
         updatable: true
       }, this.scene);
       sheathTube.material = sheathMat;

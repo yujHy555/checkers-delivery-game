@@ -291,6 +291,208 @@
       to { transform: translate(-50%, -50%) scale(1.28); box-shadow: 0 0 18px #ffea00, 0 0 30px rgba(255, 234, 0, 0.85); }
     }
 
+    /* MINIMAP NITRO PICKUP BLIPS (Real-Time Locator) */
+    .minimap-nitro-blip {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #1bb1aa;
+      border: 1.5px solid #ffffff;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 7;
+      box-shadow: 0 0 6px #1bb1aa, 0 0 10px rgba(27, 177, 170, 0.95);
+      animation: pulseNitroBlip 1.1s infinite alternate ease-in-out;
+    }
+    @keyframes pulseNitroBlip {
+      from { transform: translate(-50%, -50%) scale(0.85); }
+      to { transform: translate(-50%, -50%) scale(1.30); }
+    }
+
+    /* CIRCULAR HUD COLLECTION DEVICE (Bag & Nitros) - Strictly NO SHADOW */
+    .hud-circle-device {
+      position: absolute;
+      top: 76px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.2);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 75;
+      opacity: 0;
+      box-shadow: none !important;
+      filter: none !important;
+      --device-color: #1bb1aa;
+    }
+
+    .hud-circle-device.active {
+      display: flex;
+      animation: devicePopOn 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .hud-circle-device.exiting {
+      display: flex;
+      animation: deviceCoolExit 0.44s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+    }
+
+    @keyframes devicePopOn {
+      0% {
+        transform: translateX(-50%) scale(0.2) rotate(-40deg);
+        opacity: 0;
+      }
+      65% {
+        transform: translateX(-50%) scale(1.12) rotate(4deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translateX(-50%) scale(1.0) rotate(0deg);
+        opacity: 1;
+      }
+    }
+
+    @keyframes deviceCoolExit {
+      0% {
+        transform: translateX(-50%) scale(1.0) rotate(0deg);
+        opacity: 1;
+      }
+      30% {
+        transform: translateX(-50%) scale(1.08) rotate(-6deg);
+        opacity: 1;
+      }
+      100% {
+        transform: translateX(-50%) scale(0.18) rotate(65deg);
+        opacity: 0;
+      }
+    }
+
+    .device-rings-container {
+      position: relative;
+      width: 92px;
+      height: 92px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: none !important;
+      filter: none !important;
+    }
+
+    .device-tech-bracket {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border: 1.5px solid var(--device-color);
+      pointer-events: none;
+      box-shadow: none !important;
+      filter: none !important;
+    }
+    .device-tech-bracket.top-left { top: 0; left: 0; border-right: none; border-bottom: none; }
+    .device-tech-bracket.top-right { top: 0; right: 0; border-left: none; border-bottom: none; }
+    .device-tech-bracket.bottom-left { bottom: 0; left: 0; border-right: none; border-top: none; }
+    .device-tech-bracket.bottom-right { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+    .device-ring-spinner {
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      border: 1.5px dashed var(--device-color);
+      animation: deviceRingRotate 4.5s linear infinite;
+      box-shadow: none !important;
+      filter: none !important;
+      opacity: 0.85;
+    }
+    @keyframes deviceRingRotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .device-timer-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+      box-shadow: none !important;
+      filter: none !important;
+    }
+
+    .device-timer-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.12);
+      stroke-width: 3.5;
+    }
+
+    .device-timer-bar {
+      fill: none;
+      stroke: var(--device-color);
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      stroke-dasharray: 276.46;
+      stroke-dashoffset: 0;
+    }
+
+    @keyframes deviceTimerDrain {
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: 276.46; }
+    }
+
+    .device-core-circle {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: rgba(10, 22, 28, 0.94);
+      border: 2px solid var(--device-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: none !important;
+      filter: none !important;
+      overflow: hidden;
+    }
+
+    .hud-device-icon-img {
+      max-width: 44px;
+      max-height: 44px;
+      object-fit: contain;
+      box-shadow: none !important;
+      filter: none !important;
+    }
+
+    .device-meta-pill {
+      margin-top: 6px;
+      background: rgba(10, 22, 28, 0.94);
+      border: 1.5px solid var(--device-color);
+      border-radius: 14px;
+      padding: 3px 14px;
+      text-align: center;
+      box-shadow: none !important;
+      filter: none !important;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .device-tag-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--device-color);
+      text-shadow: none !important;
+    }
+
+    .device-title-label {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.6px;
+      color: #ffffff;
+      text-shadow: none !important;
+      white-space: nowrap;
+    }
+
     /* ACTION PROMPT */
     #action-prompt {
       position: absolute;
@@ -2073,6 +2275,28 @@
 
   <!-- TOAST NOTIFICATION -->
   <div id="toast-msg"></div>
+
+  <!-- CIRCULAR COLLECTION HUD DEVICE (Bag & Nitros) - Strictly NO SHADOW -->
+  <div id="hud-collection-device" class="hud-circle-device">
+    <div class="device-rings-container">
+      <div class="device-tech-bracket top-left"></div>
+      <div class="device-tech-bracket top-right"></div>
+      <div class="device-tech-bracket bottom-left"></div>
+      <div class="device-tech-bracket bottom-right"></div>
+      <div class="device-ring-spinner"></div>
+      <svg class="device-timer-svg" viewBox="0 0 100 100">
+        <circle class="device-timer-bg" cx="50" cy="50" r="44" />
+        <circle class="device-timer-bar" id="hud-device-timer-bar" cx="50" cy="50" r="44" />
+      </svg>
+      <div class="device-core-circle">
+        <img id="hud-device-icon" class="hud-device-icon-img" src="" alt="Collected Item" />
+      </div>
+    </div>
+    <div class="device-meta-pill">
+      <div class="device-tag-label" id="hud-device-tag">ITEM</div>
+      <div class="device-title-label" id="hud-device-title">COLLECTED</div>
+    </div>
+  </div>
 
   <!-- CELEBRATION MODAL BANNER -->
   <div id="celebration-banner"></div>

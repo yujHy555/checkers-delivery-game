@@ -103,6 +103,14 @@ class GameApp {
     // 7b. Nitro Pickup & Speed Boost System (5s spurt to 100-110 km/h with animated turquoise aura)
     this.nitroSystem = new NitroSystem(this.scene, this.shadowGenerator, this.sunLight);
     this.nitroSystem.loadLevelPickups('city');
+    this.nitroSystem.onPickupCollected = () => {
+      this.showCollectionPopup('nitro', {
+        tag: 'SPEED BOOST',
+        title: 'NITROS +5 SEC',
+        icon: '/assets/nitro_bottle.png',
+        color: '#1bb1aa'
+      });
+    };
 
     // 8. Audio Synthesizer (Web Audio API)
     this.audio = new AudioSynth();
@@ -562,6 +570,15 @@ class GameApp {
     this.uiCamBtn = document.getElementById('btn-cam');
     this.uiMinimapPin = document.getElementById('minimap-target');
     this.uiMinimapVan = document.getElementById('minimap-player');
+
+    // Circular Collection HUD Device (Bag & Nitros)
+    this.uiCollectionDevice = document.getElementById('hud-collection-device');
+    this.uiCollectionIcon = document.getElementById('hud-device-icon');
+    this.uiCollectionTag = document.getElementById('hud-device-tag');
+    this.uiCollectionTitle = document.getElementById('hud-device-title');
+    this.uiCollectionTimerBar = document.getElementById('hud-device-timer-bar');
+    this.deviceTimeout = null;
+    this.deviceExitTimeout = null;
 
     if (this.uiCamBtn) {
       if (this.isMobile) {
@@ -1432,6 +1449,14 @@ class GameApp {
   }
 
   showDeliveryCelebration(result) {
+    // Show circular collection device with Bag icon (stays 5s or updates with latest item)
+    this.showCollectionPopup('bag', {
+      tag: 'BAG DELIVERED',
+      title: '+500 POINTS',
+      icon: '/assets/checkers_delivery_bag.png',
+      color: '#ffeb3b'
+    });
+
     const banner = document.getElementById('celebration-banner');
     if (banner) {
       const count = (result && typeof result.deliveredCount === 'number') ? result.deliveredCount : 1;
@@ -1447,6 +1472,46 @@ class GameApp {
       if (this.celebrationTimer) clearTimeout(this.celebrationTimer);
       this.celebrationTimer = setTimeout(() => banner.classList.remove('active'), 3000);
     }
+  }
+
+  showCollectionPopup(type, config) {
+    if (!this.uiCollectionDevice || !this.uiCollectionIcon) return;
+
+    // If an existing popup is active, immediately cancel previous timers to show latest item
+    if (this.deviceTimeout) clearTimeout(this.deviceTimeout);
+    if (this.deviceExitTimeout) clearTimeout(this.deviceExitTimeout);
+
+    // Apply configuration for latest collected item
+    this.uiCollectionIcon.src = config.icon;
+    if (this.uiCollectionTag) {
+      this.uiCollectionTag.textContent = config.tag;
+      this.uiCollectionTag.style.color = config.color;
+    }
+    if (this.uiCollectionTitle) {
+      this.uiCollectionTitle.textContent = config.title;
+    }
+    this.uiCollectionDevice.style.setProperty('--device-color', config.color);
+
+    // Re-trigger the pop-on entrance animation
+    this.uiCollectionDevice.classList.remove('active', 'exiting');
+    void this.uiCollectionDevice.offsetWidth; // Force CSS reflow
+    this.uiCollectionDevice.classList.add('active');
+
+    // Reset and trigger the 5.0s timer ring countdown animation
+    if (this.uiCollectionTimerBar) {
+      this.uiCollectionTimerBar.style.animation = 'none';
+      void this.uiCollectionTimerBar.offsetWidth;
+      this.uiCollectionTimerBar.style.animation = 'deviceTimerDrain 5.0s linear forwards';
+    }
+
+    // Stays visible for 5.0 seconds, then plays cool transition out
+    this.deviceTimeout = setTimeout(() => {
+      this.uiCollectionDevice.classList.remove('active');
+      this.uiCollectionDevice.classList.add('exiting');
+      this.deviceExitTimeout = setTimeout(() => {
+        this.uiCollectionDevice.classList.remove('exiting');
+      }, 450);
+    }, 5000);
   }
 
   updateMinimap(playerPos, playerRot, targetPos) {
@@ -1478,6 +1543,7 @@ class GameApp {
     const headingDeg = playerRot * (180 / Math.PI);
     this.uiMinimapVan.style.transform = `translate(-50%, -50%) rotate(${headingDeg}deg)`;
 
+    // Delivery Target
     if (targetPos) {
       const rawTx = centerX + targetPos.x * mapScale;
       const rawTy = centerY - targetPos.z * mapScale;
@@ -1488,6 +1554,36 @@ class GameApp {
       this.uiMinimapPin.style.display = 'block';
     } else {
       this.uiMinimapPin.style.display = 'none';
+    }
+
+    // Active Nitros on Map Locator
+    if (this.nitroSystem && this.nitroSystem.pickupItems) {
+      if (!this.minimapNitroBlips) {
+        this.minimapNitroBlips = [];
+      }
+      const items = this.nitroSystem.pickupItems;
+      while (this.minimapNitroBlips.length < items.length) {
+        const blip = document.createElement('div');
+        blip.className = 'minimap-nitro-blip';
+        container.appendChild(blip);
+        this.minimapNitroBlips.push(blip);
+      }
+
+      for (let i = 0; i < this.minimapNitroBlips.length; i++) {
+        const blip = this.minimapNitroBlips[i];
+        if (i < items.length && items[i] && items[i].active) {
+          const item = items[i];
+          const rawNx = centerX + item.basePos.x * mapScale;
+          const rawNy = centerY - item.basePos.z * mapScale;
+          const nx = Math.max(6, Math.min(w - 6, rawNx));
+          const ny = Math.max(6, Math.min(h - 6, rawNy));
+          blip.style.left = `${nx}px`;
+          blip.style.top = `${ny}px`;
+          blip.style.display = 'block';
+        } else {
+          blip.style.display = 'none';
+        }
+      }
     }
   }
 
