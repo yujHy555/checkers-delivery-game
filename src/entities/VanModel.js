@@ -30,7 +30,7 @@ export class VanModel {
 
     this.cargoBags = [];
     this.customBody = null;
-    this.fallbackBody = null;
+    this.isBodyLoaded = false;
     this.headlightsOn = false;
 
     this.buildModel();
@@ -207,52 +207,14 @@ export class VanModel {
       }
     }
 
-    // 6. Temporary fallback body for zero blank frames
-    this.createFallbackBody();
-
-    // 7. Load custom 3D Kei Van GLB model
+    // 6. Load custom 3D Kei Van GLB model (Pre-compiled into GPU before level begins)
     this.loadCustomModel();
 
-    // 8. Reactive Anime White Speed Lines (>= 70 km/h)
+    // 7. Reactive Anime White Speed Lines (>= 70 km/h)
     this.initAnimeSpeedLines();
 
-    // 9. Asphalt-Style Dual Rear Blue Exhaust Nitro Jets & Ground Flame Trails
+    // 8. Asphalt-Style Dual Rear Blue Exhaust Nitro Jets & Ground Flame Trails
     this.initNitroTrails();
-  }
-
-  createFallbackBody() {
-    this.fallbackBody = new TransformNode('FallbackBody', this.scene);
-    this.fallbackBody.parent = this.chassisGroup;
-
-    const bodyMat = new StandardMaterial('fallbackBodyMat', this.scene);
-    bodyMat.diffuseColor = new Color3(0.0, 0.70, 0.85); // cyan
-    bodyMat.specularColor = new Color3(0, 0, 0);
-    bodyMat.roughness = 0.9;
-
-    const greenMat = new StandardMaterial('fallbackGreenMat', this.scene);
-    greenMat.diffuseColor = new Color3(0.30, 0.72, 0.14); // green
-    greenMat.specularColor = new Color3(0, 0, 0);
-    greenMat.roughness = 0.9;
-
-    const lowerBox = MeshBuilder.CreateBox('fallbackLower', {
-      width: 1.80,
-      height: 0.70,
-      depth: 4.40
-    }, this.scene);
-    lowerBox.position.set(0, 0.40, 0.04);
-    lowerBox.material = bodyMat;
-    lowerBox.receiveShadows = false;
-    lowerBox.parent = this.fallbackBody;
-
-    const upperBox = MeshBuilder.CreateBox('fallbackUpper', {
-      width: 1.76,
-      height: 0.90,
-      depth: 4.30
-    }, this.scene);
-    upperBox.position.set(0, 1.15, -0.05);
-    upperBox.material = greenMat;
-    upperBox.receiveShadows = false;
-    upperBox.parent = this.fallbackBody;
   }
 
   async loadCustomModel() {
@@ -326,22 +288,26 @@ export class VanModel {
         }
       }
 
+      // Pre-compile all allowed Kei van body mesh shaders on the GPU before making the model available
+      const compilePromises = [];
+      for (const mesh of meshes) {
+        if (mesh.isEnabled() && mesh.material) {
+          compilePromises.push(mesh.material.forceCompilationAsync(mesh).catch(() => {}));
+        }
+      }
+      await Promise.all(compilePromises);
+
       rootNode.parent = this.chassisGroup;
       rootNode.position.set(0, -0.355, 0);
       this.customBody = rootNode;
+      this.isBodyLoaded = true;
 
-      // Dispose fallback body now that custom model is loaded
-      if (this.fallbackBody) {
-        this.fallbackBody.dispose();
-        this.fallbackBody = null;
-      }
-
-      console.log('✅ Custom 3D Kei Van Body loaded into Babylon.js scene!');
+      console.log('✅ Custom 3D Kei Van Body loaded & compiled into Babylon.js scene!');
       if (this.options && this.options.onLoaded) {
         this.options.onLoaded(rootNode);
       }
     } catch (err) {
-      console.warn('ℹ️ Could not load /models/checkers_van_body_01.glb, keeping fallback body:', err);
+      console.warn('ℹ️ Could not load /models/checkers_van_body_01.glb:', err);
       if (this.options && this.options.onError) {
         this.options.onError(err);
       }
@@ -594,41 +560,6 @@ export class VanModel {
     ringMat.opacityFresnelParameters.rightColor = new Color3(1.0, 1.0, 1.0);
     ringMat.opacityFresnelParameters.power = 1.8;
 
-    // 4. Ground Wash Neon Aura beneath van in #1bb1aa
-    const underglowDt = new DynamicTexture('nitroUnderglowTex', 256, this.scene, false);
-    const uCtx = underglowDt.getContext();
-    const grad = uCtx.createRadialGradient(128, 128, 15, 128, 128, 122);
-    grad.addColorStop(0, 'rgba(27, 177, 170, 0.95)');
-    grad.addColorStop(0.35, 'rgba(27, 177, 170, 0.65)');
-    grad.addColorStop(0.70, 'rgba(27, 177, 170, 0.25)');
-    grad.addColorStop(1.0, 'rgba(27, 177, 170, 0.0)');
-    uCtx.fillStyle = grad;
-    uCtx.fillRect(0, 0, 256, 256);
-    underglowDt.hasAlpha = true;
-    underglowDt.update();
-
-    const underglowMat = new StandardMaterial('nitroUnderglowMat', this.scene);
-    underglowMat.diffuseTexture = underglowDt;
-    underglowMat.emissiveTexture = underglowDt;
-    underglowMat.diffuseColor = Color3.FromHexString('#1bb1aa');
-    underglowMat.emissiveColor = Color3.FromHexString('#1bb1aa');
-    underglowMat.alphaMode = Engine.ALPHA_ADD;
-    underglowMat.disableLighting = true;
-    underglowMat.backFaceCulling = false;
-    underglowMat.disableDepthWrite = true;
-
-    this.underglowPlane = MeshBuilder.CreatePlane('nitroUnderglowPlane', {
-      width: 2.9,
-      height: 4.9
-    }, this.scene);
-    this.underglowPlane.rotation.x = Math.PI / 2;
-    this.underglowPlane.position.set(0, -0.32, 0);
-    this.underglowPlane.material = underglowMat;
-    this.underglowPlane.isPickable = false;
-    this.underglowPlane.receiveShadows = false;
-    this.underglowPlane.parent = this.nitroTrailsGroup;
-    this.underglowMat = underglowMat;
-
     this.nitroJets = [];
     const nozzleOffsets = [-exhaustX, exhaustX];
 
@@ -782,13 +713,6 @@ export class VanModel {
         r.scaling.set(pulse, pulse, pulse);
         r.position.z = jet.baseZ - 0.20 - d * 0.28 - (flicker1 * 0.025);
       }
-    }
-
-    // Pulse animated neon turquoise underglow pool (#1bb1aa)
-    if (this.underglowPlane && this.underglowMat) {
-      const pulse = 1.0 + Math.sin(t * 6.5) * 0.08;
-      this.underglowPlane.scaling.set(pulse, 1.0, pulse);
-      this.underglowMat.alpha = 0.70 + Math.sin(t * 8.0) * 0.22;
     }
   }
 

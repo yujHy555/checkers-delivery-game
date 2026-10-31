@@ -402,7 +402,7 @@ class GameApp {
       }
     }, 200);
 
-    // Safety timeout: transition smoothly into the game if network pauses or takes > 6s
+    // Safety timeout: transition smoothly into the game if network pauses or takes > 90s
     this.safetyTimeout = setTimeout(() => {
       if (!this.preloaderDismissed) {
         console.log('ℹ️ Preloader safety fallback activated - proceeding to game');
@@ -410,7 +410,7 @@ class GameApp {
         this.allHdrsReady = true;
         this.tryFinishPreloader();
       }
-    }, 6000);
+    }, 90000);
   }
 
   onVanProgress(xhr) {
@@ -433,7 +433,7 @@ class GameApp {
 
   tryFinishPreloader() {
     if (this.preloaderDismissed) return;
-    if (!this.modelLoaded) return;
+    if (!this.modelLoaded || (this.vanModel && !this.vanModel.isBodyLoaded)) return;
     if (!this.allHdrsReady || !this.levelGroundsReady) {
       this.updatePreloaderUI(98, 'Pre-compiling Level Grounds & HDRIs...');
       return;
@@ -685,6 +685,10 @@ class GameApp {
     this.initProvingGroundUI();
 
     const startDriving = (mode = 'career') => {
+      if (!this.modelLoaded || (this.vanModel && !this.vanModel.isBodyLoaded)) {
+        this.showToast('Loading Delivery Van Body... Please wait.');
+        return;
+      }
       console.log('🏁 Starting game in mode:', mode);
       this.inMainMenu = false;
       if (mainMenu) {
