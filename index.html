@@ -659,15 +659,16 @@
       justify-content: center;
       align-items: center;
       gap: clamp(6px, 0.55vw, 12px);
-      max-width: 96vw;
+      max-width: calc(100vw - 32px);
       z-index: 10;
       pointer-events: auto;
     }
 
-    /* On Ultra-wide monitors (>= 2100px or aspect >= 2:1), shift left to 28% to frame the garage van */
-    @media (min-width: 2100px), (min-aspect-ratio: 2/1) {
+    /* On true Ultra-wide monitors (>= 2400px wide AND aspect >= 2.05:1, e.g. 2560x1080 or 3440x1440),
+       shift to 32% (moved right a bit from 28%) to comfortably frame the garage van with generous left clearance */
+    @media (min-width: 2400px) and (min-aspect-ratio: 205/100) {
       .menu-buttons-cluster {
-        left: 28%;
+        left: 32%;
         transform: translateX(-50%);
       }
     }
