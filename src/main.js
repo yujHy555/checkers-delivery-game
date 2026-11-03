@@ -779,6 +779,24 @@ class GameApp {
     if (btnMenuFreeroam) btnMenuFreeroam.addEventListener('click', () => startDriving('freeroam'));
     if (btnMenuProving) btnMenuProving.addEventListener('click', () => startDriving('proving_ground'));
 
+    const openCityBuilder = () => {
+      this.showToast('Opening Low Poly City Builder (lowpolycitybuilder.vercel.app)...');
+      window.open('https://lowpolycitybuilder.vercel.app', '_blank', 'noopener,noreferrer');
+    };
+
+    const btnMenuCityBuilder = document.getElementById('btn-menu-citybuilder');
+    if (btnMenuCityBuilder) {
+      btnMenuCityBuilder.addEventListener('click', openCityBuilder);
+    }
+    const btnTopCityBuilder = document.getElementById('btn-top-citybuilder');
+    if (btnTopCityBuilder) {
+      btnTopCityBuilder.addEventListener('click', openCityBuilder);
+    }
+    const btnOptCityBuilder = document.getElementById('btn-opt-citybuilder');
+    if (btnOptCityBuilder) {
+      btnOptCityBuilder.addEventListener('click', openCityBuilder);
+    }
+
     if (btnMenuGarage) {
       btnMenuGarage.addEventListener('click', () => {
         if (garageModal) {
